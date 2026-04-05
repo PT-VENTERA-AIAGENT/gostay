@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { User, Calendar, MessageSquare, Search } from "lucide-react";
+import ChatWidget from "@/components/portal/ChatWidget";
 
 const portalNav = [
   { label: "Home", path: "/portal", icon: Search },
@@ -57,9 +58,49 @@ export default function PortalLayout() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-card border-t border-border px-8 py-6 text-center text-sm text-muted-foreground">
-        © 2026 BookMe Hotel. All rights reserved.
+      <footer className="bg-card border-t border-border px-8 py-8">
+        <div className="max-w-6xl mx-auto grid grid-cols-4 gap-8">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-xs">B</span>
+              </div>
+              <span className="font-bold text-foreground">BookMe</span>
+            </div>
+            <p className="text-sm text-muted-foreground">Your perfect stay awaits. Book directly for the best rates and exclusive perks.</p>
+          </div>
+          <div>
+            <h4 className="font-semibold text-foreground text-sm mb-3">Quick Links</h4>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <Link to="/portal" className="block hover:text-foreground transition-colors">Home</Link>
+              <Link to="/portal/my-account" className="block hover:text-foreground transition-colors">My Bookings</Link>
+              <Link to="/portal/chat" className="block hover:text-foreground transition-colors">Contact Us</Link>
+            </div>
+          </div>
+          <div>
+            <h4 className="font-semibold text-foreground text-sm mb-3">Contact</h4>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>+62 21 1234 5678</p>
+              <p>info@bookme.id</p>
+              <p>Jl. Hotel No. 1, Jakarta</p>
+            </div>
+          </div>
+          <div>
+            <h4 className="font-semibold text-foreground text-sm mb-3">Policies</h4>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p className="hover:text-foreground transition-colors cursor-pointer">Privacy Policy</p>
+              <p className="hover:text-foreground transition-colors cursor-pointer">Terms of Service</p>
+              <p className="hover:text-foreground transition-colors cursor-pointer">Cancellation Policy</p>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
+          © 2026 BookMe Hotel. All rights reserved.
+        </div>
       </footer>
+
+      {/* Chat Widget */}
+      <ChatWidget />
     </div>
   );
 }
