@@ -1,28 +1,38 @@
 import {
-  LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare, Sparkles,
-  Package, CalendarDays, DollarSign, Star, ConciergeBell, ChevronDown
+  LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
+  Package, CalendarDays, DollarSign, Star, ConciergeBell, ChevronDown,
+  Phone, Users, BarChart3
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", active: true },
-  { icon: CalendarCheck, label: "Reservation" },
-  { icon: DoorOpen, label: "Rooms" },
-  { icon: MessageSquare, label: "Messages", badge: 7 },
-  { icon: Sparkles, label: "Housekeeping" },
-  { icon: Package, label: "Inventory" },
-  { icon: CalendarDays, label: "Calendar" },
-  { icon: DollarSign, label: "Financials", hasSubmenu: true },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: CalendarCheck, label: "Reservations", path: "/bookings" },
+  { icon: DoorOpen, label: "Rooms", path: "/rooms" },
+  { icon: MessageSquare, label: "Messages", path: "/chat", badge: 7 },
+  { icon: Phone, label: "Call Logs", path: "/calls" },
+  { icon: Package, label: "Inventory", path: "/inventory" },
+  { icon: CalendarDays, label: "Calendar", path: "/bookings?view=calendar" },
+  { icon: DollarSign, label: "Financials", path: "/analytics", hasSubmenu: true },
 ];
 
 const bottomItems = [
-  { icon: Star, label: "Reviews" },
-  { icon: ConciergeBell, label: "Concierge" },
+  { icon: Users, label: "User Management", path: "/users" },
+  { icon: Star, label: "Reviews", path: "/reviews" },
+  { icon: ConciergeBell, label: "Concierge", path: "/concierge" },
 ];
 
 export default function AppSidebar() {
+  const { pathname } = useLocation();
+
+  const isActive = (path: string) => {
+    if (path === "/") return pathname === "/";
+    return pathname.startsWith(path.split("?")[0]);
+  };
+
   return (
-    <aside className="flex flex-col w-56 min-h-screen bg-card border-r border-sidebar-border px-3 py-6">
+    <aside className="flex flex-col w-56 min-h-screen bg-card border-r border-sidebar-border px-3 py-6 shrink-0">
       <div className="flex items-center gap-2 px-3 mb-8">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
           <span className="text-primary-foreground font-bold text-sm">B</span>
@@ -32,11 +42,12 @@ export default function AppSidebar() {
 
       <nav className="flex-1 flex flex-col gap-1">
         {navItems.map((item) => (
-          <button
+          <Link
             key={item.label}
+            to={item.path}
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              item.active
+              isActive(item.path)
                 ? "bg-primary text-primary-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             )}
@@ -49,19 +60,25 @@ export default function AppSidebar() {
               </span>
             )}
             {item.hasSubmenu && <ChevronDown className="w-4 h-4" />}
-          </button>
+          </Link>
         ))}
       </nav>
 
       <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-sidebar-border">
         {bottomItems.map((item) => (
-          <button
+          <Link
             key={item.label}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            to={item.path}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+              isActive(item.path)
+                ? "bg-primary text-primary-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            )}
           >
             <item.icon className="w-5 h-5" />
             <span>{item.label}</span>
-          </button>
+          </Link>
         ))}
       </div>
     </aside>
