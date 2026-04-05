@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { Plus, Search, Filter, Download, Calendar, List, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { motion } from "framer-motion";
+import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import BookingCalendar from "@/components/bookings/BookingCalendar";
 
 const bookings = [
@@ -56,116 +58,126 @@ export default function Bookings() {
   });
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Reservations</h1>
-          <p className="text-sm text-muted-foreground mt-1">{bookings.length} total bookings</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
-            <Download className="w-4 h-4" /> Export CSV
-          </button>
-          <Link to="/bookings/new" className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
-            <Plus className="w-4 h-4" /> New Booking
-          </Link>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2.5 w-80">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by guest, reference, room..."
-              className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full"
-            />
+    <PageTransition>
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">Reservations</h1>
+            <p className="text-sm text-muted-foreground mt-1">{bookings.length} total bookings</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
-            <Filter className="w-4 h-4" /> Filter
-          </button>
-        </div>
-        <div className="flex items-center bg-muted rounded-lg p-1">
-          <button onClick={() => setView("list")} className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5", view === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
-            <List className="w-4 h-4" /> List
-          </button>
-          <button onClick={() => setView("calendar")} className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5", view === "calendar" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
-            <Calendar className="w-4 h-4" /> Calendar
-          </button>
-        </div>
-      </div>
-
-      {view === "list" ? (
-        <>
-          {/* Status tabs */}
-          <div className="flex items-center gap-1 border-b border-border">
-            {statusTabs.map((tab) => {
-              const count = tab.key === "all" ? bookings.length : bookings.filter((b) => b.status === tab.key).length;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={cn(
-                    "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
-                    activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {tab.label} <span className="text-xs ml-1 opacity-60">({count})</span>
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-2 md:gap-3">
+            <button className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
+              <Download className="w-4 h-4" /> <span className="hidden md:inline">Export CSV</span>
+            </button>
+            <Link to="/bookings/new" className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Booking</span>
+            </Link>
           </div>
+        </div>
 
-          <div className="bg-card rounded-xl border border-border overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="text-left px-4 py-3 font-medium">Reference</th>
-                  <th className="text-left px-4 py-3 font-medium">Guest</th>
-                  <th className="text-left px-4 py-3 font-medium">Room</th>
-                  <th className="text-left px-4 py-3 font-medium">Check-in</th>
-                  <th className="text-left px-4 py-3 font-medium">Check-out</th>
-                  <th className="text-left px-4 py-3 font-medium">Status</th>
-                  <th className="text-left px-4 py-3 font-medium">Total</th>
-                  <th className="text-left px-4 py-3 font-medium">Source</th>
-                  <th className="text-left px-4 py-3 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((b) => {
-                  const sc = statusConfig[b.status];
-                  return (
-                    <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
-                      <td className="px-4 py-3 text-sm font-mono font-medium text-primary">{b.reference}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-foreground">{b.guest}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{b.room} · {b.roomType}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{b.checkIn}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{b.checkOut}</td>
-                      <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", sc.cls)}>{sc.label}</span></td>
-                      <td className="px-4 py-3 text-sm font-medium text-foreground">{formatIDR(b.total)}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{b.source.replace("_", " ")}</td>
-                      <td className="px-4 py-3">
-                        <Link to={`/bookings/${b.id}`} className="text-muted-foreground hover:text-foreground transition-colors">
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">No bookings found</td>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 md:gap-3 flex-1">
+            <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 sm:max-w-sm">
+              <Search className="w-4 h-4 text-muted-foreground" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search guest, ref, room..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
+            </div>
+            <button className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
+              <Filter className="w-4 h-4" /> Filter
+            </button>
+          </div>
+          <div className="flex items-center bg-muted rounded-lg p-1 self-start">
+            <button onClick={() => setView("list")} className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5", view === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
+              <List className="w-4 h-4" /> List
+            </button>
+            <button onClick={() => setView("calendar")} className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5", view === "calendar" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
+              <Calendar className="w-4 h-4" /> Calendar
+            </button>
+          </div>
+        </div>
+
+        {view === "list" ? (
+          <>
+            <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
+              {statusTabs.map((tab) => {
+                const count = tab.key === "all" ? bookings.length : bookings.filter((b) => b.status === tab.key).length;
+                return (
+                  <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-3 md:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap", activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
+                    {tab.label} <span className="text-xs ml-1 opacity-60">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border text-xs text-muted-foreground">
+                    <th className="text-left px-4 py-3 font-medium">Reference</th>
+                    <th className="text-left px-4 py-3 font-medium">Guest</th>
+                    <th className="text-left px-4 py-3 font-medium">Room</th>
+                    <th className="text-left px-4 py-3 font-medium">Check-in</th>
+                    <th className="text-left px-4 py-3 font-medium">Check-out</th>
+                    <th className="text-left px-4 py-3 font-medium">Status</th>
+                    <th className="text-left px-4 py-3 font-medium">Total</th>
+                    <th className="text-left px-4 py-3 font-medium">Source</th>
+                    <th className="text-left px-4 py-3 font-medium"></th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : (
-        <BookingCalendar />
-      )}
-    </div>
+                </thead>
+                <motion.tbody variants={staggerContainer} initial="hidden" animate="show">
+                  {filtered.map((b) => {
+                    const sc = statusConfig[b.status];
+                    return (
+                      <motion.tr key={b.id} variants={staggerItem} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-3 text-sm font-mono font-medium text-primary">{b.reference}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-foreground">{b.guest}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.room} · {b.roomType}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.checkIn}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.checkOut}</td>
+                        <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", sc.cls)}>{sc.label}</span></td>
+                        <td className="px-4 py-3 text-sm font-medium text-foreground">{formatIDR(b.total)}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{b.source.replace("_", " ")}</td>
+                        <td className="px-4 py-3"><Link to={`/bookings/${b.id}`} className="text-muted-foreground hover:text-foreground transition-colors"><Eye className="w-4 h-4" /></Link></td>
+                      </motion.tr>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <tr><td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">No bookings found</td></tr>
+                  )}
+                </motion.tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <motion.div variants={staggerContainer} initial="hidden" animate="show" className="md:hidden space-y-3">
+              {filtered.map((b) => {
+                const sc = statusConfig[b.status];
+                return (
+                  <motion.div key={b.id} variants={staggerItem}>
+                    <Link to={`/bookings/${b.id}`} className="block bg-card rounded-xl border border-border p-4 hover:shadow-sm transition-shadow">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{b.guest}</p>
+                          <p className="text-xs font-mono text-primary">{b.reference}</p>
+                        </div>
+                        <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", sc.cls)}>{sc.label}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{b.room} · {b.roomType}</span>
+                        <span>{b.checkIn} → {b.checkOut}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-foreground mt-2">{formatIDR(b.total)}</p>
+                    </Link>
+                  </motion.div>
+                );
+              })}
+              {filtered.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No bookings found</p>}
+            </motion.div>
+          </>
+        ) : (
+          <BookingCalendar />
+        )}
+      </div>
+    </PageTransition>
   );
 }
