@@ -47,16 +47,19 @@ export function CardSkeleton() {
   );
 }
 
+// Fixed heights to avoid re-render flickering from Math.random() in JSX
+const CHART_BAR_HEIGHTS = [72, 55, 88, 45, 68, 90, 52];
+
 export function ChartSkeleton() {
   return (
     <div className="bg-card rounded-xl border border-border p-4 md:p-5">
       <Skeleton className="h-5 w-32 mb-4" />
       <div className="flex items-end gap-2 h-[200px]">
-        {Array.from({ length: 7 }).map((_, i) => (
+        {CHART_BAR_HEIGHTS.map((h, i) => (
           <Skeleton
             key={i}
             className="flex-1 rounded-t"
-            style={{ height: `${30 + Math.random() * 60}%` }}
+            style={{ height: `${h}%` }}
           />
         ))}
       </div>

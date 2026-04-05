@@ -5,17 +5,18 @@ export function useAnimatedCounter(target: number, duration: number = 1200) {
 
   useEffect(() => {
     if (target === 0) { setCount(0); return; }
-    let start = 0;
     const startTime = performance.now();
+    let rafId: number;
     const step = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
       // Ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setCount(Math.round(eased * target));
-      if (progress < 1) requestAnimationFrame(step);
+      if (progress < 1) { rafId = requestAnimationFrame(step); }
     };
-    requestAnimationFrame(step);
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
   }, [target, duration]);
 
   return count;

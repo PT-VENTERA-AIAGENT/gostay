@@ -72,7 +72,7 @@ export default function BookingList() {
                   </span>
                 </td>
                 <td className="py-3">
-                  <Link to="/bookings/1" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
+                  <Link to={`/bookings/${b.id}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
                     <Eye className="w-4 h-4" />
                   </Link>
                 </td>
@@ -86,7 +86,7 @@ export default function BookingList() {
       <motion.div variants={staggerContainer} initial="hidden" animate="show" className="md:hidden space-y-3">
         {bookings.map((b) => (
           <motion.div key={b.id} variants={staggerItem}>
-            <Link to="/bookings/1" className="block bg-muted/30 rounded-xl p-4 hover:bg-muted/50 transition-colors">
+            <Link to={`/bookings/${b.id}`} className="block bg-muted/30 rounded-xl p-4 hover:bg-muted/50 transition-colors">
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <p className="text-sm font-semibold text-foreground">{b.guest}</p>
