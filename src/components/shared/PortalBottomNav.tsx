@@ -13,8 +13,8 @@ export default function PortalBottomNav() {
   const { pathname } = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 md:hidden">
-      <div className="flex items-center justify-around py-2 px-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border z-40 md:hidden safe-area-bottom">
+      <div className="flex items-center justify-around py-1.5 px-2">
         {nav.map((item) => {
           const active = item.path === "/portal" ? pathname === "/portal" : pathname.startsWith(item.path);
           return (
@@ -22,7 +22,7 @@ export default function PortalBottomNav() {
               key={item.label}
               to={item.path}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-colors min-w-[56px]",
+                "flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-[10px] font-medium transition-colors min-w-[56px] touch-target active:scale-95",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >

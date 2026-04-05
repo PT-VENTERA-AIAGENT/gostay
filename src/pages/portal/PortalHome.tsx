@@ -57,7 +57,7 @@ export default function PortalHome() {
               { icon: Clock, title: "Instant Confirmation", desc: "Get your booking confirmed immediately" },
               { icon: Phone, title: "24/7 Support", desc: "Our team is always here to help you" },
             ].map((item) => (
-              <motion.div key={item.title} variants={staggerItem} whileHover={{ y: -4 }} className="text-center p-4">
+              <motion.div key={item.title} variants={staggerItem} whileHover={{ y: -4, transition: { duration: 0.2 } }} className="text-center p-4 rounded-xl hover:bg-card hover:shadow-sm transition-all cursor-default">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3"><item.icon className="w-6 h-6 text-primary" /></div>
                 <h3 className="font-semibold text-foreground text-sm mb-1">{item.title}</h3>
                 <p className="text-xs text-muted-foreground">{item.desc}</p>

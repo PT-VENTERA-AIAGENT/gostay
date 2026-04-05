@@ -1,19 +1,30 @@
 import { Link } from "react-router-dom";
 import { Mail, Lock, User, Phone, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function Register() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="w-full max-w-md"
+      >
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4">
+          <motion.div
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+            className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4"
+          >
             <span className="text-primary-foreground font-bold text-xl">B</span>
-          </div>
+          </motion.div>
           <h1 className="text-2xl font-bold text-foreground">Create an account</h1>
           <p className="text-muted-foreground mt-1">Join BookMe to book your perfect stay</p>
         </div>
 
-        <div className="bg-card rounded-2xl border border-border p-8 shadow-sm">
+        <div className="bg-card rounded-2xl border border-border p-6 md:p-8 shadow-sm">
           <form className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -53,9 +64,13 @@ export default function Register() {
               </div>
             </div>
 
-            <button type="button" className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.98 }}
+              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 touch-target"
+            >
               Create Account <ArrowRight className="w-4 h-4" />
-            </button>
+            </motion.button>
           </form>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
@@ -63,7 +78,7 @@ export default function Register() {
             <Link to="/login" className="text-primary font-medium hover:underline">Sign in</Link>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

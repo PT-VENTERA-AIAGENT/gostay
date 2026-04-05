@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-import { Search, Filter, Plus, Settings } from "lucide-react";
+import { Search, Plus, Settings, DoorOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
+import { useAnimatedCounter } from "@/hooks/use-animated-counter";
 
 type RoomStatus = "available" | "occupied" | "checked_in" | "out_of_service" | "reserved";
 
@@ -32,13 +33,18 @@ const rooms: { id: string; number: string; floor: number; type: string; status: 
 
 const statusConfig: Record<RoomStatus, { label: string; colorClass: string; dotClass: string }> = {
   available: { label: "Available", colorClass: "bg-secondary text-secondary-foreground", dotClass: "bg-success" },
-  occupied: { label: "Occupied", colorClass: "bg-info/10 text-info", dotClass: "bg-info" },
-  checked_in: { label: "Checked In", colorClass: "bg-primary/10 text-primary", dotClass: "bg-primary" },
-  reserved: { label: "Reserved", colorClass: "bg-warning/10 text-warning", dotClass: "bg-warning" },
-  out_of_service: { label: "Out of Service", colorClass: "bg-destructive/10 text-destructive", dotClass: "bg-destructive" },
+  occupied: { label: "Occupied", colorClass: "badge-info", dotClass: "bg-info" },
+  checked_in: { label: "Checked In", colorClass: "badge-primary", dotClass: "bg-primary" },
+  reserved: { label: "Reserved", colorClass: "badge-warning", dotClass: "bg-warning" },
+  out_of_service: { label: "Out of Service", colorClass: "badge-destructive", dotClass: "bg-destructive" },
 };
 
 const roomTypes = ["All", "Standard", "Deluxe", "Suite", "Family", "Presidential"];
+
+function AnimatedCount({ value }: { value: number }) {
+  const animated = useAnimatedCounter(value, 800);
+  return <>{animated}</>;
+}
 
 export default function Rooms() {
   const [search, setSearch] = useState("");
@@ -63,10 +69,10 @@ export default function Rooms() {
             <p className="text-sm text-muted-foreground mt-1">{rooms.length} total rooms · {rooms.filter((r) => r.status === "available").length} available</p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
-            <Link to="/rooms/types" className="px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2">
+            <Link to="/rooms/types" className="px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2 btn-press">
               <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Room Types</span>
             </Link>
-            <button className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
+            <button className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Room</span>
             </button>
           </div>
@@ -81,28 +87,28 @@ export default function Rooms() {
                 key={key}
                 variants={staggerItem}
                 whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => setStatusFilter(isActive ? "all" : key)}
-                className={cn("bg-card rounded-xl border p-3 md:p-4 text-left transition-all hover:shadow-sm", isActive ? "border-primary ring-1 ring-primary/30" : "border-border")}
+                className={cn("bg-card rounded-xl border p-3 md:p-4 text-left transition-all card-hover", isActive ? "border-primary ring-1 ring-primary/30" : "border-border")}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className={cn("w-2.5 h-2.5 rounded-full", config.dotClass)} />
                   <span className="text-xs font-medium text-muted-foreground">{config.label}</span>
                 </div>
-                <p className="text-xl md:text-2xl font-bold text-foreground">{count}</p>
+                <p className="text-xl md:text-2xl font-bold text-foreground tabular-nums"><AnimatedCount value={count} /></p>
               </motion.button>
             );
           })}
         </motion.div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 w-full sm:max-w-sm">
+          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 w-full sm:max-w-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background transition-shadow">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search room or guest..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
           </div>
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1 overflow-x-auto">
             {roomTypes.map((t) => (
-              <button key={t} onClick={() => setTypeFilter(t)} className={cn("px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", typeFilter === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+              <button key={t} onClick={() => setTypeFilter(t)} className={cn("px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap touch-target btn-press", typeFilter === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
                 {t}
               </button>
             ))}
@@ -120,6 +126,7 @@ export default function Rooms() {
                     key={room.id}
                     variants={staggerItem}
                     whileHover={{ scale: 1.03, y: -3 }}
+                    whileTap={{ scale: 0.98 }}
                     className="bg-card rounded-xl border border-border p-3 md:p-4 hover:shadow-md transition-shadow cursor-pointer"
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -140,7 +147,14 @@ export default function Rooms() {
             </motion.div>
           </div>
         ))}
-        {floors.length === 0 && <div className="text-center py-12 text-sm text-muted-foreground">No rooms match your filters</div>}
+        {floors.length === 0 && (
+          <div className="text-center py-16">
+            <DoorOpen className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground mb-1">No rooms match your filters</p>
+            <p className="text-xs text-muted-foreground mb-4">Try adjusting your search or filter criteria</p>
+            <button onClick={() => { setSearch(""); setStatusFilter("all"); setTypeFilter("All"); }} className="text-sm text-primary font-medium hover:underline">Clear filters</button>
+          </div>
+        )}
       </div>
     </PageTransition>
   );

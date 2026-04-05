@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { User, Calendar, MessageSquare, Search, Menu, X } from "lucide-react";
 import ChatWidget from "@/components/portal/ChatWidget";
 import PortalBottomNav from "@/components/shared/PortalBottomNav";
+import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,7 +21,7 @@ export default function PortalLayout() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="bg-card border-b border-border px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
+      <header className="bg-card border-b border-border px-4 md:px-8 py-3 md:py-4 flex items-center justify-between sticky top-0 z-30 backdrop-blur-sm bg-card/95">
         <Link to="/portal" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-sm">B</span>
@@ -29,31 +30,35 @@ export default function PortalLayout() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
-          {portalNav.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                pathname === item.path || (item.path !== "/portal" && pathname.startsWith(item.path))
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </Link>
-          ))}
+          {portalNav.map((item) => {
+            const active = pathname === item.path || (item.path !== "/portal" && pathname.startsWith(item.path));
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  "relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors btn-press",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className="w-4 h-4" />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2 md:gap-3">
+          <ThemeToggle />
           <Link to="/login" className="hidden md:inline text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Sign In
           </Link>
-          <Link to="/register" className="hidden sm:inline text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity">
+          <Link to="/register" className="hidden sm:inline text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity btn-press">
             Register
           </Link>
-          <button className="md:hidden w-9 h-9 flex items-center justify-center text-muted-foreground" onClick={() => setMobileMenu(!mobileMenu)}>
+          <button className="md:hidden w-9 h-9 flex items-center justify-center text-muted-foreground touch-target" onClick={() => setMobileMenu(!mobileMenu)}>
             {mobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
@@ -66,7 +71,8 @@ export default function PortalLayout() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="md:hidden bg-card border-b border-border overflow-hidden"
+            transition={{ duration: 0.2 }}
+            className="md:hidden bg-card border-b border-border overflow-hidden z-20"
           >
             <div className="px-4 py-3 space-y-1">
               {portalNav.map((item) => (
@@ -75,7 +81,7 @@ export default function PortalLayout() {
                   to={item.path}
                   onClick={() => setMobileMenu(false)}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors touch-target",
                     pathname === item.path ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                   )}
                 >
@@ -84,8 +90,8 @@ export default function PortalLayout() {
                 </Link>
               ))}
               <div className="flex gap-2 pt-2 border-t border-border">
-                <Link to="/login" className="flex-1 text-center text-sm font-medium text-muted-foreground py-2 rounded-lg hover:bg-muted" onClick={() => setMobileMenu(false)}>Sign In</Link>
-                <Link to="/register" className="flex-1 text-center text-sm font-medium bg-primary text-primary-foreground py-2 rounded-lg" onClick={() => setMobileMenu(false)}>Register</Link>
+                <Link to="/login" className="flex-1 text-center text-sm font-medium text-muted-foreground py-2.5 rounded-lg hover:bg-muted touch-target" onClick={() => setMobileMenu(false)}>Sign In</Link>
+                <Link to="/register" className="flex-1 text-center text-sm font-medium bg-primary text-primary-foreground py-2.5 rounded-lg touch-target" onClick={() => setMobileMenu(false)}>Register</Link>
               </div>
             </div>
           </motion.div>
@@ -94,7 +100,17 @@ export default function PortalLayout() {
 
       {/* Main */}
       <main className="flex-1 pb-16 md:pb-0">
-        <Outlet />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Footer */}
@@ -135,7 +151,7 @@ export default function PortalLayout() {
           </div>
         </div>
         <div className="max-w-6xl mx-auto mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
-          © 2026 BookMe Hotel. All rights reserved.
+          &copy; 2026 BookMe Hotel. All rights reserved.
         </div>
       </footer>
 

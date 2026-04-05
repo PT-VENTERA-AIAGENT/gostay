@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle, LogIn, LogOut, XCircle, AlertTriangle, Clock, F
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
+import CopyButton from "@/components/shared/CopyButton";
 
 const booking = {
   reference: "BK-20260401-A1B2",
@@ -47,7 +48,10 @@ export default function BookingDetail() {
           </Link>
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl md:text-2xl font-bold text-foreground">{booking.reference}</h1>
+              <div className="flex items-center gap-1">
+                <h1 className="text-xl md:text-2xl font-bold text-foreground">{booking.reference}</h1>
+                <CopyButton text={booking.reference} />
+              </div>
               <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", sc.cls)}>{sc.label}</span>
             </div>
             <p className="text-sm text-muted-foreground">Booking for {booking.guest.name}</p>
