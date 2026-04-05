@@ -31,6 +31,8 @@ import BookingReview from "./pages/portal/BookingReview";
 import BookingConfirmation from "./pages/portal/BookingConfirmation";
 import MyAccount from "./pages/portal/MyAccount";
 import PortalBookingDetail from "./pages/portal/PortalBookingDetail";
+import PortalProfile from "./pages/portal/PortalProfile";
+import PortalChat from "./pages/portal/PortalChat";
 
 import NotFound from "./pages/NotFound";
 
@@ -73,6 +75,8 @@ const App = () => (
             <Route path="book/confirmation" element={<BookingConfirmation />} />
             <Route path="my-account" element={<MyAccount />} />
             <Route path="my-account/bookings/:id" element={<PortalBookingDetail />} />
+            <Route path="profile" element={<PortalProfile />} />
+            <Route path="chat" element={<PortalChat />} />
           </Route>
 
           {/* Catch-all */}
