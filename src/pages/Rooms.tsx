@@ -2,6 +2,8 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { Search, Filter, Plus, Settings } from "lucide-react";
+import { motion } from "framer-motion";
+import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 
 type RoomStatus = "available" | "occupied" | "checked_in" | "out_of_service" | "reserved";
 
@@ -53,106 +55,93 @@ export default function Rooms() {
   const floors = [...new Set(filtered.map((r) => r.floor))].sort();
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Room Status Board</h1>
-          <p className="text-sm text-muted-foreground mt-1">{rooms.length} total rooms · {rooms.filter((r) => r.status === "available").length} available</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link to="/rooms/types" className="px-4 py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2">
-            <Settings className="w-4 h-4" /> Room Types
-          </Link>
-          <button className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Room
-          </button>
-        </div>
-      </div>
-
-      {/* Status summary cards */}
-      <div className="grid grid-cols-5 gap-3">
-        {(Object.entries(statusConfig) as [RoomStatus, typeof statusConfig[RoomStatus]][]).map(([key, config]) => {
-          const count = rooms.filter((r) => r.status === key).length;
-          const isActive = statusFilter === key;
-          return (
-            <button
-              key={key}
-              onClick={() => setStatusFilter(isActive ? "all" : key)}
-              className={cn(
-                "bg-card rounded-xl border p-4 text-left transition-all hover:shadow-sm",
-                isActive ? "border-primary ring-1 ring-primary/30" : "border-border"
-              )}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <span className={cn("w-2.5 h-2.5 rounded-full", config.dotClass)} />
-                <span className="text-xs font-medium text-muted-foreground">{config.label}</span>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{count}</p>
+    <PageTransition>
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">Room Status Board</h1>
+            <p className="text-sm text-muted-foreground mt-1">{rooms.length} total rooms · {rooms.filter((r) => r.status === "available").length} available</p>
+          </div>
+          <div className="flex items-center gap-2 md:gap-3">
+            <Link to="/rooms/types" className="px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2">
+              <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Room Types</span>
+            </Link>
+            <button className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Room</span>
             </button>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2.5 flex-1 max-w-sm">
-          <Search className="w-4 h-4 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search room number or guest..."
-            className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full"
-          />
+          </div>
         </div>
-        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-          {roomTypes.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTypeFilter(t)}
-              className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-colors", typeFilter === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      {/* Room grid by floor */}
-      {floors.map((floor) => (
-        <div key={floor}>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3">Floor {floor}</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {filtered
-              .filter((r) => r.floor === floor)
-              .map((room) => {
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {(Object.entries(statusConfig) as [RoomStatus, typeof statusConfig[RoomStatus]][]).map(([key, config]) => {
+            const count = rooms.filter((r) => r.status === key).length;
+            const isActive = statusFilter === key;
+            return (
+              <motion.button
+                key={key}
+                variants={staggerItem}
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setStatusFilter(isActive ? "all" : key)}
+                className={cn("bg-card rounded-xl border p-3 md:p-4 text-left transition-all hover:shadow-sm", isActive ? "border-primary ring-1 ring-primary/30" : "border-border")}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={cn("w-2.5 h-2.5 rounded-full", config.dotClass)} />
+                  <span className="text-xs font-medium text-muted-foreground">{config.label}</span>
+                </div>
+                <p className="text-xl md:text-2xl font-bold text-foreground">{count}</p>
+              </motion.button>
+            );
+          })}
+        </motion.div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 w-full sm:max-w-sm">
+            <Search className="w-4 h-4 text-muted-foreground" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search room or guest..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
+          </div>
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1 overflow-x-auto">
+            {roomTypes.map((t) => (
+              <button key={t} onClick={() => setTypeFilter(t)} className={cn("px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap", typeFilter === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {floors.map((floor) => (
+          <div key={floor}>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3">Floor {floor}</h3>
+            <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {filtered.filter((r) => r.floor === floor).map((room) => {
                 const config = statusConfig[room.status];
                 return (
-                  <div
+                  <motion.div
                     key={room.id}
-                    className="bg-card rounded-xl border border-border p-4 hover:shadow-md transition-shadow cursor-pointer group"
+                    variants={staggerItem}
+                    whileHover={{ scale: 1.03, y: -3 }}
+                    className="bg-card rounded-xl border border-border p-3 md:p-4 hover:shadow-md transition-shadow cursor-pointer"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-lg font-bold text-foreground">{room.number}</span>
+                      <span className="text-base md:text-lg font-bold text-foreground">{room.number}</span>
                       <span className={cn("w-2.5 h-2.5 rounded-full", config.dotClass)} />
                     </div>
                     <p className="text-xs text-muted-foreground mb-1">{room.type}</p>
-                    <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full", config.colorClass)}>
-                      {config.label}
-                    </span>
+                    <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full", config.colorClass)}>{config.label}</span>
                     {room.guest && (
                       <div className="mt-2 pt-2 border-t border-border">
                         <p className="text-xs font-medium text-foreground truncate">{room.guest}</p>
                         {room.checkOut && <p className="text-xs text-muted-foreground">Out: {room.checkOut}</p>}
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 );
               })}
+            </motion.div>
           </div>
-        </div>
-      ))}
-      {floors.length === 0 && (
-        <div className="text-center py-12 text-sm text-muted-foreground">No rooms match your filters</div>
-      )}
-    </div>
+        ))}
+        {floors.length === 0 && <div className="text-center py-12 text-sm text-muted-foreground">No rooms match your filters</div>}
+      </div>
+    </PageTransition>
   );
 }
