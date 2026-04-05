@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
@@ -32,7 +33,7 @@ export default function AppSidebar() {
   };
 
   return (
-    <aside className="flex flex-col w-56 min-h-screen bg-card border-r border-sidebar-border px-3 py-6 shrink-0">
+    <aside className="hidden md:flex flex-col w-56 min-h-screen bg-card border-r border-sidebar-border px-3 py-6 shrink-0">
       <div className="flex items-center gap-2 px-3 mb-8">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
           <span className="text-primary-foreground font-bold text-sm">B</span>
@@ -42,43 +43,45 @@ export default function AppSidebar() {
 
       <nav className="flex-1 flex flex-col gap-1">
         {navItems.map((item) => (
-          <Link
-            key={item.label}
-            to={item.path}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              isActive(item.path)
-                ? "bg-primary text-primary-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            )}
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="flex-1 text-left">{item.label}</span>
-            {item.badge && (
-              <span className="bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
-                {item.badge}
-              </span>
-            )}
-            {item.hasSubmenu && <ChevronDown className="w-4 h-4" />}
-          </Link>
+          <motion.div key={item.label} whileHover={{ x: 2 }} whileTap={{ scale: 0.98 }}>
+            <Link
+              to={item.path}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                isActive(item.path)
+                  ? "bg-primary text-primary-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.badge && (
+                <span className="bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
+                  {item.badge}
+                </span>
+              )}
+              {item.hasSubmenu && <ChevronDown className="w-4 h-4" />}
+            </Link>
+          </motion.div>
         ))}
       </nav>
 
       <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-sidebar-border">
         {bottomItems.map((item) => (
-          <Link
-            key={item.label}
-            to={item.path}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              isActive(item.path)
-                ? "bg-primary text-primary-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            )}
-          >
-            <item.icon className="w-5 h-5" />
-            <span>{item.label}</span>
-          </Link>
+          <motion.div key={item.label} whileHover={{ x: 2 }} whileTap={{ scale: 0.98 }}>
+            <Link
+              to={item.path}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                isActive(item.path)
+                  ? "bg-primary text-primary-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <item.icon className="w-5 h-5" />
+              <span>{item.label}</span>
+            </Link>
+          </motion.div>
         ))}
       </div>
     </aside>
