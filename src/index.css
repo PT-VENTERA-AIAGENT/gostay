@@ -70,3 +70,16 @@
     font-family: 'Plus Jakarta Sans', sans-serif;
   }
 }
+
+@media print {
+  nav, aside, footer, .print\\:hidden {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    font-size: 12px;
+  }
+  .print\\:break-before-page {
+    break-before: page;
+  }
+}
