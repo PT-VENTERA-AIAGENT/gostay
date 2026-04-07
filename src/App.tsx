@@ -36,6 +36,9 @@ import PortalChat from "./pages/portal/PortalChat";
 
 import NotFound from "./pages/NotFound";
 
+import { PromoPopup } from "./components/PromoPopup";
+import { ExitIntentPopup } from "./components/ExitIntentPopup";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -83,6 +86,8 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      <PromoPopup />
+      <ExitIntentPopup />
     </TooltipProvider>
   </QueryClientProvider>
 );
