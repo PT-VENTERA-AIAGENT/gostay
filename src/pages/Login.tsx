@@ -1,8 +1,37 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
+
+  const from = (location.state as { from?: string })?.from ?? "/";
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setIsLoading(true);
+    const { error } = await signIn(email, password);
+    setIsLoading(false);
+    if (error) {
+      toast({
+        title: "Sign in failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      navigate(from, { replace: true });
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <motion.div
@@ -25,7 +54,7 @@ export default function Login() {
         </div>
 
         <div className="bg-card rounded-2xl border border-border p-6 md:p-8 shadow-sm">
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
               <label className="text-sm font-medium text-foreground mb-1.5 block">Email</label>
               <div className="relative">
@@ -33,6 +62,9 @@ export default function Login() {
                 <input
                   type="email"
                   placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
@@ -48,18 +80,22 @@ export default function Login() {
                 <input
                   type="password"
                   placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
             </div>
 
             <motion.button
-              type="button"
+              type="submit"
+              disabled={isLoading}
               whileTap={{ scale: 0.98 }}
-              onClick={() => window.location.href = "/"}
-              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 touch-target"
+              className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 touch-target disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Sign In <ArrowRight className="w-4 h-4" />
+              {isLoading ? "Signing in…" : "Sign In"}
+              {!isLoading && <ArrowRight className="w-4 h-4" />}
             </motion.button>
           </form>
 

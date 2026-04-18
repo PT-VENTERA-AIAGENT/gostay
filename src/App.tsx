@@ -4,6 +4,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
+
 import StaffLayout from "./components/layout/StaffLayout";
 import PortalLayout from "./components/layout/PortalLayout";
 
@@ -39,7 +42,14 @@ import NotFound from "./pages/NotFound";
 import { PromoPopup } from "./components/PromoPopup";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -47,44 +57,80 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          {/* Auth pages (no layout) */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+        <AuthProvider>
+          <Routes>
+            {/* Auth pages (no layout, no auth required) */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
-          {/* Staff/Admin pages */}
-          <Route element={<StaffLayout />}>
-            <Route path="/" element={<Index />} />
-            <Route path="/bookings" element={<Bookings />} />
-            <Route path="/bookings/new" element={<NewBooking />} />
-            <Route path="/bookings/:id" element={<BookingDetail />} />
-            <Route path="/rooms" element={<Rooms />} />
-            <Route path="/rooms/types" element={<RoomTypes />} />
-            <Route path="/rooms/types/:id" element={<RoomTypeDetail />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/calls" element={<CallLogs />} />
-            <Route path="/calls/new" element={<NewCallLog />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/users" element={<UserManagement />} />
-          </Route>
+            {/* Staff/Admin pages — require authentication */}
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                  <StaffLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/" element={<Index />} />
+              <Route path="/bookings" element={<Bookings />} />
+              <Route path="/bookings/new" element={<NewBooking />} />
+              <Route path="/bookings/:id" element={<BookingDetail />} />
+              <Route path="/rooms" element={<Rooms />} />
+              <Route path="/rooms/types" element={<RoomTypes />} />
+              <Route path="/rooms/types/:id" element={<RoomTypeDetail />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/calls" element={<CallLogs />} />
+              <Route path="/calls/new" element={<NewCallLog />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <UserManagement />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
 
-          {/* Customer Portal */}
-          <Route path="/portal" element={<PortalLayout />}>
-            <Route index element={<PortalHome />} />
-            <Route path="rooms/:slug" element={<PortalRoomDetail />} />
-            <Route path="book/details" element={<BookingDetails />} />
-            <Route path="book/review" element={<BookingReview />} />
-            <Route path="book/confirmation" element={<BookingConfirmation />} />
-            <Route path="my-account" element={<MyAccount />} />
-            <Route path="my-account/bookings/:id" element={<PortalBookingDetail />} />
-            <Route path="profile" element={<PortalProfile />} />
-            <Route path="chat" element={<PortalChat />} />
-          </Route>
+            {/* Customer Portal — public (no auth required to browse) */}
+            <Route path="/portal" element={<PortalLayout />}>
+              <Route index element={<PortalHome />} />
+              <Route path="rooms/:slug" element={<PortalRoomDetail />} />
+              <Route path="book/details" element={<BookingDetails />} />
+              <Route path="book/review" element={<BookingReview />} />
+              <Route path="book/confirmation" element={<BookingConfirmation />} />
+              <Route
+                path="my-account"
+                element={
+                  <ProtectedRoute>
+                    <MyAccount />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="my-account/bookings/:id"
+                element={
+                  <ProtectedRoute>
+                    <PortalBookingDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="profile"
+                element={
+                  <ProtectedRoute>
+                    <PortalProfile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="chat" element={<PortalChat />} />
+            </Route>
 
-          {/* Catch-all */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            {/* Catch-all */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
       <PromoPopup />
       <ExitIntentPopup />
