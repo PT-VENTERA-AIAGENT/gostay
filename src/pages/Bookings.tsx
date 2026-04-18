@@ -1,43 +1,30 @@
 import { Link } from "react-router-dom";
-import { Plus, Search, Filter, Download, Calendar, List, Eye, CalendarPlus } from "lucide-react";
+import { Plus, Search, Filter, Download, Calendar, List, Eye, CalendarPlus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import BookingCalendar from "@/components/bookings/BookingCalendar";
 import CopyButton from "@/components/shared/CopyButton";
-
-const bookings = [
-  { id: "1", reference: "BK-20260401-A1B2", guest: "David Chen", room: "203", roomType: "Deluxe", checkIn: "2026-04-01", checkOut: "2026-04-04", status: "checked_in", total: 3750000, source: "portal" },
-  { id: "2", reference: "BK-20260402-C3D4", guest: "Sarah Kim", room: "103", roomType: "Standard", checkIn: "2026-04-02", checkOut: "2026-04-05", status: "confirmed", total: 2550000, source: "phone" },
-  { id: "3", reference: "BK-20260403-E5F6", guest: "Mike Johnson", room: "202", roomType: "Standard", checkIn: "2026-04-05", checkOut: "2026-04-07", status: "pending", total: 1700000, source: "walk_in" },
-  { id: "4", reference: "BK-20260403-G7H8", guest: "Emily Davis", room: "208", roomType: "Deluxe", checkIn: "2026-04-03", checkOut: "2026-04-06", status: "checked_in", total: 3750000, source: "portal" },
-  { id: "5", reference: "BK-20260401-I9J0", guest: "Robert Wilson", room: "205", roomType: "Suite", checkIn: "2026-04-01", checkOut: "2026-04-03", status: "checked_out", total: 5000000, source: "staff" },
-  { id: "6", reference: "BK-20260330-K1L2", guest: "Anna Lee", room: "302", roomType: "Family", checkIn: "2026-03-30", checkOut: "2026-04-02", status: "checked_out", total: 5400000, source: "portal" },
-  { id: "7", reference: "BK-20260405-M3N4", guest: "James Brown", room: "305", roomType: "Presidential", checkIn: "2026-04-07", checkOut: "2026-04-10", status: "confirmed", total: 15000000, source: "phone" },
-  { id: "8", reference: "BK-20260328-O5P6", guest: "Lisa Wang", room: "107", roomType: "Deluxe", checkIn: "2026-03-28", checkOut: "2026-04-01", status: "cancelled", total: 5000000, source: "portal" },
-  { id: "9", reference: "BK-20260404-Q7R8", guest: "Grace Park", room: "204", roomType: "Suite", checkIn: "2026-04-04", checkOut: "2026-04-08", status: "confirmed", total: 10000000, source: "portal" },
-  { id: "10", reference: "BK-20260402-S9T0", guest: "Kevin Nguyen", room: "301", roomType: "Family", checkIn: "2026-04-02", checkOut: "2026-04-06", status: "checked_in", total: 7200000, source: "walk_in" },
-  { id: "11", reference: "BK-20260401-U1V2", guest: "Sofia Martinez", room: "304", roomType: "Presidential", checkIn: "2026-04-01", checkOut: "2026-04-05", status: "checked_in", total: 20000000, source: "phone" },
-  { id: "12", reference: "BK-20260406-W3X4", guest: "Tom Harris", room: "101", roomType: "Standard", checkIn: "2026-04-06", checkOut: "2026-04-09", status: "confirmed", total: 2550000, source: "portal" },
-];
+import { useBookings } from "@/hooks/useBookings";
+import type { BookingStatus } from "@/types/database.types";
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
-  pending: { label: "Pending", cls: "badge-warning" },
-  confirmed: { label: "Confirmed", cls: "badge-info" },
-  checked_in: { label: "Checked In", cls: "badge-primary" },
+  pending:     { label: "Pending",     cls: "badge-warning" },
+  confirmed:   { label: "Confirmed",   cls: "badge-info" },
+  checked_in:  { label: "Checked In",  cls: "badge-primary" },
   checked_out: { label: "Checked Out", cls: "badge-muted" },
-  cancelled: { label: "Cancelled", cls: "badge-destructive" },
-  no_show: { label: "No Show", cls: "badge-destructive" },
+  cancelled:   { label: "Cancelled",   cls: "badge-destructive" },
+  no_show:     { label: "No Show",     cls: "badge-destructive" },
 };
 
 const statusTabs = [
-  { key: "all", label: "All" },
-  { key: "pending", label: "Pending" },
-  { key: "confirmed", label: "Confirmed" },
-  { key: "checked_in", label: "Checked In" },
+  { key: "all",         label: "All" },
+  { key: "pending",     label: "Pending" },
+  { key: "confirmed",   label: "Confirmed" },
+  { key: "checked_in",  label: "Checked In" },
   { key: "checked_out", label: "Checked Out" },
-  { key: "cancelled", label: "Cancelled" },
+  { key: "cancelled",   label: "Cancelled" },
 ];
 
 function formatIDR(n: number) {
@@ -49,14 +36,31 @@ export default function Bookings() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
 
-  const filtered = bookings.filter((b) => {
-    if (activeTab !== "all" && b.status !== activeTab) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return b.guest.toLowerCase().includes(q) || b.reference.toLowerCase().includes(q) || b.room.includes(q);
-    }
-    return true;
+  const { data, isLoading, error } = useBookings({
+    status: activeTab as BookingStatus | "all",
+    search: search || undefined,
   });
+
+  const bookings = data?.data ?? [];
+  const totalCount = data?.count ?? 0;
+
+  if (isLoading) {
+    return (
+      <PageTransition>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      </PageTransition>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageTransition>
+        <div className="p-6 text-center text-sm text-destructive">Failed to load bookings. Please try again.</div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>
@@ -64,7 +68,7 @@ export default function Bookings() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">Reservations</h1>
-            <p className="text-sm text-muted-foreground mt-1">{bookings.length} total bookings</p>
+            <p className="text-sm text-muted-foreground mt-1">{totalCount} total bookings</p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <button className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors btn-press">
@@ -99,14 +103,11 @@ export default function Bookings() {
         {view === "list" ? (
           <>
             <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
-              {statusTabs.map((tab) => {
-                const count = tab.key === "all" ? bookings.length : bookings.filter((b) => b.status === tab.key).length;
-                return (
-                  <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-3 md:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap touch-target", activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-                    {tab.label} <span className="text-xs ml-1 opacity-60">({count})</span>
-                  </button>
-                );
-              })}
+              {statusTabs.map((tab) => (
+                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-3 md:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap touch-target", activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
             {/* Desktop table */}
@@ -126,7 +127,7 @@ export default function Bookings() {
                   </tr>
                 </thead>
                 <motion.tbody variants={staggerContainer} initial="hidden" animate="show">
-                  {filtered.map((b) => {
+                  {bookings.map((b) => {
                     const sc = statusConfig[b.status];
                     return (
                       <motion.tr key={b.id} variants={staggerItem} className="border-b border-border last:border-0 table-row-hover">
@@ -136,12 +137,12 @@ export default function Bookings() {
                             <CopyButton text={b.reference} />
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-foreground">{b.guest}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.room} · {b.roomType}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.checkIn}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.checkOut}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-foreground">{b.customers?.full_name}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.rooms?.number} · {b.rooms?.room_types?.name}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.check_in}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.check_out}</td>
                         <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", sc.cls)}>{sc.label}</span></td>
-                        <td className="px-4 py-3 text-sm font-medium text-foreground tabular-nums">{formatIDR(b.total)}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-foreground tabular-nums">{formatIDR(b.total_amount)}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{b.source.replace("_", " ")}</td>
                         <td className="px-4 py-3">
                           <Link to={`/bookings/${b.id}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
@@ -151,7 +152,7 @@ export default function Bookings() {
                       </motion.tr>
                     );
                   })}
-                  {filtered.length === 0 && (
+                  {bookings.length === 0 && (
                     <tr>
                       <td colSpan={9} className="px-4 py-16 text-center">
                         <CalendarPlus className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
@@ -167,28 +168,28 @@ export default function Bookings() {
 
             {/* Mobile cards */}
             <motion.div variants={staggerContainer} initial="hidden" animate="show" className="md:hidden space-y-3">
-              {filtered.map((b) => {
+              {bookings.map((b) => {
                 const sc = statusConfig[b.status];
                 return (
                   <motion.div key={b.id} variants={staggerItem}>
                     <Link to={`/bookings/${b.id}`} className="block bg-card rounded-xl border border-border p-4 hover:shadow-sm transition-shadow active:scale-[0.99]">
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <p className="text-sm font-semibold text-foreground">{b.guest}</p>
+                          <p className="text-sm font-semibold text-foreground">{b.customers?.full_name}</p>
                           <p className="text-xs font-mono text-primary">{b.reference}</p>
                         </div>
                         <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", sc.cls)}>{sc.label}</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{b.room} · {b.roomType}</span>
-                        <span>{b.checkIn} → {b.checkOut}</span>
+                        <span>{b.rooms?.number} · {b.rooms?.room_types?.name}</span>
+                        <span>{b.check_in} → {b.check_out}</span>
                       </div>
-                      <p className="text-sm font-semibold text-foreground mt-2 tabular-nums">{formatIDR(b.total)}</p>
+                      <p className="text-sm font-semibold text-foreground mt-2 tabular-nums">{formatIDR(b.total_amount)}</p>
                     </Link>
                   </motion.div>
                 );
               })}
-              {filtered.length === 0 && (
+              {bookings.length === 0 && (
                 <div className="text-center py-12">
                   <CalendarPlus className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm font-medium text-foreground mb-1">No bookings found</p>

@@ -1,24 +1,21 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Filter, PhoneIncoming, PhoneOutgoing, Flag, Calendar } from "lucide-react";
+import { Plus, Search, PhoneIncoming, PhoneOutgoing, Flag, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
+import { useCallLogs } from "@/hooks/useCallLogs";
 
-const callLogs = [
-  { id: "1", callerPhone: "+62 812 3456 7890", direction: "inbound" as const, datetime: "2026-04-05 09:15", duration: "4:32", summary: "Asked about room availability for next weekend. Interested in Deluxe Room.", customer: "David Chen", followUp: false, agent: "James", followUpDue: "" },
-  { id: "2", callerPhone: "+62 878 9012 3456", direction: "inbound" as const, datetime: "2026-04-05 10:30", duration: "2:15", summary: "Called to confirm booking BK-20260405-M3N4. Requested airport pickup.", customer: "James Brown", followUp: true, followUpDue: "2026-04-06", agent: "James" },
-  { id: "3", callerPhone: "+62 856 1234 5678", direction: "outbound" as const, datetime: "2026-04-05 11:00", duration: "1:45", summary: "Called to inform about room upgrade availability.", customer: "Sarah Kim", followUp: false, agent: "Maria", followUpDue: "" },
-  { id: "4", callerPhone: "+62 821 5678 9012", direction: "inbound" as const, datetime: "2026-04-04 16:20", duration: "6:10", summary: "New guest inquiry. Wants family room for 5 nights.", customer: null, followUp: true, followUpDue: "2026-04-05", agent: "James" },
-  { id: "5", callerPhone: "+62 812 3456 7890", direction: "outbound" as const, datetime: "2026-04-04 14:00", duration: "3:00", summary: "Follow-up on check-out survey. Guest satisfied.", customer: "Robert Wilson", followUp: false, agent: "Maria", followUpDue: "" },
-  { id: "6", callerPhone: "+62 899 7654 3210", direction: "inbound" as const, datetime: "2026-04-04 11:45", duration: "5:20", summary: "Corporate booking inquiry for 10 rooms in June.", customer: null, followUp: true, followUpDue: "2026-04-07", agent: "Maria" },
-  { id: "7", callerPhone: "+62 813 1111 2222", direction: "inbound" as const, datetime: "2026-04-03 09:00", duration: "3:45", summary: "Asked about wedding venue. Transferred to events.", customer: null, followUp: false, agent: "James", followUpDue: "" },
-  { id: "8", callerPhone: "+62 812 3456 7890", direction: "inbound" as const, datetime: "2026-04-03 15:30", duration: "2:00", summary: "David Chen: extra pillows and late check-out.", customer: "David Chen", followUp: false, agent: "Sarah", followUpDue: "" },
-];
+function formatDuration(seconds: number | null) {
+  if (!seconds) return "—";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 const tabs = [
-  { key: "all", label: "All Calls" },
-  { key: "inbound", label: "Inbound" },
+  { key: "all",      label: "All Calls" },
+  { key: "inbound",  label: "Inbound" },
   { key: "outbound", label: "Outbound" },
   { key: "followup", label: "Follow-ups" },
 ];
@@ -27,18 +24,38 @@ export default function CallLogs() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
 
+  const { data: callLogs = [], isLoading, error } = useCallLogs({
+    search: search || undefined,
+    followUpOnly: activeTab === "followup" ? true : undefined,
+  });
+
   const filtered = callLogs.filter((c) => {
-    if (activeTab === "inbound" && c.direction !== "inbound") return false;
+    if (activeTab === "inbound"  && c.direction !== "inbound")  return false;
     if (activeTab === "outbound" && c.direction !== "outbound") return false;
-    if (activeTab === "followup" && !c.followUp) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return c.callerPhone.includes(q) || c.customer?.toLowerCase().includes(q) || c.summary.toLowerCase().includes(q);
-    }
     return true;
   });
 
-  const followUpCount = callLogs.filter((c) => c.followUp).length;
+  const inboundCount   = callLogs.filter((c) => c.direction === "inbound").length;
+  const outboundCount  = callLogs.filter((c) => c.direction === "outbound").length;
+  const followUpCount  = callLogs.filter((c) => c.follow_up).length;
+
+  if (isLoading) {
+    return (
+      <PageTransition>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      </PageTransition>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageTransition>
+        <div className="p-6 text-center text-sm text-destructive">Failed to load call logs.</div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>
@@ -55,9 +72,9 @@ export default function CallLogs() {
 
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {[
-            { label: "Total Today", value: "3" },
-            { label: "Inbound", value: String(callLogs.filter((c) => c.direction === "inbound").length) },
-            { label: "Outbound", value: String(callLogs.filter((c) => c.direction === "outbound").length) },
+            { label: "Total",      value: String(callLogs.length) },
+            { label: "Inbound",    value: String(inboundCount) },
+            { label: "Outbound",   value: String(outboundCount) },
             { label: "Follow-ups", value: String(followUpCount), warn: true },
           ].map((s) => (
             <motion.div key={s.label} variants={staggerItem} className="bg-card rounded-xl border border-border p-3 md:p-4">
@@ -75,14 +92,11 @@ export default function CallLogs() {
         </div>
 
         <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
-          {tabs.map((tab) => {
-            const count = tab.key === "all" ? callLogs.length : tab.key === "followup" ? followUpCount : callLogs.filter((c) => c.direction === tab.key).length;
-            return (
-              <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-3 md:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap", activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-                {tab.label} <span className="text-xs ml-1 opacity-60">({count})</span>
-              </button>
-            );
-          })}
+          {tabs.map((tab) => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-3 md:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap", activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Desktop table */}
@@ -110,15 +124,18 @@ export default function CallLogs() {
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> Out</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-foreground">{call.callerPhone}</td>
-                  <td className="px-4 py-3 text-sm">{call.customer ? <span className="text-foreground font-medium">{call.customer}</span> : <span className="text-muted-foreground italic">Unknown</span>}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{call.datetime}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{call.duration}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">{call.summary}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{call.agent}</td>
-                  <td className="px-4 py-3">{call.followUp && <span className="inline-flex items-center gap-1 text-xs font-medium text-warning bg-warning/10 px-2 py-0.5 rounded-full"><Flag className="w-3 h-3" /> {call.followUpDue}</span>}</td>
+                  <td className="px-4 py-3 text-sm font-mono text-foreground">{call.caller_phone}</td>
+                  <td className="px-4 py-3 text-sm">{call.customers ? <span className="text-foreground font-medium">{call.customers.full_name}</span> : <span className="text-muted-foreground italic">Unknown</span>}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(call.created_at).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDuration(call.duration_seconds)}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">{call.summary ?? "—"}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{call.profiles?.full_name}</td>
+                  <td className="px-4 py-3">{call.follow_up && <span className="inline-flex items-center gap-1 text-xs font-medium text-warning bg-warning/10 px-2 py-0.5 rounded-full"><Flag className="w-3 h-3" /> {call.follow_up_due ?? ""}</span>}</td>
                 </motion.tr>
               ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">No call logs found</td></tr>
+              )}
             </motion.tbody>
           </table>
         </div>
@@ -128,21 +145,21 @@ export default function CallLogs() {
           {filtered.map((call) => (
             <motion.div key={call.id} variants={staggerItem} className="bg-card rounded-xl border border-border p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-mono text-foreground">{call.callerPhone}</span>
+                <span className="text-sm font-mono text-foreground">{call.caller_phone}</span>
                 {call.direction === "inbound" ? (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><PhoneIncoming className="w-3 h-3" /> In</span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> Out</span>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{call.summary}</p>
+              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{call.summary ?? "—"}</p>
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{call.customer || "Unknown"} · {call.agent}</span>
-                <span>{call.duration}</span>
+                <span>{call.customers?.full_name ?? "Unknown"} · {call.profiles?.full_name}</span>
+                <span>{formatDuration(call.duration_seconds)}</span>
               </div>
-              {call.followUp && (
+              {call.follow_up && (
                 <div className="mt-2 pt-2 border-t border-border">
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-warning"><Flag className="w-3 h-3" /> Follow-up: {call.followUpDue}</span>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-warning"><Flag className="w-3 h-3" /> Follow-up: {call.follow_up_due ?? "—"}</span>
                 </div>
               )}
             </motion.div>

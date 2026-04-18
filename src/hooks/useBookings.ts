@@ -1,0 +1,135 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  getBookings,
+  getBookingById,
+  createBooking,
+  updateBookingStatus,
+  updateBooking,
+  getAuditLog,
+  getTodayArrivals,
+  getTodayDepartures,
+  searchCustomers,
+  getCustomerBookings,
+} from "@/services/bookingService";
+import type {
+  BookingFilters,
+  BookingInsert,
+  BookingUpdate,
+  BookingStatus,
+} from "@/services/bookingService";
+import type { BookingUpdate as BookingUpdateType } from "@/types/database.types";
+import { useAuth } from "@/contexts/AuthContext";
+
+export const bookingKeys = {
+  all: ["bookings"] as const,
+  list: (filters?: BookingFilters) => ["bookings", "list", filters] as const,
+  detail: (id: string) => ["bookings", "detail", id] as const,
+  audit: (id: string) => ["bookings", "audit", id] as const,
+  arrivals: () => ["bookings", "arrivals"] as const,
+  departures: () => ["bookings", "departures"] as const,
+  customerBookings: (customerId: string) =>
+    ["bookings", "customer", customerId] as const,
+};
+
+export function useBookings(filters?: BookingFilters) {
+  return useQuery({
+    queryKey: bookingKeys.list(filters),
+    queryFn: () => getBookings(filters),
+  });
+}
+
+export function useBooking(id: string) {
+  return useQuery({
+    queryKey: bookingKeys.detail(id),
+    queryFn: () => getBookingById(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useBookingAuditLog(bookingId: string) {
+  return useQuery({
+    queryKey: bookingKeys.audit(bookingId),
+    queryFn: () => getAuditLog(bookingId),
+    enabled: Boolean(bookingId),
+  });
+}
+
+export function useTodayArrivals() {
+  return useQuery({
+    queryKey: bookingKeys.arrivals(),
+    queryFn: getTodayArrivals,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useTodayDepartures() {
+  return useQuery({
+    queryKey: bookingKeys.departures(),
+    queryFn: getTodayDepartures,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useCustomerBookings(customerId: string) {
+  return useQuery({
+    queryKey: bookingKeys.customerBookings(customerId),
+    queryFn: () => getCustomerBookings(customerId),
+    enabled: Boolean(customerId),
+  });
+}
+
+export function useSearchCustomers(query: string) {
+  return useQuery({
+    queryKey: ["customers", "search", query],
+    queryFn: () => searchCustomers(query),
+    enabled: query.length >= 2,
+  });
+}
+
+export function useCreateBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: BookingInsert) => createBooking(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: bookingKeys.all }),
+  });
+}
+
+export function useUpdateBookingStatus() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({
+      id,
+      status,
+      note,
+    }: {
+      id: string;
+      status: BookingStatus;
+      note?: string;
+    }) => updateBookingStatus(id, status, user?.id ?? "system", note),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: bookingKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: bookingKeys.list() });
+      qc.invalidateQueries({ queryKey: bookingKeys.arrivals() });
+      qc.invalidateQueries({ queryKey: bookingKeys.departures() });
+    },
+  });
+}
+
+export function useUpdateBooking() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: BookingUpdateType;
+    }) => updateBooking(id, payload, user?.id ?? "system"),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: bookingKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: bookingKeys.list() });
+    },
+  });
+}
