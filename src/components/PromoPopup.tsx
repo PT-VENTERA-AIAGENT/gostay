@@ -1,18 +1,23 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 const LEADS_COLLECTOR_URL =
   "https://wfthvovlhphnrodrqxqt.supabase.co/functions/v1/leads-collector";
 
 export function PromoPopup() {
-  if (import.meta.env.DEV) return null;
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [contact, setContact] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDone, setIsDone] = useState(false);
 
+  const isLandingPage = location.pathname === "/";
+
   useEffect(() => {
+    if (import.meta.env.DEV || isLandingPage) return;
+
     const dismissed = sessionStorage.getItem("bm_promo_dismissed");
     if (dismissed) return;
 
@@ -21,7 +26,7 @@ export function PromoPopup() {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isLandingPage]);
 
   const handleClose = () => {
     setIsOpen(false);
@@ -66,12 +71,18 @@ export function PromoPopup() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="relative w-full max-w-sm rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-0 text-white shadow-2xl overflow-hidden">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={handleClose}
+    >
+      <div
+        className="relative w-full max-w-sm rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-0 text-white shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close */}
         <button
           onClick={handleClose}
-          className="absolute right-3 top-3 z-10 rounded-full bg-white/10 p-1.5 hover:bg-white/20 transition-colors"
+          className="absolute right-3 top-3 z-20 rounded-full bg-white/20 p-1.5 hover:bg-white/40 transition-colors"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -88,7 +99,7 @@ export function PromoPopup() {
           {isDone ? (
             <div className="text-center py-4">
               <div className="text-3xl mb-2">&#10003;</div>
-              <p className="font-semibold">Terima kasih! Kami akan hubungi kamu.</p>
+              <p className="font-semibold">Terima kasih! Kami segera hubungi kamu.</p>
             </div>
           ) : (
             <>
@@ -112,14 +123,14 @@ export function PromoPopup() {
               <button
                 onClick={handleSubmit}
                 disabled={isLoading || !contact.trim()}
-                className="w-full rounded-lg bg-green-500 hover:bg-green-600 py-2.5 text-sm font-bold text-white transition-colors disabled:opacity-60"
+                className="w-full rounded-lg bg-white text-blue-700 hover:bg-blue-50 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
               >
                 {isLoading ? "Mengirim..." : "Coba GoStay Gratis"}
               </button>
 
               <button
                 onClick={handleWhatsApp}
-                className="w-full text-center text-xs text-white/70 hover:text-white font-medium underline underline-offset-2 flex items-center justify-center gap-1.5"
+                className="w-full text-center text-xs text-white/70 hover:text-white font-medium underline underline-offset-2"
               >
                 Chat langsung via WhatsApp
               </button>

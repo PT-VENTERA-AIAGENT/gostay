@@ -134,10 +134,10 @@ const App = () => (
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <PromoPopup />
+          <ExitIntentPopup />
         </AuthProvider>
       </BrowserRouter>
-      <PromoPopup />
-      <ExitIntentPopup />
     </TooltipProvider>
   </QueryClientProvider>
 );

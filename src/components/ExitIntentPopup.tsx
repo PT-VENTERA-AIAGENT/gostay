@@ -1,19 +1,24 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 const LEADS_COLLECTOR_URL =
   "https://wfthvovlhphnrodrqxqt.supabase.co/functions/v1/leads-collector";
 
 export function ExitIntentPopup() {
-  if (import.meta.env.DEV) return null;
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [contact, setContact] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [hasTriggered, setHasTriggered] = useState(false);
 
+  const isLandingPage = location.pathname === "/";
+
   useEffect(() => {
+    if (import.meta.env.DEV || isLandingPage) return;
+
     const dismissed = sessionStorage.getItem("bm_exit_dismissed");
     if (dismissed) return;
 
@@ -26,7 +31,7 @@ export function ExitIntentPopup() {
 
     document.addEventListener("mouseleave", handleMouseLeave);
     return () => document.removeEventListener("mouseleave", handleMouseLeave);
-  }, [hasTriggered]);
+  }, [hasTriggered, isLandingPage]);
 
   const handleClose = () => {
     setIsOpen(false);
@@ -71,12 +76,18 @@ export function ExitIntentPopup() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="relative w-full max-w-sm rounded-2xl bg-gradient-to-br from-red-600 to-orange-600 p-0 text-white shadow-2xl overflow-hidden">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={handleClose}
+    >
+      <div
+        className="relative w-full max-w-sm rounded-2xl bg-gradient-to-br from-red-600 to-orange-600 p-0 text-white shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close */}
         <button
           onClick={handleClose}
-          className="absolute right-3 top-3 z-10 rounded-full bg-white/10 p-1.5 hover:bg-white/20 transition-colors"
+          className="absolute right-3 top-3 z-20 rounded-full bg-white/20 p-1.5 hover:bg-white/40 transition-colors"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -124,7 +135,7 @@ export function ExitIntentPopup() {
 
               <button
                 onClick={handleWhatsApp}
-                className="w-full text-center text-xs text-white/70 hover:text-white font-medium underline underline-offset-2 flex items-center justify-center gap-1.5"
+                className="w-full text-center text-xs text-white/70 hover:text-white font-medium underline underline-offset-2"
               >
                 Chat via WhatsApp
               </button>
