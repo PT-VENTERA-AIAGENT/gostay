@@ -10,6 +10,7 @@ import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import StaffLayout from "./components/layout/StaffLayout";
 import PortalLayout from "./components/layout/PortalLayout";
 
+import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import Bookings from "./pages/Bookings";
 import BookingDetail from "./pages/BookingDetail";
@@ -59,6 +60,9 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            {/* Public landing page */}
+            <Route path="/" element={<LandingPage />} />
+
             {/* Auth pages (no layout, no auth required) */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -72,7 +76,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Index />} />
               <Route path="/bookings" element={<Bookings />} />
               <Route path="/bookings/new" element={<NewBooking />} />
               <Route path="/bookings/:id" element={<BookingDetail />} />
