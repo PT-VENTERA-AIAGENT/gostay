@@ -26,7 +26,7 @@ export default function PortalLayout() {
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-sm">B</span>
           </div>
-          <span className="text-lg font-bold text-foreground tracking-tight">BookMe</span>
+          <span className="text-lg font-bold text-foreground tracking-tight">GoStay</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
@@ -121,7 +121,7 @@ export default function PortalLayout() {
               <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
                 <span className="text-primary-foreground font-bold text-xs">B</span>
               </div>
-              <span className="font-bold text-foreground">BookMe</span>
+              <span className="font-bold text-foreground">GoStay</span>
             </div>
             <p className="text-sm text-muted-foreground">Your perfect stay awaits. Book directly for the best rates and exclusive perks.</p>
           </div>
@@ -137,7 +137,7 @@ export default function PortalLayout() {
             <h4 className="font-semibold text-foreground text-sm mb-3">Contact</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>+62 21 1234 5678</p>
-              <p>info@bookme.id</p>
+              <p>info@gostay.id</p>
               <p>Jl. Hotel No. 1, Jakarta</p>
             </div>
           </div>
@@ -151,7 +151,7 @@ export default function PortalLayout() {
           </div>
         </div>
         <div className="max-w-6xl mx-auto mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
-          &copy; 2026 BookMe Hotel. All rights reserved.
+          &copy; 2026 GoStay Hotel. All rights reserved.
         </div>
       </footer>
 

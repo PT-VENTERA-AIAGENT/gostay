@@ -107,7 +107,7 @@ export default function Analytics() {
     exportCSV(
       ["Month", "Revenue (M IDR)", "Bookings"],
       monthlyRevenue.map((r) => [r.month, r.revenue, r.bookings]),
-      "bookme-analytics.csv"
+      "gostay-analytics.csv"
     );
   };
 
@@ -116,7 +116,7 @@ export default function Analytics() {
       <div className="p-4 md:p-6 space-y-4 md:space-y-6 print:p-0">
         {/* Print header */}
         <div className="hidden print:block mb-6">
-          <h1 className="text-2xl font-bold">BookMe Hotel — Analytics Report</h1>
+          <h1 className="text-2xl font-bold">GoStay Hotel — Analytics Report</h1>
           <p className="text-sm text-muted-foreground">Generated: {new Date().toLocaleDateString()}</p>
         </div>
 

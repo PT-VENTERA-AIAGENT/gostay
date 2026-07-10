@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 const mockMessages = [
-  { id: "1", sender: "staff", content: "Welcome to BookMe Hotel! How can we help you today?", time: "10:00 AM" },
+  { id: "1", sender: "staff", content: "Welcome to GoStay Hotel! How can we help you today?", time: "10:00 AM" },
 ];
 
 export default function ChatWidget() {
@@ -60,7 +60,7 @@ export default function ChatWidget() {
                   <MessageSquare className="w-4 h-4 text-primary-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-primary-foreground">BookMe Hotel</p>
+                  <p className="text-sm font-semibold text-primary-foreground">GoStay Hotel</p>
                   <p className="text-xs text-primary-foreground/70">Typically replies in minutes</p>
                 </div>
               </div>

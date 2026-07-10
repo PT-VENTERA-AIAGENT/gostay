@@ -65,7 +65,7 @@ export default function Register() {
             <span className="text-primary-foreground font-bold text-xl">B</span>
           </motion.div>
           <h1 className="text-2xl font-bold text-foreground">Create an account</h1>
-          <p className="text-muted-foreground mt-1">Join BookMe to book your perfect stay</p>
+          <p className="text-muted-foreground mt-1">Join GoStay to book your perfect stay</p>
         </div>
 
         <div className="bg-card rounded-2xl border border-border p-6 md:p-8 shadow-sm">

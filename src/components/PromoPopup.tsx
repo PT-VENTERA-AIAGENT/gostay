@@ -6,6 +6,7 @@ const LEADS_COLLECTOR_URL =
   "https://wfthvovlhphnrodrqxqt.supabase.co/functions/v1/leads-collector";
 
 export function PromoPopup() {
+  if (import.meta.env.DEV) return null;
   const [isOpen, setIsOpen] = useState(false);
   const [contact, setContact] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +39,7 @@ export function PromoPopup() {
           email: contact.includes("@") ? contact : "",
           whatsapp: !contact.includes("@") ? contact : "",
           domain: window.location.hostname,
-          project: "bookme-hotel",
+          project: "gostay-hotel",
           source,
         }),
       });
@@ -56,7 +57,7 @@ export function PromoPopup() {
   const handleWhatsApp = async () => {
     if (contact.trim()) await saveLead("promo-popup-wa");
     const msg = encodeURIComponent(
-      "Halo, saya mau tanya soal sistem booking hotel BookMe.",
+      "Halo, saya mau tanya soal sistem booking hotel GoStay.",
     );
     window.open(`https://wa.me/6281318000263?text=${msg}`, "_blank");
     handleClose();
@@ -96,7 +97,7 @@ export function PromoPopup() {
                   Kelola Reservasi Hotel Tanpa Ribet?
                 </h3>
                 <p className="text-sm text-blue-100 leading-relaxed">
-                  BookMe membantu hotel dan penginapan kamu menerima booking online, kelola kamar, dan otomasi konfirmasi — semua dari satu dashboard.
+                  GoStay membantu hotel dan penginapan kamu menerima booking online, kelola kamar, dan otomasi konfirmasi — semua dari satu dashboard.
                 </p>
               </div>
 
@@ -113,7 +114,7 @@ export function PromoPopup() {
                 disabled={isLoading || !contact.trim()}
                 className="w-full rounded-lg bg-green-500 hover:bg-green-600 py-2.5 text-sm font-bold text-white transition-colors disabled:opacity-60"
               >
-                {isLoading ? "Mengirim..." : "Coba BookMe Gratis"}
+                {isLoading ? "Mengirim..." : "Coba GoStay Gratis"}
               </button>
 
               <button

@@ -5,10 +5,10 @@ import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 
 const users = [
-  { id: "1", name: "Maria Rodriguez", email: "maria@bookme.id", role: "admin", status: "active", lastLogin: "2026-04-05 09:00", avatar: "MR", phone: "+62 812 0001 0001" },
-  { id: "2", name: "James Anderson", email: "james@bookme.id", role: "staff", status: "active", lastLogin: "2026-04-05 08:30", avatar: "JA", phone: "+62 812 0002 0002" },
-  { id: "3", name: "Sarah Williams", email: "sarah@bookme.id", role: "staff", status: "active", lastLogin: "2026-04-04 22:00", avatar: "SW", phone: "+62 812 0003 0003" },
-  { id: "4", name: "Mike Thompson", email: "mike@bookme.id", role: "staff", status: "inactive", lastLogin: "2026-03-15 14:00", avatar: "MT", phone: "+62 812 0004 0004" },
+  { id: "1", name: "Maria Rodriguez", email: "maria@gostay.id", role: "admin", status: "active", lastLogin: "2026-04-05 09:00", avatar: "MR", phone: "+62 812 0001 0001" },
+  { id: "2", name: "James Anderson", email: "james@gostay.id", role: "staff", status: "active", lastLogin: "2026-04-05 08:30", avatar: "JA", phone: "+62 812 0002 0002" },
+  { id: "3", name: "Sarah Williams", email: "sarah@gostay.id", role: "staff", status: "active", lastLogin: "2026-04-04 22:00", avatar: "SW", phone: "+62 812 0003 0003" },
+  { id: "4", name: "Mike Thompson", email: "mike@gostay.id", role: "staff", status: "inactive", lastLogin: "2026-03-15 14:00", avatar: "MT", phone: "+62 812 0004 0004" },
   { id: "5", name: "David Chen", email: "david@example.com", role: "customer", status: "active", lastLogin: "2026-04-05 07:45", avatar: "DC", phone: "+62 812 3456 7890" },
   { id: "6", name: "Emily Davis", email: "emily@example.com", role: "customer", status: "active", lastLogin: "2026-04-03 16:30", avatar: "ED", phone: "+62 878 9012 3456" },
   { id: "7", name: "Robert Wilson", email: "robert@example.com", role: "customer", status: "active", lastLogin: "2026-04-01 10:00", avatar: "RW", phone: "+62 856 1234 5678" },

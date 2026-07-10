@@ -34,7 +34,7 @@ export default function PortalHome() {
               <Star className="w-4 h-4 text-warning fill-warning" />
               <span>Rated 4.8/5 by 350+ guests</span>
             </motion.div>
-            <motion.h1 variants={staggerItem} className="text-3xl md:text-5xl font-bold text-foreground mb-3 md:mb-4 leading-tight">Find Your Perfect<br />Stay at BookMe Hotel</motion.h1>
+            <motion.h1 variants={staggerItem} className="text-3xl md:text-5xl font-bold text-foreground mb-3 md:mb-4 leading-tight">Find Your Perfect<br />Stay at GoStay Hotel</motion.h1>
             <motion.p variants={staggerItem} className="text-base md:text-lg text-muted-foreground mb-6 md:mb-10 max-w-2xl mx-auto">Discover comfort and luxury in the heart of the city. Book directly for the best rates and exclusive perks.</motion.p>
 
             <motion.div variants={staggerItem} className="bg-card rounded-2xl border border-border p-4 md:p-6 shadow-sm max-w-3xl mx-auto">
@@ -122,8 +122,8 @@ export default function PortalHome() {
         {/* Hotel Info */}
         <section className="px-4 md:px-8 py-12 md:py-16 bg-card border-t border-border">
           <motion.div variants={fadeInUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="max-w-4xl mx-auto text-center">
-            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3">About BookMe Hotel</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto mb-8 text-sm md:text-base">Located in the heart of the city, BookMe Hotel offers world-class hospitality with modern amenities.</p>
+            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3">About GoStay Hotel</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto mb-8 text-sm md:text-base">Located in the heart of the city, GoStay Hotel offers world-class hospitality with modern amenities.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-2xl mx-auto">
               {[{ value: "43", label: "Rooms" }, { value: "4.8", label: "Rating" }, { value: "350+", label: "Reviews" }, { value: "5+", label: "Room Types" }].map((s) => (
                 <div key={s.label}><p className="text-2xl md:text-3xl font-bold text-primary">{s.value}</p><p className="text-sm text-muted-foreground">{s.label}</p></div>

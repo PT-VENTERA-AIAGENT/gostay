@@ -6,6 +6,7 @@ const LEADS_COLLECTOR_URL =
   "https://wfthvovlhphnrodrqxqt.supabase.co/functions/v1/leads-collector";
 
 export function ExitIntentPopup() {
+  if (import.meta.env.DEV) return null;
   const [isOpen, setIsOpen] = useState(false);
   const [contact, setContact] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -43,7 +44,7 @@ export function ExitIntentPopup() {
           email: contact.includes("@") ? contact : "",
           whatsapp: !contact.includes("@") ? contact : "",
           domain: window.location.hostname,
-          project: "bookme-hotel",
+          project: "gostay-hotel",
           source,
         }),
       });
@@ -61,7 +62,7 @@ export function ExitIntentPopup() {
   const handleWhatsApp = async () => {
     if (contact.trim()) await saveLead("exit-intent-wa");
     const msg = encodeURIComponent(
-      "Halo, saya mau minta demo gratis sistem reservasi BookMe.",
+      "Halo, saya mau minta demo gratis sistem reservasi GoStay.",
     );
     window.open(`https://wa.me/6281318000263?text=${msg}`, "_blank");
     handleClose();

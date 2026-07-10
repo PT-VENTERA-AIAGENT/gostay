@@ -58,7 +58,7 @@ export default function AppSidebar() {
               exit={{ opacity: 0, width: 0 }}
               className="text-lg font-bold text-foreground tracking-tight overflow-hidden whitespace-nowrap"
             >
-              BookMe
+              GoStay
             </motion.span>
           )}
         </AnimatePresence>

@@ -50,7 +50,7 @@ export default function Login() {
             <span className="text-primary-foreground font-bold text-xl">B</span>
           </motion.div>
           <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
-          <p className="text-muted-foreground mt-1">Sign in to your BookMe account</p>
+          <p className="text-muted-foreground mt-1">Sign in to your GoStay account</p>
         </div>
 
         <div className="bg-card rounded-2xl border border-border p-6 md:p-8 shadow-sm">
