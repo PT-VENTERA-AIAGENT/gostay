@@ -24,7 +24,7 @@
 
 ### 1.1 Product Summary
 
-The **BookMe Hotel Management System (HMS)** is an all-in-one, cloud-native platform built to streamline every operational touchpoint of a hotel — from room inventory and booking lifecycle management, to real-time guest communication, phone call logging, and revenue analytics. It serves both internal hotel staff (admin, front desk) and external guests (via a customer-facing booking portal).
+The **GoStay Hotel Management System (HMS)** is an all-in-one, cloud-native platform built to streamline every operational touchpoint of a hotel — from room inventory and booking lifecycle management, to real-time guest communication, phone call logging, and revenue analytics. It serves both internal hotel staff (admin, front desk) and external guests (via a customer-facing booking portal).
 
 The system is designed to replace fragmented tools (spreadsheets, third-party PMS, disconnected chat apps, paper logs) with a single unified platform accessible from any modern browser.
 
@@ -1602,7 +1602,7 @@ Total      : ~20 weeks (5 months)
 
 ---
 
-*End of Document — BookMe Hotel Management System PRD v1.0*
+*End of Document — GoStay Hotel Management System PRD v1.0*
 
 *Document Owner: Product Team*
 *Next Review Date: Prior to Phase 1 kickoff*
