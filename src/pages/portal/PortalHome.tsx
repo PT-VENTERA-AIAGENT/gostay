@@ -1,15 +1,9 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Search, Star, Wifi, Wind, Tv, Coffee, Bath, Mountain, Users, MapPin, ArrowRight, Shield, Clock, CreditCard, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem, fadeInUp } from "@/components/shared/PageTransition";
-
-const featuredRooms = [
-  { slug: "standard", name: "Standard Room", price: 850000, rating: 4.5, reviews: 128, description: "Comfortable room with essential amenities for a pleasant stay.", amenities: ["WiFi", "AC", "TV"], maxGuests: 2, size: "28 m²", bedType: "Queen" },
-  { slug: "deluxe", name: "Deluxe Room", price: 1250000, rating: 4.7, reviews: 95, description: "Spacious room with premium amenities and city views.", amenities: ["WiFi", "AC", "TV", "Mini Bar"], maxGuests: 3, size: "38 m²", bedType: "King" },
-  { slug: "suite", name: "Suite", price: 2500000, rating: 4.9, reviews: 42, description: "Luxurious suite with separate living area and stunning sea views.", amenities: ["WiFi", "AC", "TV", "Mini Bar", "Bathtub", "Sea View"], maxGuests: 4, size: "55 m²", bedType: "King" },
-  { slug: "family", name: "Family Room", price: 1800000, rating: 4.6, reviews: 67, description: "Perfect for families with extra space and kid-friendly amenities.", amenities: ["WiFi", "AC", "TV", "Mini Bar"], maxGuests: 5, size: "48 m²", bedType: "Twin + Sofa" },
-  { slug: "presidential", name: "Presidential Suite", price: 5000000, rating: 5.0, reviews: 18, description: "The ultimate luxury experience with panoramic views and private butler service.", amenities: ["WiFi", "AC", "TV", "Mini Bar", "Bathtub", "Sea View"], maxGuests: 4, size: "90 m²", bedType: "King" },
-];
+import { useRoomTypes, useAvailableRooms } from "@/hooks/useRooms";
 
 const amenityIcons: Record<string, React.ElementType> = { WiFi: Wifi, AC: Wind, TV: Tv, "Mini Bar": Coffee, Bathtub: Bath, "Sea View": Mountain };
 
@@ -23,7 +17,65 @@ function formatIDR(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 }
 
+function RoomCardSkeleton() {
+  return (
+    <div className="bg-card rounded-xl border border-border overflow-hidden animate-pulse">
+      <div className="aspect-[16/9] bg-muted" />
+      <div className="p-4 md:p-5 space-y-3">
+        <div className="h-5 bg-muted rounded w-2/3" />
+        <div className="h-4 bg-muted rounded w-full" />
+        <div className="h-4 bg-muted rounded w-4/5" />
+        <div className="flex gap-2">
+          <div className="h-6 bg-muted rounded w-16" />
+          <div className="h-6 bg-muted rounded w-16" />
+          <div className="h-6 bg-muted rounded w-16" />
+        </div>
+        <div className="pt-3 border-t border-border flex justify-between">
+          <div className="h-5 bg-muted rounded w-28" />
+          <div className="h-5 bg-muted rounded w-20" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PortalHome() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") ?? "");
+  const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") ?? "");
+  const [guests, setGuests] = useState(searchParams.get("guests") ?? "1");
+  const [searched, setSearched] = useState(Boolean(searchParams.get("checkIn")));
+
+  const { data: roomTypes, isLoading: loadingTypes, error: errorTypes } = useRoomTypes();
+  const {
+    data: availableRooms,
+    isLoading: loadingAvail,
+    error: errorAvail,
+  } = useAvailableRooms(
+    searched ? checkIn : "",
+    searched ? checkOut : ""
+  );
+
+  // Derive a set of room_type_ids that have at least one available room
+  const availableTypeIds = searched && availableRooms
+    ? new Set(availableRooms.map((r) => r.room_type_id))
+    : null;
+
+  // Filter room types by availability when searched
+  const displayedRooms = searched && availableTypeIds
+    ? (roomTypes ?? []).filter((rt) => availableTypeIds.has(rt.id))
+    : (roomTypes ?? []);
+
+  function handleSearch() {
+    if (!checkIn || !checkOut) return;
+    setSearched(true);
+    setSearchParams({ checkIn, checkOut, guests });
+  }
+
+  const isLoading = loadingTypes || (searched && loadingAvail);
+  const hasError = errorTypes || (searched && errorAvail);
+
   return (
     <PageTransition>
       <div>
@@ -39,10 +91,46 @@ export default function PortalHome() {
 
             <motion.div variants={staggerItem} className="bg-card rounded-2xl border border-border p-4 md:p-6 shadow-sm max-w-3xl mx-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                <div><label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Check-in</label><input type="date" className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-                <div><label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Check-out</label><input type="date" className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-                <div><label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Guests</label><select className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"><option>1 Guest</option><option>2 Guests</option><option>3 Guests</option><option>4 Guests</option><option>5+ Guests</option></select></div>
-                <div className="flex items-end"><button className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"><Search className="w-4 h-4" /> Search</button></div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Check-in</label>
+                  <input
+                    type="date"
+                    value={checkIn}
+                    onChange={(e) => setCheckIn(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Check-out</label>
+                  <input
+                    type="date"
+                    value={checkOut}
+                    onChange={(e) => setCheckOut(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Guests</label>
+                  <select
+                    value={guests}
+                    onChange={(e) => setGuests(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="1">1 Guest</option>
+                    <option value="2">2 Guests</option>
+                    <option value="3">3 Guests</option>
+                    <option value="4">4 Guests</option>
+                    <option value="5">5+ Guests</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={handleSearch}
+                    className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <Search className="w-4 h-4" /> Search
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -66,41 +154,77 @@ export default function PortalHome() {
           </motion.div>
         </section>
 
-        {/* Featured Rooms */}
+        {/* Featured / Available Rooms */}
         <section className="px-4 md:px-8 py-8 md:py-12 max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-6 md:mb-8">
-            <div><h2 className="text-xl md:text-2xl font-bold text-foreground">Our Rooms</h2><p className="text-sm text-muted-foreground mt-1">Choose from our carefully designed room types</p></div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-foreground">
+                {searched ? "Available Rooms" : "Our Rooms"}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {searched
+                  ? `Rooms available for your selected dates`
+                  : "Choose from our carefully designed room types"}
+              </p>
+            </div>
           </div>
 
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {featuredRooms.map((room) => (
-              <motion.div key={room.slug} variants={staggerItem} whileHover={{ y: -6, transition: { duration: 0.2 } }}>
-                <Link to={`/portal/rooms/${room.slug}`} className="block bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-shadow group">
-                  <div className="aspect-[16/9] bg-muted flex items-center justify-center text-muted-foreground text-sm relative">Room Photo<span className="absolute top-3 right-3 bg-card/90 backdrop-blur text-xs font-medium px-2.5 py-1 rounded-full text-foreground border border-border">{room.bedType}</span></div>
-                  <div className="p-4 md:p-5">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-base md:text-lg font-semibold text-foreground group-hover:text-primary transition-colors">{room.name}</h3>
-                      <div className="flex items-center gap-1 text-sm shrink-0"><Star className="w-4 h-4 text-warning fill-warning" /><span className="font-medium text-foreground">{room.rating}</span></div>
+          {hasError ? (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6 text-center text-sm text-destructive">
+              Failed to load rooms. Please try again later.
+            </div>
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {[1, 2, 3].map((i) => <RoomCardSkeleton key={i} />)}
+            </div>
+          ) : searched && displayedRooms.length === 0 ? (
+            <div className="bg-muted rounded-xl p-8 text-center">
+              <p className="text-muted-foreground text-sm">No rooms available for the selected dates. Try different dates.</p>
+            </div>
+          ) : (
+            <motion.div variants={staggerContainer} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {displayedRooms.map((room) => (
+                <motion.div key={room.slug} variants={staggerItem} whileHover={{ y: -6, transition: { duration: 0.2 } }}>
+                  <Link
+                    to={`/portal/rooms/${room.slug}${checkIn && checkOut ? `?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}` : ""}`}
+                    className="block bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-shadow group"
+                  >
+                    <div className="aspect-[16/9] bg-muted flex items-center justify-center text-muted-foreground text-sm relative">
+                      Room Photo
                     </div>
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{room.description}</p>
-                    <div className="flex items-center gap-2 md:gap-3 text-xs text-muted-foreground mb-3 flex-wrap">
-                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {room.maxGuests}</span>
-                      <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {room.size}</span>
-                      <span>({room.reviews} reviews)</span>
+                    <div className="p-4 md:p-5">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="text-base md:text-lg font-semibold text-foreground group-hover:text-primary transition-colors">{room.name}</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{room.description}</p>
+                      <div className="flex items-center gap-2 md:gap-3 text-xs text-muted-foreground mb-3 flex-wrap">
+                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Up to {room.max_occupancy}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {(room.amenities ?? []).slice(0, 3).map((a) => {
+                          const Icon = amenityIcons[a];
+                          return (
+                            <span key={a} className="inline-flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-md">
+                              {Icon && <Icon className="w-3 h-3" />} {a}
+                            </span>
+                          );
+                        })}
+                        {(room.amenities ?? []).length > 3 && (
+                          <span className="text-xs text-muted-foreground px-1">+{room.amenities.length - 3}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between pt-3 border-t border-border">
+                        <p className="text-base md:text-lg font-bold text-primary">
+                          {formatIDR(room.base_rate)} <span className="text-xs font-normal text-muted-foreground">/ night</span>
+                        </p>
+                        <span className="text-sm text-primary font-medium flex items-center gap-1">Book Now <ArrowRight className="w-4 h-4" /></span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {room.amenities.slice(0, 3).map((a) => { const Icon = amenityIcons[a]; return (<span key={a} className="inline-flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-md">{Icon && <Icon className="w-3 h-3" />} {a}</span>); })}
-                      {room.amenities.length > 3 && <span className="text-xs text-muted-foreground px-1">+{room.amenities.length - 3}</span>}
-                    </div>
-                    <div className="flex items-center justify-between pt-3 border-t border-border">
-                      <p className="text-base md:text-lg font-bold text-primary">{formatIDR(room.price)} <span className="text-xs font-normal text-muted-foreground">/ night</span></p>
-                      <span className="text-sm text-primary font-medium flex items-center gap-1">Book Now <ArrowRight className="w-4 h-4" /></span>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </motion.div>
+                  </Link>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
         </section>
 
         {/* Reviews */}

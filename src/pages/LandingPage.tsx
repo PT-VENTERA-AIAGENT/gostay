@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Hotel,
@@ -8,10 +9,36 @@ import {
   Star,
   Users,
   Zap,
+  MessageSquare,
+  Shield,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+// ─── JSON-LD structured data ─────────────────────────────────────────────────
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "GoStay",
+  applicationCategory: "BusinessApplication",
+  description:
+    "Platform manajemen hotel dan reservasi online untuk hotel dan penginapan Indonesia",
+  url: "https://gostay.id",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "IDR" },
+  provider: {
+    "@type": "Organization",
+    name: "GoStay",
+    url: "https://gostay.id",
+  },
+};
 
 // ─── Animation helpers ──────────────────────────────────────────────────────
 
@@ -38,13 +65,16 @@ const childFade = {
 
 function Section({
   className = "",
+  id,
   children,
 }: {
   className?: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
     <motion.section
+      id={id}
       initial="hidden"
       whileInView="show"
       viewport={{ once: true, margin: "-80px" }}
@@ -76,6 +106,9 @@ function Navbar() {
           <a href="#testimonials" className="hover:text-foreground transition-colors">
             Testimoni
           </a>
+          <a href="#faq" className="hover:text-foreground transition-colors">
+            FAQ
+          </a>
         </nav>
 
         <div className="flex items-center gap-2">
@@ -83,7 +116,7 @@ function Navbar() {
             <Link to="/login">Masuk</Link>
           </Button>
           <Button size="sm" asChild>
-            <Link to="/register">Mulai Gratis</Link>
+            <Link to="/register">Coba Gratis 14 Hari</Link>
           </Button>
         </div>
       </div>
@@ -116,7 +149,7 @@ function Hero() {
           <motion.div variants={childFade}>
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest bg-primary/10 text-primary px-3 py-1.5 rounded-full">
               <Zap className="h-3 w-3" />
-              Platform Hotel #1 Indonesia
+              Dipercaya 500+ Hotel & Penginapan Indonesia
             </span>
           </motion.div>
 
@@ -124,16 +157,17 @@ function Hero() {
             variants={childFade}
             className="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight text-foreground max-w-3xl"
           >
-            Kelola Hotel Anda dengan{" "}
-            <span className="text-primary">GoStay</span>
+            Booking Online Penuh,{" "}
+            <span className="text-primary">Tanpa Ribet</span>
           </motion.h1>
 
           <motion.p
             variants={childFade}
-            className="text-lg sm:text-xl text-muted-foreground max-w-xl"
+            className="text-lg sm:text-xl text-muted-foreground max-w-2xl"
           >
-            Platform manajemen hotel & reservasi online terlengkap — dari
-            booking tamu hingga laporan keuangan, semua dalam satu dashboard.
+            GoStay menggantikan spreadsheet dan telepon satu per satu. Terima
+            reservasi online 24/7, kelola kamar real-time, dan kirim konfirmasi
+            otomatis ke tamu — dari hotel butik hingga jaringan penginapan.
           </motion.p>
 
           <motion.div
@@ -142,12 +176,12 @@ function Hero() {
           >
             <Button size="lg" className="gap-2" asChild>
               <Link to="/register">
-                Mulai Gratis
+                Coba Gratis 14 Hari
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link to="/login">Lihat Demo</Link>
+              <Link to="/login">Lihat Demo Dashboard</Link>
             </Button>
           </motion.div>
 
@@ -201,21 +235,39 @@ function Hero() {
 const features = [
   {
     icon: Calendar,
-    title: "Reservasi Online",
-    desc: "Terima booking 24/7 dari berbagai channel — website, OTA, maupun walk-in — semua tersinkron otomatis.",
+    title: "Reservasi Online 24/7",
+    desc: "Tamu bisa booking langsung dari website Anda kapan saja. Tidak ada lagi telepon terlewat atau pesan WhatsApp yang menumpuk — semua tersinkron otomatis ke dashboard.",
     badge: "Real-time sync",
   },
   {
     icon: Hotel,
-    title: "Manajemen Kamar",
-    desc: "Atur tipe kamar, harga dinamis, dan ketersediaan dengan tampilan grid yang intuitif.",
+    title: "Kelola Kamar dengan Mudah",
+    desc: "Atur tipe kamar, harga dinamis per musim, dan ketersediaan harian dengan tampilan grid yang intuitif. Tidak perlu spreadsheet yang bisa error.",
     badge: "Drag & drop",
   },
   {
     icon: BarChart3,
-    title: "Laporan & Analitik",
-    desc: "Dashboard keuangan, tingkat hunian, dan performa channel dalam satu layar — ekspor ke PDF/Excel.",
+    title: "Laporan Bisnis Real-Time",
+    desc: "Pantau occupancy rate, pendapatan harian, dan performa kamar dalam satu layar. Ekspor laporan ke PDF atau Excel untuk kebutuhan akuntansi dan investor.",
     badge: "Export ready",
+  },
+  {
+    icon: MessageSquare,
+    title: "Chat Tamu Terintegrasi",
+    desc: "Balas pertanyaan calon tamu langsung dari dashboard. Riwayat percakapan tersimpan per booking sehingga staf tidak perlu menebak konteks pembicaraan.",
+    badge: "Terpusat",
+  },
+  {
+    icon: Shield,
+    title: "Data Aman & Terenkripsi",
+    desc: "Data hotel dan tamu disimpan di server terenkripsi dengan backup otomatis harian. Akses role-based sehingga staf hanya bisa melihat data yang relevan.",
+    badge: "Bank-grade",
+  },
+  {
+    icon: Zap,
+    title: "Notifikasi Otomatis",
+    desc: "Konfirmasi booking, reminder check-in, dan ucapan terima kasih dikirim otomatis ke tamu via email. Hemat waktu staf front desk hingga 3 jam per hari.",
+    badge: "Auto-pilot",
   },
 ];
 
@@ -225,16 +277,17 @@ function Features() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <motion.div variants={fadeUp} custom={0} className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-            Semua yang Anda Butuhkan
+            Satu Platform, Semua yang Anda Butuhkan
           </h2>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Fitur lengkap untuk hotel butik, resort, hingga jaringan hotel besar.
+          <p className="text-muted-foreground max-w-lg mx-auto">
+            Dari guest house 5 kamar hingga hotel bintang tiga — GoStay
+            menggantikan belasan tools terpisah dengan satu sistem terpadu.
           </p>
         </motion.div>
 
         <motion.div
           variants={stagger}
-          className="grid gap-6 sm:grid-cols-3"
+          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
           {features.map(({ icon: Icon, title, desc, badge }) => (
             <motion.div key={title} variants={childFade}>
@@ -269,18 +322,18 @@ function Features() {
 const steps = [
   {
     number: "01",
-    title: "Daftar",
-    desc: "Buat akun gratis dalam 60 detik. Tidak perlu kartu kredit.",
+    title: "Daftar Gratis",
+    desc: "Buat akun dalam 60 detik. Tidak perlu kartu kredit, tidak perlu tanda tangan kontrak.",
   },
   {
     number: "02",
-    title: "Setup Hotel",
-    desc: "Tambahkan properti, tipe kamar, harga, dan foto. Wizard langkah demi langkah.",
+    title: "Setup Properti Anda",
+    desc: "Tambahkan kamar, harga, dan foto dengan wizard langkah demi langkah. Rata-rata selesai dalam 30 menit.",
   },
   {
     number: "03",
-    title: "Terima Booking",
-    desc: "Mulai terima reservasi online. Notifikasi real-time ke email & WhatsApp.",
+    title: "Langsung Terima Booking",
+    desc: "Bagikan link booking ke tamu atau pasang di website Anda. Notifikasi real-time ke email & WhatsApp Anda.",
   },
 ];
 
@@ -290,10 +343,11 @@ function HowItWorks() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <motion.div variants={fadeUp} custom={0} className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-            Mulai dalam 3 Langkah
+            Dari Daftar ke Booking Pertama dalam 3 Langkah
           </h2>
           <p className="text-muted-foreground max-w-md mx-auto">
-            GoStay dirancang agar Anda bisa langsung produktif tanpa pelatihan panjang.
+            GoStay dirancang agar Anda bisa langsung produktif — tanpa
+            pelatihan panjang dan tanpa bantuan teknisi.
           </p>
         </motion.div>
 
@@ -333,19 +387,19 @@ const testimonials = [
   {
     name: "Budi Santoso",
     role: "GM, Grand Wahana Hotel — Yogyakarta",
-    text: "Sejak pakai GoStay, occupancy rate kami naik 23%. Manajemen kamar jadi jauh lebih efisien dan staf kami tidak perlu lagi input manual di spreadsheet.",
+    text: "Sejak pakai GoStay, occupancy rate kami naik 23% dalam tiga bulan. Staf tidak perlu input manual di spreadsheet lagi — semuanya otomatis dan akurat.",
     stars: 5,
   },
   {
     name: "Sari Dewi",
     role: "Owner, Villa Tirta Bali — Ubud",
-    text: "Setup-nya cepat banget, satu hari langsung live. Laporan keuangannya sangat membantu waktu kami pitching ke investor. Highly recommended!",
+    text: "Setup-nya cepat, satu hari sudah live. Laporan keuangannya rapi dan sangat membantu waktu kami pitching ke investor. Sangat worth it.",
     stars: 5,
   },
   {
     name: "Hendra Kusuma",
     role: "Direktur, Archipelago Boutique Hotel — Lombok",
-    text: "Integrasi channel booking OTA-nya mulus. Tidak ada lagi double booking yang bikin stres. Tim support GoStay juga responsif banget.",
+    text: "Tidak ada lagi double booking yang bikin stres. Integrasi OTA-nya mulus dan tim support GoStay sangat responsif — masalah selesai dalam hitungan jam.",
     stars: 5,
   },
 ];
@@ -356,10 +410,11 @@ function Testimonials() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <motion.div variants={fadeUp} custom={0} className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-            Dipercaya Ratusan Hotel
+            Dipercaya 500+ Hotel dari Sabang sampai Merauke
           </h2>
-          <p className="text-muted-foreground">
-            Dari Sabang sampai Merauke, hotel-hotel terbaik menggunakan GoStay.
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Dari guest house di Jogja hingga villa premium di Bali — mereka sudah
+            membuktikannya.
           </p>
         </motion.div>
 
@@ -401,27 +456,109 @@ function Testimonials() {
   );
 }
 
+// ─── FAQ ─────────────────────────────────────────────────────────────────────
+
+const faqs = [
+  {
+    q: "Apakah GoStay cocok untuk penginapan kecil?",
+    a: "Ya. GoStay dirancang untuk semua skala — dari guest house 3 kamar hingga hotel bintang tiga dengan 200 kamar. Paket harga kami menyesuaikan jumlah kamar dan fitur yang Anda butuhkan, sehingga Anda tidak membayar lebih dari yang digunakan.",
+  },
+  {
+    q: "Berapa biaya berlangganan GoStay?",
+    a: "GoStay menawarkan free trial 14 hari tanpa kartu kredit. Setelah itu, paket mulai dari Rp 299.000/bulan untuk properti kecil. Detail paket lengkap tersedia setelah Anda mendaftar dan berbicara dengan tim kami.",
+  },
+  {
+    q: "Apakah data booking saya aman?",
+    a: "Sangat aman. Seluruh data disimpan di server terenkripsi dengan standar bank (TLS 1.3 + AES-256) dan backup otomatis setiap hari. Akses sistem dikontrol per role sehingga staf hanya bisa melihat data yang relevan dengan tugasnya.",
+  },
+  {
+    q: "Bagaimana cara tamu melakukan reservasi online?",
+    a: "Setiap hotel mendapatkan halaman booking publik di GoStay (contoh: gostay.id/namahotel). Anda bisa bagikan link ini di Instagram, WhatsApp, atau pasang tombol 'Pesan Sekarang' di website Anda sendiri. Tamu memilih tanggal, tipe kamar, dan konfirmasi dalam kurang dari 2 menit.",
+  },
+  {
+    q: "Apakah ada integrasi dengan OTA seperti Traveloka atau Booking.com?",
+    a: "GoStay mendukung sinkronisasi kalender (iCal) dengan berbagai OTA sehingga ketersediaan kamar selalu sinkron dan tidak terjadi double booking. Integrasi channel manager penuh (Traveloka, Booking.com, Agoda) tersedia di paket Premium.",
+  },
+  {
+    q: "Apakah saya perlu install software khusus?",
+    a: "Tidak perlu. GoStay berbasis web — cukup buka browser di laptop, tablet, atau smartphone Anda. Tidak ada instalasi, tidak ada update manual. Sistem selalu up-to-date secara otomatis.",
+  },
+  {
+    q: "Berapa lama proses setup?",
+    a: "Kebanyakan hotel selesai setup dalam 30–60 menit: tambah kamar, upload foto, atur harga, dan sistem siap menerima booking. Tim onboarding kami siap membantu via WhatsApp jika ada pertanyaan.",
+  },
+  {
+    q: "Apakah ada free trial?",
+    a: "Ya. Anda mendapatkan akses penuh ke semua fitur selama 14 hari gratis — tanpa kartu kredit, tanpa komitmen. Jika tidak cocok, tidak ada yang perlu dilakukan; akun otomatis non-aktif setelah masa trial berakhir.",
+  },
+];
+
+function FAQ() {
+  return (
+    <Section id="faq" className="py-20 bg-background">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6">
+        <motion.div variants={fadeUp} custom={0} className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-3">
+            Pertanyaan yang Sering Ditanyakan
+          </h2>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Masih ada yang ingin ditanyakan? Hubungi kami via WhatsApp{" "}
+            <a
+              href="https://wa.me/6281318000263"
+              className="text-primary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              +62 813 1800 0263
+            </a>
+            .
+          </p>
+        </motion.div>
+
+        <motion.div variants={fadeUp} custom={0.1}>
+          <Accordion type="single" collapsible className="w-full space-y-2">
+            {faqs.map((faq, i) => (
+              <AccordionItem
+                key={i}
+                value={`item-${i}`}
+                className="border border-border rounded-xl px-2"
+              >
+                <AccordionTrigger className="text-left font-medium hover:no-underline py-4">
+                  {faq.q}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4">
+                  {faq.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </motion.div>
+      </div>
+    </Section>
+  );
+}
+
 // ─── CTA ─────────────────────────────────────────────────────────────────────
 
 function CTA() {
   return (
-    <Section className="py-20 bg-background">
+    <Section className="py-20 bg-muted/30">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
         <motion.div variants={stagger} className="flex flex-col items-center gap-6">
           <motion.h2
             variants={childFade}
             className="text-3xl sm:text-5xl font-extrabold"
           >
-            Siap mulai perjalanan Anda?
+            Siap Berhenti Kehilangan Booking?
           </motion.h2>
-          <motion.p variants={childFade} className="text-muted-foreground text-lg">
-            Bergabung dengan 500+ hotel yang sudah mempercayakan bisnis mereka
-            ke GoStay.
+          <motion.p variants={childFade} className="text-muted-foreground text-lg max-w-xl">
+            Bergabung dengan 500+ hotel yang sudah menerima reservasi online,
+            mengurangi no-show, dan mengelola bisnis lebih efisien bersama GoStay.
           </motion.p>
           <motion.div variants={childFade} className="flex flex-col sm:flex-row gap-3">
             <Button size="lg" className="gap-2" asChild>
               <Link to="/register">
-                Mulai Gratis Sekarang
+                Coba Gratis 14 Hari
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -456,11 +593,11 @@ function Footer() {
           <a href="#features" className="hover:text-foreground transition-colors">
             Fitur
           </a>
-          <a href="#how-it-works" className="hover:text-foreground transition-colors">
-            Harga
+          <a href="#faq" className="hover:text-foreground transition-colors">
+            FAQ
           </a>
           <a
-            href="mailto:halo@gostay.id"
+            href="mailto:info@gostay.id"
             className="hover:text-foreground transition-colors"
           >
             Kontak
@@ -477,6 +614,20 @@ function Footer() {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.text = JSON.stringify(jsonLd);
+    script.id = "gostay-jsonld";
+    if (!document.getElementById("gostay-jsonld")) {
+      document.head.appendChild(script);
+    }
+    return () => {
+      const existing = document.getElementById("gostay-jsonld");
+      if (existing) existing.remove();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -485,6 +636,7 @@ export default function LandingPage() {
         <Features />
         <HowItWorks />
         <Testimonials />
+        <FAQ />
         <CTA />
       </main>
       <Footer />

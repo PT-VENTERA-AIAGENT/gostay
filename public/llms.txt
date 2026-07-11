@@ -1,0 +1,22 @@
+# GoStay
+
+GoStay adalah platform manajemen hotel dan reservasi online untuk hotel, villa, dan penginapan di Indonesia.
+
+## Fitur Utama
+- Reservasi online langsung dari website hotel
+- Manajemen kamar dan ketersediaan real-time
+- Sistem chat customer service terintegrasi
+- Laporan dan analitik bisnis
+- Manajemen tamu (CRM) sederhana
+
+## Target Pengguna
+Hotel, villa, guest house, dan penginapan skala kecil-menengah di Indonesia.
+
+## URL
+- Website utama: https://gostay.id
+- Portal tamu: https://gostay.id/portal
+- Dashboard hotel: https://app.gostay.id
+
+## Kontak
+- WhatsApp: +62 813 1800 0263
+- Email: info@gostay.id

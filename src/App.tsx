@@ -23,6 +23,7 @@ import CallLogs from "./pages/CallLogs";
 import NewCallLog from "./pages/NewCallLog";
 import Analytics from "./pages/Analytics";
 import UserManagement from "./pages/UserManagement";
+import CRM from "./pages/CRM";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -92,6 +93,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <UserManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/crm"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <CRM />
                   </ProtectedRoute>
                 }
               />
