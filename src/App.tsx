@@ -26,6 +26,7 @@ import UserManagement from "./pages/UserManagement";
 import CRM from "./pages/CRM";
 
 import Login from "./pages/Login";
+import AuthCallback from "./pages/AuthCallback";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 
@@ -66,6 +67,7 @@ const App = () => (
 
             {/* Auth pages (no layout, no auth required) */}
             <Route path="/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
 
