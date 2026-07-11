@@ -137,32 +137,150 @@ function Hero() {
             Gratis 14 hari · Tanpa kartu kredit · Setup dalam 30 menit
           </motion.p>
         </motion.div>
+      </div>
+    </section>
+  );
+}
 
-        {/* mock dashboard */}
-        <motion.div initial={{ opacity: 0, y: 48, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
-          className="mt-16 rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
-          <div className="bg-muted/60 px-4 py-3 flex items-center gap-2 border-b border-border">
-            <span className="h-3 w-3 rounded-full bg-destructive/60" />
-            <span className="h-3 w-3 rounded-full bg-warning/60" />
-            <span className="h-3 w-3 rounded-full bg-success/60" />
-            <span className="ml-3 text-xs text-muted-foreground font-mono">app.gostay.id/dashboard</span>
+// ─── Dashboard Preview ────────────────────────────────────────────────────────
+
+const recentBookings = [
+  { name: "Budi Santoso", room: "Deluxe King", checkIn: "11 Jul", checkOut: "13 Jul", status: "Confirmed", src: "WA Bot" },
+  { name: "Dewi Rahayu", room: "Superior Twin", checkIn: "11 Jul", checkOut: "12 Jul", status: "Check-in", src: "Website" },
+  { name: "Ahmad Fauzi", room: "Suite Premium", checkIn: "12 Jul", checkOut: "15 Jul", status: "Pending", src: "WA Bot" },
+  { name: "Siti Nurhaliza", room: "Deluxe King", checkIn: "13 Jul", checkOut: "14 Jul", status: "Confirmed", src: "OTA" },
+];
+
+const statusColor: Record<string, string> = {
+  Confirmed: "bg-primary/15 text-primary",
+  "Check-in": "bg-emerald-500/15 text-emerald-600",
+  Pending: "bg-amber-500/15 text-amber-600",
+};
+
+function DashboardPreview() {
+  return (
+    <section className="bg-muted/30 py-16 overflow-hidden">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+          className="text-center mb-10">
+          <p className="text-sm font-semibold text-primary uppercase tracking-widest mb-2">Dashboard GoStay</p>
+          <h2 className="text-2xl sm:text-3xl font-bold">Semua yang Anda Butuhkan, dalam Satu Layar</h2>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 48, scale: 0.97 }} whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          viewport={{ once: true }} transition={{ duration: 0.7, ease: "easeOut" }}
+          className="rounded-2xl border border-border bg-card shadow-2xl overflow-hidden ring-1 ring-border/50">
+
+          {/* Browser chrome */}
+          <div className="bg-muted/70 px-4 py-2.5 flex items-center gap-2 border-b border-border">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+            <span className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+            <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
+            <div className="ml-4 flex-1 max-w-xs bg-background/60 rounded-md px-3 py-1 text-[11px] text-muted-foreground font-mono border border-border/50">
+              app.gostay.id/dashboard
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-4 p-6">
-            {[
-              { label: "Booking Hari Ini", value: "24", icon: Calendar, sub: "+8 via WA Bot" },
-              { label: "Kamar Tersedia", value: "12", icon: Hotel, sub: "Update real-time" },
-              { label: "Pendapatan Bulan Ini", value: "Rp 48 jt", icon: BarChart3, sub: "+23% vs bulan lalu" },
-            ].map(({ label, value, icon: Icon, sub }) => (
-              <div key={label} className="bg-background rounded-xl p-4 border border-border flex flex-col gap-1">
-                <Icon className="h-5 w-5 text-primary mb-1" />
-                <p className="text-2xl font-bold">{value}</p>
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="text-[10px] text-primary font-medium">{sub}</p>
+
+          {/* App shell */}
+          <div className="flex h-[420px] text-xs overflow-hidden">
+            {/* Sidebar */}
+            <div className="hidden sm:flex w-44 flex-col border-r border-border bg-card px-2 py-4 gap-1 shrink-0">
+              <div className="flex items-center gap-2 px-2 mb-4">
+                <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center shrink-0">
+                  <span className="text-primary-foreground font-bold text-[10px]">G</span>
+                </div>
+                <span className="font-bold text-sm">GoStay</span>
               </div>
-            ))}
+              {[
+                { label: "Dashboard", active: true },
+                { label: "Reservasi", active: false },
+                { label: "Kamar", active: false },
+                { label: "Pesan", active: false, badge: "7" },
+                { label: "Inventaris", active: false },
+                { label: "Laporan", active: false },
+              ].map(({ label, active, badge }) => (
+                <div key={label} className={`flex items-center justify-between rounded-lg px-3 py-2 font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
+                  <span>{label}</span>
+                  {badge && <span className="bg-destructive text-destructive-foreground text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">{badge}</span>}
+                </div>
+              ))}
+            </div>
+
+            {/* Main content */}
+            <div className="flex-1 overflow-y-auto bg-background p-4 flex flex-col gap-4">
+              {/* Top bar */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm text-foreground">Selamat pagi, Pak Budi 👋</p>
+                  <p className="text-[11px] text-muted-foreground">Jumat, 11 Juli 2026</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <div className="w-6 h-6 rounded-full bg-muted border border-border flex items-center justify-center">
+                      <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-destructive rounded-full" />
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-[10px]">B</div>
+                </div>
+              </div>
+
+              {/* Stat cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Booking Hari Ini", value: "24", sub: "+8 via WA Bot", color: "text-primary" },
+                  { label: "Kamar Tersedia", value: "12/30", sub: "Update real-time", color: "text-emerald-600" },
+                  { label: "Occupancy Rate", value: "60%", sub: "↑ vs kemarin", color: "text-amber-600" },
+                  { label: "Pendapatan Bulan Ini", value: "48 jt", sub: "+23% vs lalu", color: "text-primary" },
+                ].map(({ label, value, sub, color }) => (
+                  <div key={label} className="bg-card rounded-xl p-3 border border-border flex flex-col gap-1">
+                    <p className={`text-lg font-extrabold ${color}`}>{value}</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
+                    <p className={`text-[10px] font-medium ${color}`}>{sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Recent bookings table */}
+              <div className="bg-card rounded-xl border border-border overflow-hidden flex-1">
+                <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+                  <span className="font-semibold text-foreground text-[11px]">Reservasi Terbaru</span>
+                  <span className="text-primary text-[10px] font-medium cursor-pointer hover:underline">Lihat semua →</span>
+                </div>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      {["Tamu", "Kamar", "Check-in", "Check-out", "Sumber", "Status"].map((h) => (
+                        <th key={h} className="text-left px-3 py-2 text-[10px] text-muted-foreground font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentBookings.map((b, i) => (
+                      <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="px-3 py-2 font-medium text-foreground text-[11px]">{b.name}</td>
+                        <td className="px-3 py-2 text-muted-foreground text-[11px]">{b.room}</td>
+                        <td className="px-3 py-2 text-muted-foreground text-[11px]">{b.checkIn}</td>
+                        <td className="px-3 py-2 text-muted-foreground text-[11px]">{b.checkOut}</td>
+                        <td className="px-3 py-2 text-[11px]">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${b.src === "WA Bot" ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground"}`}>{b.src}</span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColor[b.status]}`}>{b.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </motion.div>
+
+        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.4 }}
+          className="text-center text-xs text-muted-foreground mt-4">
+          Dashboard nyata GoStay — bukan mockup. <Link to="/login" className="text-primary hover:underline font-medium">Coba langsung gratis →</Link>
+        </motion.p>
       </div>
     </section>
   );
@@ -672,6 +790,7 @@ export default function LandingPage() {
       <Navbar />
       <main className="flex-1">
         <Hero />
+        <DashboardPreview />
         <PainPoints />
         <WAChatbot />
         <Features />
