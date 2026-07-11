@@ -1,5 +1,6 @@
 const SSO_ISSUER = "https://sso.ventera.ai";
 const CLIENT_ID = (import.meta.env.VITE_SSO_CLIENT_ID as string) ?? "gostay";
+const CLIENT_SECRET = import.meta.env.VITE_SSO_CLIENT_SECRET as string | undefined;
 
 function getRedirectUri() {
   return `${window.location.origin}/auth/callback`;
@@ -91,6 +92,7 @@ export async function handleCallback(
     body: new URLSearchParams({
       grant_type: "authorization_code",
       client_id: CLIENT_ID,
+      ...(CLIENT_SECRET ? { client_secret: CLIENT_SECRET } : {}),
       redirect_uri: getRedirectUri(),
       code,
       code_verifier: verifier,
