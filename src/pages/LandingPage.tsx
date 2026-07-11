@@ -119,7 +119,7 @@ function Hero() {
           </motion.h1>
 
           <motion.p variants={childFade} className="text-lg sm:text-xl text-muted-foreground max-w-2xl">
-            WhatsApp penuh, spreadsheet berantakan, staf kelelahan balas pesan satu-satu —
+            WhatsApp telat dibalas, spreadsheet berantakan, staf kelelahan balas pesan satu-satu —
             sementara calon tamu pergi ke hotel lain yang lebih mudah dipesan.
             <strong className="text-foreground"> GoStay menghentikan kebocoran itu.</strong>
           </motion.p>
@@ -173,8 +173,8 @@ function Hero() {
 const pains = [
   {
     icon: Phone,
-    title: "WA penuh, tapi booking sering terlewat",
-    desc: "Calon tamu tanya kamar via WA jam 11 malam — staf tidak ada yang jaga. Pagi-pagi sudah pesan di tempat lain.",
+    title: "WA telat dibalas, tamu sudah pesan di tempat lain",
+    desc: "Calon tamu tanya kamar via WA jam 11 malam — staf tidak ada yang jaga. Pagi-pagi baru dibalas, tamu sudah booking di hotel sebelah.",
   },
   {
     icon: FileSpreadsheet,
