@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { uuidV5, profileIdFor, roleForRealm, mintSupabaseToken, verifySupabaseToken } from "./identity";
+import { uuidV5, profileIdFor, mintSupabaseToken, verifySupabaseToken } from "./identity";
 
 const DNS_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
@@ -53,48 +53,6 @@ describe("profileIdFor", () => {
     expect(profileIdFor("ventera|12345")).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
-  });
-});
-
-describe("roleForRealm", () => {
-  const saved = { admin: process.env.SSO_ADMIN_REALMS, staff: process.env.SSO_STAFF_REALMS };
-  beforeEach(() => {
-    delete process.env.SSO_ADMIN_REALMS;
-    delete process.env.SSO_STAFF_REALMS;
-  });
-  afterEach(() => {
-    if (saved.admin === undefined) delete process.env.SSO_ADMIN_REALMS;
-    else process.env.SSO_ADMIN_REALMS = saved.admin;
-    if (saved.staff === undefined) delete process.env.SSO_STAFF_REALMS;
-    else process.env.SSO_STAFF_REALMS = saved.staff;
-  });
-
-  it("denies by default — a guest is never staff", () => {
-    expect(roleForRealm("customers")).toBe("customer");
-    expect(roleForRealm("totally-made-up")).toBe("customer");
-  });
-
-  it("treats a missing realm as a guest", () => {
-    expect(roleForRealm(undefined)).toBe("customer");
-    expect(roleForRealm("")).toBe("customer");
-  });
-
-  it("grants admin to the default employee realm", () => {
-    expect(roleForRealm("ventera-employees")).toBe("admin");
-  });
-
-  it("honours configured staff realms", () => {
-    process.env.SSO_STAFF_REALMS = "gostay-frontdesk, gostay-reservations";
-    expect(roleForRealm("gostay-frontdesk")).toBe("staff");
-    expect(roleForRealm("gostay-reservations")).toBe("staff");
-    expect(roleForRealm("gostay-cleaning")).toBe("customer");
-  });
-
-  it("lets the admin realm list be overridden", () => {
-    process.env.SSO_ADMIN_REALMS = "hotel-owners";
-    expect(roleForRealm("hotel-owners")).toBe("admin");
-    // The built-in default no longer applies once overridden.
-    expect(roleForRealm("ventera-employees")).toBe("customer");
   });
 });
 

@@ -386,7 +386,7 @@ A public-facing website (no login required to search; login/register required to
 | AC-PO-04 | If all rooms of a selected type become booked between search and confirmation (race condition), the system redirects to search with a clear "Room no longer available" message. |
 | AC-PO-05 | Cancellation via portal is allowed up to 24 hours before check-in date (configurable by admin). After the cutoff, cancellation shows a policy message and prompts the guest to call. |
 | AC-PO-06 | Portal is fully accessible: WCAG 2.1 AA compliance, keyboard navigable, screen reader friendly. |
-| AC-PO-07 | Customer sign-in goes through Ventera SSO (OIDC PKCE), the same issuer as staff. **Open question:** the SSO realm→role mapping does not currently produce a `customer` role — see §10.2 B. *(Revised v1.1.0.)* |
+| AC-PO-07 | Customer sign-in goes through Ventera SSO (OIDC PKCE), the same issuer as staff. Everyone starts as `customer`; staff access is granted per-user in the database, not by the SSO. *(Revised v1.1.0.)* |
 
 ---
 
@@ -1054,14 +1054,28 @@ Identity comes from Ventera SSO. Supabase Auth is not used, and there are no
       │                          • POSTs to sso.ventera.ai/oidc/token
       │                          • returns only id_token, access_token, expires_in
       ▼
-5. Claims are decoded from id_token; session is stored in sessionStorage
-   under "gostay_sso_session".
+5. Still server-side, the SSO identity is bridged into Supabase:
+      • profiles.id  = uuid_v5(SSO_UUID_NAMESPACE, sub)   — deterministic
+      • the profiles row is created if absent, with the schema default
+        role 'customer'; an existing row's role is never touched
+      • an HS256 JWT is minted (sub = profiles.id, role = "authenticated")
+      • profiles.role is read back and returned as the session's role
       │
       ▼
-6. AuthContext maps claims.realm → role:
-      realm === "ventera-employees"  →  "admin"
-      otherwise                      →  "staff"
+6. Claims are decoded from id_token; the session — including supabase_token
+   and the role read from the database — is stored in sessionStorage under
+   "gostay_sso_session".
+      │
+      ▼
+7. supabase-js presents supabase_token on every request via its `accessToken`
+   hook, so auth.uid() resolves and the RLS policies in 002 apply.
 ```
+
+**Where roles come from.** `profiles.role` in the database, and nothing else.
+The SSO realm is not consulted: mapping it to a role would create a second
+source of truth that could silently disagree with what RLS enforces, and would
+push every role change onto the SSO admin surface instead of this application.
+A new user is a `customer` until an admin promotes them.
 
 **Why the exchange is server-side.** A Vite build inlines every `VITE_*` variable
 into the JavaScript it ships, so a `VITE_SSO_CLIENT_SECRET` would be readable by
@@ -1081,9 +1095,12 @@ issuer's token endpoint via our own server, not through a browser redirect.
   httpOnly cookie would require the function to set the cookie and the client to
   stop reading tokens directly.
 - There is no refresh-token rotation; the session simply expires.
-- `realmToRole()` recognises only one realm and defaults everyone else to
-  `staff`. The `customer` role is defined in the schema but never assigned by
-  the SSO mapping, so portal-authenticated guests are currently treated as staff.
+- The first admin must be granted by hand. Everyone signs in as `customer`, and
+  only an admin may promote anyone ("Admin can update any profile" in `002`), so
+  a fresh deployment has nobody who can grant anything until a role is set
+  directly in the database. See §10.3.
+- The Supabase token expires with the SSO session and is not refreshed
+  independently.
 
 ### 5.4 Real-time Architecture
 
@@ -1765,19 +1782,28 @@ unrecognised realm, or no realm at all was verified to reach `/dashboard`,
 `/bookings`, `/rooms`, `/chat`, `/calls`, `/analytics` and `/crm` — the last of
 which lists every guest's name, email and phone. Only `/users` (admin-gated) held.
 
-The mapping is now deny-by-default: an unknown or absent realm resolves to
-`customer`, the least-privileged role, and realms are configurable via
-`VITE_SSO_ADMIN_REALMS` / `VITE_SSO_STAFF_REALMS` so granting staff access does
-not require a code change.
+The realm no longer decides anything. Roles come from `profiles.role` — the
+column `get_my_role()` already reads — and the SSO token cannot grant one. A
+realm→role mapping was tried first and then removed: it created a second source
+of truth that could disagree with what RLS enforced, and it meant every role
+change had to be made in the SSO admin surface rather than in this application.
 
 `ProtectedRoute` carried a related hole: `allowedRoles && role && !allowedRoles.includes(role)`
 skipped the check entirely when `role` was null, admitting the request. It now
 denies unless the role is present *and* permitted, and sends customers to
-`/portal` rather than the landing page.
+`/portal` rather than the landing page. A null role — no profile row yet, or
+Supabase unconfigured — therefore denies everything, which is the right answer
+when we do not know what the database would say.
 
-Re-verified after the fix: guest, unknown-realm and no-realm sessions reach
-**0 of 8** staff routes; a `ventera-employees` session still reaches all 8, so
-the tightening did not over-reach.
+Re-verified after the fix, by role on the session:
+
+| Role | Staff routes reached |
+|---|---|
+| `admin` | 8 of 8 |
+| `staff` | 7 of 8 — `/users` stays admin-only |
+| `customer` | 0 of 8 |
+| null (no profile / unconfigured) | 0 of 8 |
+| realm `ventera-employees`, no role | **0 of 8** — the realm confers nothing |
 
 > **This is a UI boundary, not a security boundary.** These checks run in the
 > browser against a session in `sessionStorage`, which a determined user can
@@ -1832,12 +1858,28 @@ into Supabase, so the policies in `002` work unchanged:
 5. `src/lib/supabase.ts` presents that token through supabase-js's `accessToken`
    hook, so `auth.uid()` resolves on every request.
 
-**Where the role now lives.** `profiles.role` is authoritative, because that is
-what `get_my_role()` reads. The realm seeds it on first login only — a role an
-admin later changes in User Management survives the next sign-in. The app role
-is deliberately **not** a JWT claim: a claim would let a stale token retain a
-privilege after it was revoked, whereas a table read reflects the change at once.
-The realm mapping in `AuthContext` is now purely cosmetic.
+**Where the role lives.** `profiles.role`, and nowhere else — it is what
+`get_my_role()` reads and therefore what every policy enforces. Nothing in the
+SSO token can grant a role: the profile is inserted without one, so the column
+default (`'customer'`) applies, and an existing row's role is never written on
+login. Promotion is a database change, made through User Management.
+
+The app role is deliberately **not** a JWT claim either: a claim would let a
+stale token retain a privilege after it was revoked, whereas a table read
+reflects the change at once.
+
+**Granting the first admin.** Everyone arrives as `customer`, and only an admin
+may promote anyone (`"Admin can update any profile"`), so a fresh deployment has
+nobody who can grant anything. Sign in once to create the row, then run this in
+the Supabase SQL editor, which executes as the table owner and bypasses RLS:
+
+```sql
+update profiles set role = 'admin' where email = 'you@ventera.ai';
+```
+
+Everyone else is promoted from User Management after that — though note that
+page is still a mockup (§10.1), so until it is wired up role changes have to be
+made in the SQL editor too.
 
 **Degradation.** Without `SUPABASE_JWT_SECRET` the bridge is skipped entirely —
 no token is minted and no profile is provisioned. Sign-in still succeeds and the
@@ -1852,9 +1894,11 @@ login it cannot use.
   than merely self-consistent; derivation is stable and namespace-separated.
 - Driven end-to-end against a mock OIDC issuer and mock PostgREST: the secret
   and PKCE verifier reach the issuer, `redirect_uri` is derived from `Origin`,
-  an upstream error body is never forwarded, the profile is created once with
-  the realm-derived role, a role changed by an admin is not overwritten, a guest
-  gets `customer`, and an unconfigured Supabase still signs the user in.
+  an upstream error body is never forwarded, the profile is created once and
+  **never with a `role` field**, a role an admin granted is not overwritten on
+  the next login, a privileged-looking realm changes nothing, provisioning
+  failure yields a null role rather than a guess, and an unconfigured Supabase
+  still signs the user in.
 - In a real browser: the minted token is sent as
   `Authorization: Bearer <jwt>` on PostgREST requests — so `auth.uid()` will
   resolve to the derived uuid — and a session without one falls back to the anon
@@ -1870,11 +1914,19 @@ instance, and should be checked before trusting this in production:
 
 1. Apply `001`, `002`, `003` to the project.
 2. Set `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` and the `SSO_*` vars.
-3. Sign in as an employee — confirm a `profiles` row appears with the expected
-   role and that `/bookings` lists data.
-4. Sign in as a guest — confirm the row has role `customer` and that the guest
-   sees only their own bookings.
-5. Confirm an anon session (no token) still reads `room_types` and nothing else.
+3. Sign in once. Confirm a `profiles` row appears with `role = 'customer'` and
+   `sso_sub` set, and that the back-office is denied — that is the correct state
+   before anyone is promoted.
+4. Promote that row to `admin` (the SQL above), sign in again, and confirm
+   `/bookings` and `/crm` now list data. This is the check that proves
+   `get_my_role()` resolves — i.e. that the minted `sub` really does reach
+   `auth.uid()`.
+5. Sign in as a second user, leave them `customer`, and confirm they see only
+   their own bookings and nothing in the back-office.
+6. Confirm an anon session (no token) still reads `room_types` and nothing else.
+
+Step 4 is the one that matters most: everything up to it is verified, and it is
+the first moment a real policy is evaluated by a real database.
 
 ### 10.4 Environment and configuration
 
@@ -1912,10 +1964,8 @@ instance, and should be checked before trusting this in production:
    bridge is built and tested, but no policy in `002` has ever been evaluated by
    a real database. Run the five checks at the end of §10.3 before trusting it.
    This is the one item that cannot be deferred.
-2. Confirm the realm taxonomy at `sso.ventera.ai` and set
-   `VITE_SSO_ADMIN_REALMS` / `VITE_SSO_STAFF_REALMS` accordingly. The default
-   grants `admin` to `ventera-employees` and `customer` to everyone else, which
-   is safe but likely too coarse — front-desk staff should not be admins.
+2. Grant the first admin (the SQL in §10.3), then promote the front-desk team
+   to `staff`. Nobody can use the back-office until this is done.
 3. Wire Dashboard, Analytics and User Management to the services that already
    exist (§10.1). `analyticsService.ts` and `userService.ts` are written and
    waiting; the work is mostly at the page level.

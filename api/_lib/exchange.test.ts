@@ -70,9 +70,12 @@ beforeAll(async () => {
       if (req.method === "POST") {
         const row = JSON.parse(body);
         state.inserts.push(row);
-        state.profileRows.push(row);
+        // Emulate the column default in 001_initial_schema.sql:
+        //   role user_role not null default 'customer'
+        const stored = { role: "customer", ...row };
+        state.profileRows.push(stored);
         res.writeHead(201, { "Content-Type": "application/json" });
-        res.end(JSON.stringify([row]));
+        res.end(JSON.stringify([stored]));
         return;
       }
       if (req.method === "PATCH") {
@@ -97,8 +100,6 @@ beforeAll(async () => {
   process.env.SUPABASE_URL = base;
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
   process.env.SUPABASE_JWT_SECRET = JWT_SECRET;
-  delete process.env.SSO_ADMIN_REALMS;
-  delete process.env.SSO_STAFF_REALMS;
   delete process.env.SSO_UUID_NAMESPACE;
 });
 
@@ -158,7 +159,7 @@ describe("exchangeCode — Supabase identity bridge", () => {
     expect((claims.exp as number) - (claims.iat as number)).toBe(3600);
   });
 
-  it("creates the profile on first login with the realm-derived role", async () => {
+  it("creates the profile on first login", async () => {
     const r = await call();
     expect(state.inserts).toHaveLength(1);
     expect(state.inserts[0]).toMatchObject({
@@ -166,32 +167,42 @@ describe("exchangeCode — Supabase identity bridge", () => {
       sso_sub: SSO_SUB,
       email: "staff@ventera.ai",
       full_name: "Rafli Staff",
-      role: "admin",
     });
-    expect(r.body.role).toBe("admin");
-  });
-
-  it("gives a guest the customer role, not staff", async () => {
-    state.realm = "customers";
-    const r = await call();
-    expect(state.inserts[0].role).toBe("customer");
+    // The column default applies, so a new arrival is a guest.
     expect(r.body.role).toBe("customer");
   });
 
-  it("treats a missing realm as a guest", async () => {
+  it("never sends a role on insert — the database decides", async () => {
+    await call();
+    expect(state.inserts[0]).not.toHaveProperty("role");
+  });
+
+  it("ignores the realm entirely, even a privileged-looking one", async () => {
+    // An employee realm must not confer anything: roles come from the database.
+    state.realm = "ventera-employees";
+    const r = await call();
+    expect(state.inserts[0]).not.toHaveProperty("role");
+    expect(r.body.role).toBe("customer");
+  });
+
+  it("gives the same result whatever the realm claims", async () => {
+    state.realm = "admins";
+    const first = await call();
+    state.inserts = [];
+    state.profileRows = [];
     state.realm = undefined;
-    const r = await call();
-    expect(state.inserts[0].role).toBe("customer");
-    expect(r.body.role).toBe("customer");
+    const second = await call();
+    expect(first.body.role).toBe(second.body.role);
   });
 
-  it("does not overwrite a role an admin changed after first login", async () => {
-    // Employee realm would seed "admin", but an admin demoted them since.
-    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "staff" }];
+  it("does not overwrite a role an admin granted after first login", async () => {
+    // The admin promoted this user in User Management; signing in again must
+    // not undo that.
+    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "admin" }];
     const r = await call();
 
     expect(state.inserts).toHaveLength(0);
-    expect(r.body.role).toBe("staff");
+    expect(r.body.role).toBe("admin");
     // Contact details still refresh; role is deliberately absent from the patch.
     expect(state.patches).toHaveLength(1);
     expect(state.patches[0]).not.toHaveProperty("role");
@@ -199,11 +210,23 @@ describe("exchangeCode — Supabase identity bridge", () => {
   });
 
   it("reports the stored role, which is what RLS enforces", async () => {
-    state.realm = "ventera-employees";
-    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "customer" }];
+    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "staff" }];
     const r = await call();
-    // Realm says admin; the database says customer. The database wins.
-    expect(r.body.role).toBe("customer");
+    expect(r.body.role).toBe("staff");
+  });
+
+  it("reports no role when provisioning fails, rather than guessing one", async () => {
+    // A null role denies every gated route in the UI — the right answer when we
+    // do not know what the database would say.
+    const url = process.env.SUPABASE_URL;
+    process.env.SUPABASE_URL = "http://127.0.0.1:1"; // nothing listening
+    try {
+      const r = await call();
+      expect(r.status).toBe(200);
+      expect(r.body.role).toBeNull();
+    } finally {
+      process.env.SUPABASE_URL = url;
+    }
   });
 
   it("still signs the user in when Supabase is not configured", async () => {

@@ -33,46 +33,21 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function parseRealms(raw: string | undefined, fallback: string[]): string[] {
-  const parsed = (raw ?? "")
-    .split(",")
-    .map((r) => r.trim())
-    .filter(Boolean);
-  return parsed.length ? parsed : fallback;
-}
-
-const ADMIN_REALMS = parseRealms(import.meta.env.VITE_SSO_ADMIN_REALMS, ["ventera-employees"]);
-const STAFF_REALMS = parseRealms(import.meta.env.VITE_SSO_STAFF_REALMS, []);
-
 /**
- * Maps an SSO realm to an application role, denying by default.
+ * The role comes from `profiles.role` in the database, read back by
+ * /api/sso/token and carried on the session. Nothing in the SSO token — realm
+ * included — grants a role: the database is the only source of truth, which is
+ * also what get_my_role() reads inside every RLS policy.
  *
- * Anyone who authenticates against the issuer lands here, including guests —
- * the portal's own "Sign In" points at the same /login. So an unrecognised or
- * absent realm must resolve to the *least* privileged role, never to `staff`.
+ * Null when Supabase is not configured, or before a profile exists. Null denies
+ * every gated route, which is the correct answer in both cases.
  *
- * Only a fallback: when the server has provisioned a profile it returns the
- * stored role on the session, and that is what the database enforces. This runs
- * when Supabase is not configured, or before a profile exists.
+ * This value is not a security boundary: it only decides what the browser
+ * renders, and the session it comes from is editable. Enforcement lives in the
+ * RLS policies keyed on auth.uid().
  */
-function realmToRole(realm?: string): UserRole {
-  if (!realm) return "customer";
-  if (ADMIN_REALMS.includes(realm)) return "admin";
-  if (STAFF_REALMS.includes(realm)) return "staff";
-  return "customer";
-}
-
-/**
- * The role to show in the UI. Prefers the role the server read back from
- * profiles, because that is the one RLS applies — an admin may have changed it
- * since the user's realm was assigned.
- *
- * Neither source is a security boundary: this value only decides what the
- * browser renders, and the session it comes from is editable. Enforcement lives
- * in the RLS policies keyed on auth.uid().
- */
-function resolveRole(session: SsoSession): UserRole {
-  return session.role ?? realmToRole(session.claims.realm);
+function resolveRole(session: SsoSession): UserRole | null {
+  return session.role ?? null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

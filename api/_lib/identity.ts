@@ -48,28 +48,20 @@ export function profileIdFor(ssoSub: string): string {
   return uuidV5(ssoSub, ns);
 }
 
-// ─── Role mapping (authoritative) ────────────────────────────────────────────
-
-export type AppRole = "admin" | "staff" | "customer";
-
-function realms(raw: string | undefined, fallback: string[]): string[] {
-  const parsed = (raw ?? "").split(",").map((r) => r.trim()).filter(Boolean);
-  return parsed.length ? parsed : fallback;
-}
-
 /**
- * Server-side realm→role mapping. This one is authoritative: it decides the
- * role written to profiles.role, which is what RLS reads. The identical mapping
- * in AuthContext only drives what the UI shows and can be tampered with freely.
+ * Roles are not derived from anything in the SSO token.
  *
- * Denies by default — an unrecognised or absent realm is a guest.
+ * `profiles.role` is the only source of truth: it is what get_my_role() reads,
+ * and therefore what every RLS policy enforces. A new profile takes the schema
+ * default ('customer'); promoting someone is a database change, made through
+ * User Management or the Supabase SQL editor.
+ *
+ * Mapping the SSO realm to a role as well would create a second source of
+ * truth that could silently disagree with the database — and it would mean
+ * every role change had to go through the SSO admin surface rather than this
+ * application.
  */
-export function roleForRealm(realm?: string): AppRole {
-  if (!realm) return "customer";
-  if (realms(process.env.SSO_ADMIN_REALMS, ["ventera-employees"]).includes(realm)) return "admin";
-  if (realms(process.env.SSO_STAFF_REALMS, []).includes(realm)) return "staff";
-  return "customer";
-}
+export type AppRole = "admin" | "staff" | "customer";
 
 // ─── Supabase JWT ────────────────────────────────────────────────────────────
 

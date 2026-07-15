@@ -13,14 +13,12 @@ export interface ProvisionInput {
   ssoSub: string;
   email: string;
   fullName: string;
-  /** Seeds the role on first login only. */
-  initialRole: AppRole;
 }
 
 export interface ProvisionResult {
   ok: boolean;
   created: boolean;
-  /** The role now in the database, which may differ from initialRole. */
+  /** The role as stored in the database — the only role that means anything. */
   role: AppRole | null;
   error?: string;
 }
@@ -38,6 +36,22 @@ export function provisioningEnabled(): boolean {
 }
 
 export async function provisionProfile(input: ProvisionInput): Promise<ProvisionResult> {
+  // A network failure here must not take the whole sign-in down with it. fetch
+  // rejects on DNS failures, refused connections and timeouts, none of which
+  // the per-response `.ok` checks below would ever see.
+  try {
+    return await runProvision(input);
+  } catch (e) {
+    return {
+      ok: false,
+      created: false,
+      role: null,
+      error: `network_error: ${(e as Error).message}`,
+    };
+  }
+}
+
+async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
   const { url, serviceKey } = config();
   if (!url || !serviceKey) {
     return { ok: false, created: false, role: null, error: "provisioning_not_configured" };
@@ -60,9 +74,9 @@ export async function provisionProfile(input: ProvisionInput): Promise<Provision
   const rows = (await existing.json()) as Array<{ id: string; role: AppRole }>;
 
   if (rows.length > 0) {
-    // The row is already there. Refresh the contact fields, but leave `role`
-    // alone: an admin may have promoted or demoted this user in User
-    // Management, and that decision must outlive the next login.
+    // The row is already there. Refresh the contact fields, but never touch
+    // `role`: it is owned by the database, and an admin's decision to promote
+    // or demote must outlive every subsequent login.
     const patch = await fetch(`${url}/rest/v1/profiles?id=eq.${encodeURIComponent(input.profileId)}`, {
       method: "PATCH",
       headers: { ...headers, Prefer: "return=representation" },
@@ -80,6 +94,9 @@ export async function provisionProfile(input: ProvisionInput): Promise<Provision
     return { ok: true, created: false, role: rows[0].role };
   }
 
+  // `role` is deliberately absent: the column defaults to 'customer', so a new
+  // arrival gets the least privilege and is promoted later through the database.
+  // Sending a role here would let the SSO token influence authorization.
   const insert = await fetch(`${url}/rest/v1/profiles`, {
     method: "POST",
     headers: { ...headers, Prefer: "return=representation" },
@@ -88,7 +105,6 @@ export async function provisionProfile(input: ProvisionInput): Promise<Provision
       sso_sub: input.ssoSub,
       email: input.email,
       full_name: input.fullName,
-      role: input.initialRole,
     }),
   });
 
@@ -97,5 +113,5 @@ export async function provisionProfile(input: ProvisionInput): Promise<Provision
   }
 
   const created = (await insert.json()) as Array<{ role: AppRole }>;
-  return { ok: true, created: true, role: created[0]?.role ?? input.initialRole };
+  return { ok: true, created: true, role: created[0]?.role ?? null };
 }

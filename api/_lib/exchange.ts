@@ -8,7 +8,7 @@
 // The client secret is read from SSO_CLIENT_SECRET — deliberately without a
 // VITE_ prefix, so Vite can never inline it into the browser bundle.
 
-import { mintSupabaseToken, profileIdFor, roleForRealm, type AppRole } from "./identity";
+import { mintSupabaseToken, profileIdFor, type AppRole } from "./identity";
 import { provisionProfile, provisioningEnabled } from "./provision";
 
 // Read lazily, never at module scope: the Vite dev middleware populates
@@ -142,9 +142,11 @@ async function buildSupabaseSession(claims: IdTokenClaims, expiresInSeconds: num
 
   const sub = claims.sub as string;
   const profileId = profileIdFor(sub);
-  const initialRole = roleForRealm(claims.realm);
 
-  let role: AppRole = initialRole;
+  // Null until the database says otherwise. Nothing in the SSO token can grant
+  // a role: profiles.role is the only source of truth, and a null role means
+  // the UI denies every gated route.
+  let role: AppRole | null = null;
 
   if (provisioningEnabled()) {
     const result = await provisionProfile({
@@ -152,14 +154,12 @@ async function buildSupabaseSession(claims: IdTokenClaims, expiresInSeconds: num
       ssoSub: sub,
       email: claims.email ?? "",
       fullName: claims.name ?? claims.email ?? "",
-      initialRole,
     });
     if (!result.ok) {
       // Sign-in still succeeds; the user simply sees empty data rather than a
       // dead login. Surfacing it here beats failing silently at query time.
       console.error(`[sso] profile provisioning failed: ${result.error}`);
-    } else if (result.role) {
-      // The stored role wins — an admin may have changed it since first login.
+    } else {
       role = result.role;
     }
   }
