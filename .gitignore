@@ -7,16 +7,43 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 *.local
+
+# Environment / secrets — only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# Vite / TypeScript caches
+.vite
+*.tsbuildinfo
+
+# Test output
+coverage
+playwright-report
+test-results
+blob-report
+
+# Deploy
+.vercel
+
+# Supabase CLI local state
+supabase/.branches
+supabase/.temp
+supabase/.env
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
