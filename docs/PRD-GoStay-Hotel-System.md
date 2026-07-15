@@ -435,7 +435,7 @@ All tables reside in Supabase PostgreSQL. Row Level Security (RLS) policies enfo
 ---
 
 #### `profiles`
-One row per user account. The original draft extended Supabase Auth's `auth.users`; that dependency no longer holds, since identity comes from Ventera SSO and Supabase Auth is unused. `profiles.id` is expected to carry the SSO subject (`sub`) claim. Note that the RLS policies still resolve this table via `auth.uid()`, which is always NULL under the current design — see §10.3.
+One row per user account. The original draft extended Supabase Auth's `auth.users`; that dependency no longer holds, since identity comes from Ventera SSO and Supabase Auth is unused. `profiles.id` is a uuid derived from the SSO subject as `uuid_v5(SSO_UUID_NAMESPACE, sub)`, and `sso_sub` (added in `003_sso_identity.sql`) keeps the original claim. The FK to `auth.users` and the `on_auth_user_created` trigger were dropped in `003` — both were unreachable once Supabase Auth stopped being used. The RLS policies resolve this table via `auth.uid()`, which works because the token minted by `api/sso/token.ts` carries that uuid as `sub` — see §10.3.
 
 ```
 profiles
@@ -1221,7 +1221,8 @@ arbitrary redirect target.
 > **Status: none of the endpoints below exist.** There are no Next.js Route
 > Handlers in this project (see §5.2). Reads and writes currently go from the
 > browser straight to Supabase via `src/services/*`, relying on RLS for
-> authorization — a model that is presently broken (§10.3). The specifications
+> authorization, with the SSO identity bridged into Supabase so that RLS can
+> apply (§10.3). The specifications
 > below remain the target design for moving mutations server-side; the
 > `@supabase/ssr` session validation they describe does not apply while
 > authentication is handled by Ventera SSO rather than Supabase Auth.
@@ -1703,6 +1704,10 @@ feature sections (§3) disagree, this section is correct.
 Two thirds of the pages are genuinely wired to the data layer. The rest are
 static mockups that look finished but read nothing.
 
+> "Live" here means the page fetches and renders correctly against a **stubbed**
+> Supabase. Whether it returns rows against the real one depends on the identity
+> bridge in §10.3, which has not yet been checked against a live database.
+
 | Page | Route | Status |
 |---|---|---|
 | Landing | `/` | **Live** — static by design (marketing) |
@@ -1777,18 +1782,16 @@ the tightening did not over-reach.
 > **This is a UI boundary, not a security boundary.** These checks run in the
 > browser against a session in `sessionStorage`, which a determined user can
 > edit. They stop accidental and casual access, not a deliberate attacker. The
-> real boundary is the database, and it is not currently working — see §10.3.
+> real boundary is the database — see §10.3, which is now wired up but still
+> awaiting a check against a live Postgres.
 
 **C. `TopBar` showed a fabricated identity. FIXED.** It hardcoded
 "Jaylon Dorwart" and the role "Admin" on every page. It now renders the name,
 initials and mapped role from the live session.
 
-### 10.3 The authorization model is currently broken
+### 10.3 The authorization model — repaired, pending a live check
 
-This is the most consequential gap, and it is why §10.1's "Live" ratings must be
-read with care — they were verified against a *stub*.
-
-`supabase/migrations/002_rls_policies.sql` enables RLS on all twelve tables and
+**The problem.** `002_rls_policies.sql` enables RLS on all twelve tables and
 gates them on `auth.uid()` (13 occurrences), mostly via:
 
 ```sql
@@ -1798,29 +1801,80 @@ returns user_role language sql stable security definer as $$
 $$;
 ```
 
-But the app no longer uses Supabase Auth. It talks to PostgREST with the **anon
-key** and the Ventera session is never handed to Supabase. Therefore `auth.uid()`
-is always `NULL`, `get_my_role()` always returns `NULL`, and every
-staff/admin/customer policy evaluates false.
+But the app stopped using Supabase Auth when it moved to Ventera SSO. It talked
+to PostgREST with the **anon key**, and the Ventera session was never handed to
+Supabase — so `auth.uid()` was always `NULL`, `get_my_role()` always returned
+`NULL`, and every staff/admin/customer policy evaluated false. Against a real
+project the only readable table would have been `room_types`
+(`"Anyone can view active room types"`); the entire staff surface would have
+returned zero rows while still rendering correctly against a stub.
 
-**Consequence:** against a real Supabase project, the only readable table is
-`room_types` (`"Anyone can view active room types"`). Bookings, customers, chat,
-call logs and rooms would all return zero rows, and every write would be rejected
-— even though the same pages render correctly against a stub. The staff UI is
-built on a data layer it is not currently authorized to reach.
+Worse, `profiles` was unreachable in both directions: `profiles.id` carried a
+foreign key to `auth.users(id)`, and the `on_auth_user_created` trigger fired
+off `auth.users`. With nothing writing to `auth.users`, a profile row could
+never be created at all — so even a correct `auth.uid()` would have found no row
+and `get_my_role()` would still have returned `NULL`.
 
-Resolving this requires a decision (see Appendix B):
+**The fix — option 1 from the original three.** The SSO identity is now bridged
+into Supabase, so the policies in `002` work unchanged:
 
-1. **Mint a Supabase JWT from the SSO identity.** The `api/sso/token.ts` function
-   already runs server-side and holds the client secret; it could additionally
-   sign a Supabase-compatible JWT carrying `sub` and `role` so the existing RLS
-   policies work unchanged. Smallest change; keeps browser→Supabase calls.
-2. **Move reads/writes behind server endpoints** using the service-role key, per
-   the §7.1.2 design. Larger change; removes reliance on RLS.
-3. **Rewrite the policies** around a claim the anon client can present. Weakest —
-   the anon key is public, so this offers little real protection.
+1. `003_sso_identity.sql` drops the `auth.users` trigger and the FK on
+   `profiles.id`, and adds `profiles.sso_sub` for traceability.
+2. `api/sso/token.ts` derives `profiles.id = uuid_v5(SSO_UUID_NAMESPACE, sub)` —
+   deterministic, so a returning user always resolves to the same row without a
+   lookup table, and an opaque non-uuid subject still yields a valid uuid.
+3. It provisions the profile on first login using the **service_role** key.
+   Provisioning is deliberately server-side: `profiles` must not be
+   self-insertable, or a guest could mint themselves an admin row.
+4. It mints an HS256 JWT signed with `SUPABASE_JWT_SECRET`, carrying
+   `sub = profiles.id`, `aud`/`role = "authenticated"`, and expiring with the
+   SSO session.
+5. `src/lib/supabase.ts` presents that token through supabase-js's `accessToken`
+   hook, so `auth.uid()` resolves on every request.
 
-Until one is chosen, the staff surface cannot work against real data.
+**Where the role now lives.** `profiles.role` is authoritative, because that is
+what `get_my_role()` reads. The realm seeds it on first login only — a role an
+admin later changes in User Management survives the next sign-in. The app role
+is deliberately **not** a JWT claim: a claim would let a stale token retain a
+privilege after it was revoked, whereas a table read reflects the change at once.
+The realm mapping in `AuthContext` is now purely cosmetic.
+
+**Degradation.** Without `SUPABASE_JWT_SECRET` the bridge is skipped entirely —
+no token is minted and no profile is provisioned. Sign-in still succeeds and the
+client falls back to anon, reading only public data. This is deliberate: a
+half-configured deployment should read nothing rather than write a row on every
+login it cannot use.
+
+**Verified** (34 automated tests, `npm test`):
+
+- `uuidV5` matches the published RFC 4122 vector
+  (`uuid5(DNS, "python.org") = 886313e1-…`), so it is standard-correct rather
+  than merely self-consistent; derivation is stable and namespace-separated.
+- Driven end-to-end against a mock OIDC issuer and mock PostgREST: the secret
+  and PKCE verifier reach the issuer, `redirect_uri` is derived from `Origin`,
+  an upstream error body is never forwarded, the profile is created once with
+  the realm-derived role, a role changed by an admin is not overwritten, a guest
+  gets `customer`, and an unconfigured Supabase still signs the user in.
+- In a real browser: the minted token is sent as
+  `Authorization: Bearer <jwt>` on PostgREST requests — so `auth.uid()` will
+  resolve to the derived uuid — and a session without one falls back to the anon
+  key.
+- Neither `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` nor
+  `SSO_CLIENT_SECRET` appears in `dist/` after a build (canary-checked).
+
+**Not yet verified — the one gap.** Nothing here has run against a live
+Postgres. What is proven is that a correctly-signed token carrying the right
+`sub` reaches the database; what is *not* proven is that the policies in `002`
+then return the intended rows. That needs either a Supabase project or a local
+instance, and should be checked before trusting this in production:
+
+1. Apply `001`, `002`, `003` to the project.
+2. Set `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` and the `SSO_*` vars.
+3. Sign in as an employee — confirm a `profiles` row appears with the expected
+   role and that `/bookings` lists data.
+4. Sign in as a guest — confirm the row has role `customer` and that the guest
+   sees only their own bookings.
+5. Confirm an anon session (no token) still reads `room_types` and nothing else.
 
 ### 10.4 Environment and configuration
 
@@ -1854,9 +1908,10 @@ Until one is chosen, the staff surface cannot work against real data.
 
 ### 10.6 Suggested order of work
 
-1. **Decide the authorization model (§10.3).** Everything else on the staff side
-   is blocked behind it, and until it is resolved the role checks in §10.2 B are
-   cosmetic. This is the one item that cannot be deferred.
+1. **Verify the authorization model against a live Postgres (§10.3).** The
+   bridge is built and tested, but no policy in `002` has ever been evaluated by
+   a real database. Run the five checks at the end of §10.3 before trusting it.
+   This is the one item that cannot be deferred.
 2. Confirm the realm taxonomy at `sso.ventera.ai` and set
    `VITE_SSO_ADMIN_REALMS` / `VITE_SSO_STAFF_REALMS` accordingly. The default
    grants `admin` to `ventera-employees` and `customer` to everyone else, which

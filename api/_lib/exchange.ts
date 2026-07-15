@@ -8,6 +8,9 @@
 // The client secret is read from SSO_CLIENT_SECRET — deliberately without a
 // VITE_ prefix, so Vite can never inline it into the browser bundle.
 
+import { mintSupabaseToken, profileIdFor, roleForRealm, type AppRole } from "./identity";
+import { provisionProfile, provisioningEnabled } from "./provision";
+
 // Read lazily, never at module scope: the Vite dev middleware populates
 // process.env from .env only after this module has already been imported.
 function config() {
@@ -87,6 +90,13 @@ export async function exchangeCode({
   }
 
   const tokens = (await res.json()) as Record<string, unknown>;
+  const claims = decodeIdToken(tokens.id_token as string | undefined);
+
+  // Bridge the SSO identity into Supabase. Without this the browser talks to
+  // PostgREST as anon, auth.uid() is NULL, and every RLS policy denies.
+  const supabase = claims?.sub
+    ? await buildSupabaseSession(claims, Number(tokens.expires_in ?? 3600))
+    : null;
 
   // Only the fields the client actually needs. The refresh_token, if the issuer
   // sends one, stays server-side.
@@ -97,6 +107,70 @@ export async function exchangeCode({
       access_token: tokens.access_token,
       expires_in: tokens.expires_in,
       token_type: tokens.token_type,
+      supabase_token: supabase?.token ?? null,
+      // What the database will actually enforce, as opposed to what the client
+      // infers from the realm for display purposes.
+      role: supabase?.role ?? null,
+      profile_id: supabase?.profileId ?? null,
     },
   };
+}
+
+interface IdTokenClaims {
+  sub?: string;
+  email?: string;
+  name?: string;
+  realm?: string;
+}
+
+function decodeIdToken(idToken?: string): IdTokenClaims | null {
+  if (!idToken) return null;
+  const part = idToken.split(".")[1];
+  if (!part) return null;
+  try {
+    return JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as IdTokenClaims;
+  } catch {
+    return null;
+  }
+}
+
+async function buildSupabaseSession(claims: IdTokenClaims, expiresInSeconds: number) {
+  // The bridge is all-or-nothing on the signing secret: without it we cannot
+  // mint a usable token, so provisioning a row would be a pointless write to
+  // the live database on every single login.
+  if (!process.env.SUPABASE_JWT_SECRET) return null;
+
+  const sub = claims.sub as string;
+  const profileId = profileIdFor(sub);
+  const initialRole = roleForRealm(claims.realm);
+
+  let role: AppRole = initialRole;
+
+  if (provisioningEnabled()) {
+    const result = await provisionProfile({
+      profileId,
+      ssoSub: sub,
+      email: claims.email ?? "",
+      fullName: claims.name ?? claims.email ?? "",
+      initialRole,
+    });
+    if (!result.ok) {
+      // Sign-in still succeeds; the user simply sees empty data rather than a
+      // dead login. Surfacing it here beats failing silently at query time.
+      console.error(`[sso] profile provisioning failed: ${result.error}`);
+    } else if (result.role) {
+      // The stored role wins — an admin may have changed it since first login.
+      role = result.role;
+    }
+  }
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const token = mintSupabaseToken({
+    profileId,
+    email: claims.email,
+    issuedAt,
+    expiresAt: issuedAt + expiresInSeconds,
+  });
+
+  return { token, role, profileId };
 }

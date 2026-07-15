@@ -50,10 +50,23 @@ export interface SsoClaims {
   exp?: number;
 }
 
+export type SsoRole = "admin" | "staff" | "customer";
+
 export interface SsoSession {
   claims: SsoClaims;
   access_token: string;
   expires_at: number;
+  /**
+   * Supabase-compatible JWT minted by /api/sso/token. supabase-js presents it
+   * via the `accessToken` hook, which is what makes auth.uid() resolve and RLS
+   * work. Null when SUPABASE_JWT_SECRET is not configured — the app then falls
+   * back to anon and reads only public data.
+   */
+  supabase_token?: string | null;
+  /** The role the database will enforce. Authoritative; decided server-side. */
+  role?: SsoRole | null;
+  /** profiles.id — a uuid derived from the SSO subject. */
+  profile_id?: string | null;
 }
 
 export async function startLogin(returnTo = "/") {
@@ -108,6 +121,9 @@ export async function handleCallback(
     claims,
     access_token: tokens.access_token as string,
     expires_at: Date.now() + Number(tokens.expires_in ?? 3600) * 1000,
+    supabase_token: (tokens.supabase_token as string | null) ?? null,
+    role: (tokens.role as SsoRole | null) ?? null,
+    profile_id: (tokens.profile_id as string | null) ?? null,
   };
 
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));

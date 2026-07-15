@@ -50,12 +50,29 @@ const STAFF_REALMS = parseRealms(import.meta.env.VITE_SSO_STAFF_REALMS, []);
  * Anyone who authenticates against the issuer lands here, including guests —
  * the portal's own "Sign In" points at the same /login. So an unrecognised or
  * absent realm must resolve to the *least* privileged role, never to `staff`.
+ *
+ * Only a fallback: when the server has provisioned a profile it returns the
+ * stored role on the session, and that is what the database enforces. This runs
+ * when Supabase is not configured, or before a profile exists.
  */
 function realmToRole(realm?: string): UserRole {
   if (!realm) return "customer";
   if (ADMIN_REALMS.includes(realm)) return "admin";
   if (STAFF_REALMS.includes(realm)) return "staff";
   return "customer";
+}
+
+/**
+ * The role to show in the UI. Prefers the role the server read back from
+ * profiles, because that is the one RLS applies — an admin may have changed it
+ * since the user's realm was assigned.
+ *
+ * Neither source is a security boundary: this value only decides what the
+ * browser renders, and the session it comes from is editable. Enforcement lives
+ * in the RLS policies keyed on auth.uid().
+ */
+function resolveRole(session: SsoSession): UserRole {
+  return session.role ?? realmToRole(session.claims.realm);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -79,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session,
         user: session ? { ...session.claims, id: session.claims.sub } : null,
-        role: session ? realmToRole(session.claims.realm) : null,
+        role: session ? resolveRole(session) : null,
         isLoading,
         signIn,
         signOut,
