@@ -1,6 +1,11 @@
-const SSO_ISSUER = "https://sso.ventera.ai";
+// Issuer and client id are public by nature — they travel in the authorize URL.
+// The client secret is deliberately absent: every VITE_* value is inlined into
+// the browser bundle, so the secret lives only on the server and the token
+// exchange happens in api/sso/token.ts.
+const SSO_ISSUER =
+  (import.meta.env.VITE_SSO_ISSUER as string) ?? "https://sso.ventera.ai";
 const CLIENT_ID = (import.meta.env.VITE_SSO_CLIENT_ID as string) ?? "gostay";
-const CLIENT_SECRET = import.meta.env.VITE_SSO_CLIENT_SECRET as string | undefined;
+const TOKEN_ENDPOINT = "/api/sso/token";
 
 function getRedirectUri() {
   return `${window.location.origin}/auth/callback`;
@@ -86,17 +91,12 @@ export async function handleCallback(
   sessionStorage.removeItem(TX_VERIFIER_KEY);
   sessionStorage.removeItem(TX_STATE_KEY);
 
-  const res = await fetch(`${SSO_ISSUER}/oidc/token`, {
+  // redirect_uri is not sent: the server derives it from the request origin so
+  // it cannot be pointed elsewhere by a caller.
+  const res = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: CLIENT_ID,
-      ...(CLIENT_SECRET ? { client_secret: CLIENT_SECRET } : {}),
-      redirect_uri: getRedirectUri(),
-      code,
-      code_verifier: verifier,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, code_verifier: verifier }),
   });
 
   if (!res.ok) return null;
