@@ -6,18 +6,7 @@ import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
 import { useRooms } from "@/hooks/useRooms";
-import type { RoomWithType } from "@/types/database.types";
-
-type RoomStatus = "available" | "occupied" | "checked_in" | "out_of_service" | "reserved";
-
-function deriveStatus(room: RoomWithType): RoomStatus {
-  if (!room.is_active) return "out_of_service";
-  const booking = room.current_booking;
-  if (!booking) return "available";
-  if (booking.status === "checked_in") return "checked_in";
-  if (booking.status === "confirmed") return "reserved";
-  return "available";
-}
+import { deriveRoomStatus as deriveStatus, type RoomStatus } from "@/lib/roomStatus";
 
 const statusConfig: Record<RoomStatus, { label: string; colorClass: string; dotClass: string }> = {
   available:       { label: "Available",     colorClass: "bg-secondary text-secondary-foreground", dotClass: "bg-success" },

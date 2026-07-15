@@ -172,6 +172,31 @@ export async function getAuditLog(
   return data;
 }
 
+export interface ActivityEntry extends BookingAuditLog {
+  bookings: { reference: string; rooms: { number: string } | null } | null;
+  profiles: { full_name: string } | null;
+}
+
+/**
+ * Recent activity across every booking, for the dashboard feed.
+ *
+ * booking_audit_log is the only activity trail the schema keeps — there is no
+ * housekeeping or maintenance log, so those never appear here.
+ */
+export async function getRecentActivity(limit = 6): Promise<ActivityEntry[]> {
+  const { data, error } = await supabase
+    .from("booking_audit_log")
+    .select(
+      `*,
+       bookings ( reference, rooms ( number ) ),
+       profiles!booking_audit_log_performed_by_fkey ( full_name )`,
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as unknown as ActivityEntry[];
+}
+
 async function addAuditLog(payload: BookingAuditLogInsert): Promise<void> {
   const { error } = await supabase.from("booking_audit_log").insert(payload);
   if (error) console.error("Failed to write audit log:", error);

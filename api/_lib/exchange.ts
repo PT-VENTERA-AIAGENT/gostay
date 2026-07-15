@@ -142,6 +142,7 @@ async function buildSupabaseSession(claims: IdTokenClaims, expiresInSeconds: num
 
   const sub = claims.sub as string;
   const profileId = profileIdFor(sub);
+  const issuedAt = Math.floor(Date.now() / 1000);
 
   // Null until the database says otherwise. Nothing in the SSO token can grant
   // a role: profiles.role is the only source of truth, and a null role means
@@ -154,17 +155,23 @@ async function buildSupabaseSession(claims: IdTokenClaims, expiresInSeconds: num
       ssoSub: sub,
       email: claims.email ?? "",
       fullName: claims.name ?? claims.email ?? "",
+      now: new Date(issuedAt * 1000).toISOString(),
     });
     if (!result.ok) {
       // Sign-in still succeeds; the user simply sees empty data rather than a
       // dead login. Surfacing it here beats failing silently at query time.
       console.error(`[sso] profile provisioning failed: ${result.error}`);
+    } else if (!result.isActive) {
+      // Deactivated by an admin: hand back no token at all, so the client falls
+      // to anon and reads only public data. get_my_role() also excludes inactive
+      // users, which covers anyone deactivated mid-session who still holds a
+      // valid token — this check only stops them getting a fresh one.
+      return { token: null, role: null, profileId };
     } else {
       role = result.role;
     }
   }
 
-  const issuedAt = Math.floor(Date.now() / 1000);
   const token = mintSupabaseToken({
     profileId,
     email: claims.email,

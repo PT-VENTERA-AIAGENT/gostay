@@ -13,6 +13,8 @@ export interface ProvisionInput {
   ssoSub: string;
   email: string;
   fullName: string;
+  /** ISO timestamp for last_seen_at, passed in so it matches the token's iat. */
+  now: string;
 }
 
 export interface ProvisionResult {
@@ -20,6 +22,8 @@ export interface ProvisionResult {
   created: boolean;
   /** The role as stored in the database — the only role that means anything. */
   role: AppRole | null;
+  /** False when an admin has deactivated this user. */
+  isActive: boolean;
   error?: string;
 }
 
@@ -46,6 +50,7 @@ export async function provisionProfile(input: ProvisionInput): Promise<Provision
       ok: false,
       created: false,
       role: null,
+      isActive: false,
       error: `network_error: ${(e as Error).message}`,
     };
   }
@@ -54,7 +59,7 @@ export async function provisionProfile(input: ProvisionInput): Promise<Provision
 async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
   const { url, serviceKey } = config();
   if (!url || !serviceKey) {
-    return { ok: false, created: false, role: null, error: "provisioning_not_configured" };
+    return { ok: false, created: false, role: null, isActive: false, error: "provisioning_not_configured" };
   }
 
   const headers = {
@@ -64,14 +69,14 @@ async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
   };
 
   const existing = await fetch(
-    `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(input.profileId)}&select=id,role`,
+    `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(input.profileId)}&select=id,role,is_active`,
     { headers },
   );
   if (!existing.ok) {
-    return { ok: false, created: false, role: null, error: `lookup_failed_${existing.status}` };
+    return { ok: false, created: false, role: null, isActive: false, error: `lookup_failed_${existing.status}` };
   }
 
-  const rows = (await existing.json()) as Array<{ id: string; role: AppRole }>;
+  const rows = (await existing.json()) as Array<{ id: string; role: AppRole; is_active: boolean }>;
 
   if (rows.length > 0) {
     // The row is already there. Refresh the contact fields, but never touch
@@ -84,14 +89,19 @@ async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
         email: input.email,
         full_name: input.fullName,
         sso_sub: input.ssoSub,
-        updated_at: new Date().toISOString(),
+        last_seen_at: input.now,
+        updated_at: input.now,
       }),
     });
     if (!patch.ok) {
       // Not fatal: the profile exists, so the session is still usable.
-      return { ok: true, created: false, role: rows[0].role, error: `update_failed_${patch.status}` };
+      return {
+        ok: true, created: false,
+        role: rows[0].role, isActive: rows[0].is_active !== false,
+        error: `update_failed_${patch.status}`,
+      };
     }
-    return { ok: true, created: false, role: rows[0].role };
+    return { ok: true, created: false, role: rows[0].role, isActive: rows[0].is_active !== false };
   }
 
   // `role` is deliberately absent: the column defaults to 'customer', so a new
@@ -105,13 +115,18 @@ async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
       sso_sub: input.ssoSub,
       email: input.email,
       full_name: input.fullName,
+      last_seen_at: input.now,
     }),
   });
 
   if (!insert.ok) {
-    return { ok: false, created: false, role: null, error: `insert_failed_${insert.status}` };
+    return { ok: false, created: false, role: null, isActive: false, error: `insert_failed_${insert.status}` };
   }
 
-  const created = (await insert.json()) as Array<{ role: AppRole }>;
-  return { ok: true, created: true, role: created[0]?.role ?? null };
+  const created = (await insert.json()) as Array<{ role: AppRole; is_active: boolean }>;
+  return {
+    ok: true, created: true,
+    role: created[0]?.role ?? null,
+    isActive: created[0]?.is_active !== false,
+  };
 }

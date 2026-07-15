@@ -101,6 +101,12 @@ export interface Profile {
   phone: string | null;
   role: UserRole;
   avatar_url: string | null;
+  /** Ventera SSO subject. id = uuid_v5(namespace, sso_sub). Added in 003. */
+  sso_sub: string | null;
+  /** Last SSO sign-in; null means never. Added in 004. */
+  last_seen_at: string | null;
+  /** False revokes access — get_my_role() ignores inactive users. Added in 004. */
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -143,10 +149,17 @@ export type RoomUpdate = Partial<RoomInsert>;
 // ─── Room with type (joined) ──────────────────────────────────────────────────
 export interface RoomWithType extends Room {
   room_types: Pick<RoomType, "id" | "name" | "slug" | "base_rate">;
+  /**
+   * An array, not an object: bookings has a foreign key to rooms, so the
+   * `current_booking:bookings(...)` embed in roomService.getRooms() is
+   * one-to-many and PostgREST returns a list. Typing it as a single object made
+   * `current_booking.status` read undefined on an array — which silently
+   * reported every room as available.
+   */
   current_booking?: Pick<
     Booking,
     "id" | "status" | "check_out" | "customer_id"
-  > | null;
+  >[] | null;
 }
 
 // ─── Seasonal Pricing ─────────────────────────────────────────────────────────

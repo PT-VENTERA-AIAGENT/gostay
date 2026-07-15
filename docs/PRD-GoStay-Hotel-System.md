@@ -1718,8 +1718,9 @@ feature sections (§3) disagree, this section is correct.
 
 ### 10.1 Page-by-page
 
-Two thirds of the pages are genuinely wired to the data layer. The rest are
-static mockups that look finished but read nothing.
+Every page now reads from the database. The three that were static mockups —
+Dashboard, Analytics and User Management — are wired, and the two panels that
+had no table behind them are gone rather than faked.
 
 > "Live" here means the page fetches and renders correctly against a **stubbed**
 > Supabase. Whether it returns rows against the real one depends on the identity
@@ -1729,22 +1730,32 @@ static mockups that look finished but read nothing.
 |---|---|---|
 | Landing | `/` | **Live** — static by design (marketing) |
 | Login | `/login` | **Live** — redirects to Ventera SSO |
+| Dashboard | `/dashboard` | **Live** — stats, room availability, revenue, reservations, source mix, booking list, activity feed |
 | Reservations list | `/bookings` | **Live** — list, filters, counts, Rupiah formatting |
 | Booking detail | `/bookings/:id` | **Live** — includes audit-log fetch |
 | Rooms | `/rooms` | **Live** |
 | Room types | `/rooms/types` | **Live** |
+| Analytics | `/analytics` | **Live** — 6 KPIs, 8 charts, today's movements, quick stats |
 | Call logs | `/calls` | **Live** |
-| Chat inbox | `/chat` | **Live** — thread list loads; *sending is broken, see §10.2* |
+| Chat inbox | `/chat` | **Live** — thread list and sending |
+| User Management | `/users` | **Live** — list, search, role change, activate/deactivate |
 | CRM | `/crm` | **Live** |
 | Portal home | `/portal` | **Live** |
 | Portal room detail | `/portal/rooms/:slug` | **Live** |
-| **Dashboard** | `/dashboard` | **MOCKUP** — zero network calls. Every figure is hardcoded in `src/components/dashboard/*` (e.g. `StatCards.tsx` ships `value: 840`). Shows US dollars and 2028 dates. |
-| **Analytics** | `/analytics` | **MOCKUP** — `src/services/analyticsService.ts` exists and is fully written, but **no file imports it**. |
-| **User Management** | `/users` | **MOCKUP** — `src/services/userService.ts` exists but **no file imports it**. |
 
-`src/components/layout/TopBar.tsx` previously hardcoded the operator name
-"Jaylon Dorwart" and the role "Admin" on every page; it now reads the live SSO
-session (§10.2 C).
+**Removed rather than wired.** `OverallRating` and `TasksPanel` sat on the
+dashboard showing invented ratings and housekeeping tasks. The schema has no
+`reviews` table and no `tasks` table, and housekeeping task management is
+explicitly out of v1 scope (§1.4), so there was nothing to connect them to.
+Leaving two fabricated panels on an otherwise live dashboard would have made the
+whole page untrustworthy. They remain in git history if the tables ever land.
+
+**Things the mockups implied that the system cannot do.** The old dashboard
+attributed bookings to Booking.com, Agoda and Airbnb; `booking_source` only has
+`portal | phone | walk_in | staff`, and channel-manager integration is v2.0
+(§1.4). "Booking by Platform" is now "Booking by Source" over the real enum.
+User Management offered "Invite" and "Add Staff"; identities live in Ventera SSO
+and this app can neither create nor delete one, so the page says so instead.
 
 ### 10.2 Defects found and fixed
 
@@ -1814,6 +1825,33 @@ Re-verified after the fix, by role on the session:
 **C. `TopBar` showed a fabricated identity. FIXED.** It hardcoded
 "Jaylon Dorwart" and the role "Admin" on every page. It now renders the name,
 initials and mapped role from the live session.
+
+**D. Every room reported "Available". FIXED.** `roomService.getRooms()` embeds
+`current_booking:bookings(...)`, and because bookings has a foreign key to rooms
+that embed is one-to-many — PostgREST returns an **array**. `RoomWithType` typed
+it as a single object, so `current_booking.status` read `undefined` and
+`deriveStatus` fell through to "available" for every active room, whatever was
+booked. The Room Status Board therefore contradicted the Reservations list: a
+guest visibly checked into 301 while the board showed 25 of 25 free.
+
+Fixed by typing the embed as an array and reading `[0]`. The derivation moved to
+`src/lib/roomStatus.ts` so the dashboard's Room Availability panel and the Rooms
+page cannot drift apart, and it is covered by unit tests — including the exact
+regression, since `[]` is truthy and the old null-check could never catch it.
+
+**E. `user.id` carried the SSO subject, not the profile id. FIXED.**
+An earlier fix mapped `user.id` to `claims.sub`. That was the wrong value: every
+foreign key recording who did something — `chat_messages.sender_id`,
+`call_logs.agent_id`, `booking_audit_log.performed_by` — points at
+`profiles.id`, which is `uuid_v5(namespace, sub)` and not the subject itself.
+Writes would have been rejected as foreign key violations against a real
+database, and `isMe` comparisons in User Management silently never matched, so
+an admin could demote or deactivate themselves.
+
+`AuthContext` now exposes `id: session.profile_id ?? session.claims.sub` — the
+uuid the server derived and provisioned. Verified: sending a chat message now
+carries the profile uuid as `sender_id`, and an admin's own row shows a role
+badge with no deactivate button while everyone else's is editable.
 
 ### 10.3 The authorization model — repaired, pending a live check
 
@@ -1942,8 +1980,8 @@ the first moment a real policy is evaluated by a real database.
 
 - `npm run build` succeeds. The bundle is a single ~1.4 MB chunk (~388 kB
   gzipped); no code splitting is configured.
-- `tsc --noEmit` reports **53 errors** (down from 65 once defect A was fixed), so
-  the app still ships types it does not satisfy. `vite build` uses esbuild/SWC
+- `tsc --noEmit` reports **52 errors** (down from 65), so the app still ships
+  types it does not satisfy. `vite build` uses esbuild/SWC
   and strips types without checking, which is why the build passes regardless.
   Adding a typecheck to CI would have caught defect A on the commit that
   introduced it. Broad groups:
@@ -1955,8 +1993,11 @@ the first moment a real policy is evaluated by a real database.
 - `playwright.config.ts` and `playwright-fixture.ts` import
   `lovable-agent-playwright-config`, which is **not in `package.json`**. Any
   `npx playwright test` run fails at config load. The scaffolding is inert.
-- There is one placeholder test (`src/test/example.test.ts`). No flow in this
-  document has automated coverage.
+- **59 tests** now run under `npm test`, covering the OIDC exchange and identity
+  bridge (`api/_lib/*`), the analytics derivations, and room-status derivation.
+  The UI itself still has no automated coverage — the page behaviour recorded in
+  this section was verified by driving a real browser, which is not repeatable in
+  CI until the Playwright setup is repaired.
 
 ### 10.6 Suggested order of work
 
@@ -1966,17 +2007,20 @@ the first moment a real policy is evaluated by a real database.
    This is the one item that cannot be deferred.
 2. Grant the first admin (the SQL in §10.3), then promote the front-desk team
    to `staff`. Nobody can use the back-office until this is done.
-3. Wire Dashboard, Analytics and User Management to the services that already
-   exist (§10.1). `analyticsService.ts` and `userService.ts` are written and
-   waiting; the work is mostly at the page level.
-4. Repair the Playwright setup (§10.5) and cover the booking, chat and call-log
-   flows so the defects in §10.2 cannot regress unnoticed.
-5. Work down the 65 → 53 remaining `tsc` errors, starting with the
-   `database.types.ts` / `supabase-js` mismatch, which is the group most likely
-   to be hiding a real defect.
+3. Repair the Playwright setup (§10.5) and cover the booking, chat, call-log
+   and role-management flows so the defects in §10.2 cannot regress unnoticed.
+   Every one of them was silent — none surfaced an error — and three were only
+   caught by driving the UI.
+4. Work down the remaining 52 `tsc` errors, starting with the
+   `database.types.ts` / `supabase-js` mismatch. That group is the most likely
+   to be hiding another defect: it is the same class of type/reality gap that
+   produced §10.2 D.
+5. Decide whether `reviews` and `tasks` tables are wanted. Two dashboard panels
+   were removed for want of them (§10.1).
 
-~~2. Fix `user.id` → `claims.sub` centrally (§10.2 A).~~ Done.
-~~3. Fix `realmToRole()` and map the `customer` role explicitly (§10.2 B).~~ Done.
+~~Fix `user.id` centrally (§10.2 A, corrected by E).~~ Done.
+~~Fix `realmToRole()` (§10.2 B) — superseded: roles now come only from the database.~~ Done.
+~~Wire Dashboard, Analytics and User Management (§10.1).~~ Done.
 
 ---
 

@@ -17,7 +17,7 @@ function fakeIdToken(claims: Record<string, unknown>): string {
 /** Stands in for both the SSO issuer and Supabase's PostgREST. */
 interface MockState {
   tokenRequests: Array<Record<string, string>>;
-  profileRows: Array<{ id: string; role: string; email?: string; full_name?: string }>;
+  profileRows: Array<{ id: string; role: string; is_active?: boolean; email?: string; full_name?: string }>;
   inserts: Array<Record<string, unknown>>;
   patches: Array<Record<string, unknown>>;
   realm: string | undefined;
@@ -70,9 +70,10 @@ beforeAll(async () => {
       if (req.method === "POST") {
         const row = JSON.parse(body);
         state.inserts.push(row);
-        // Emulate the column default in 001_initial_schema.sql:
-        //   role user_role not null default 'customer'
-        const stored = { role: "customer", ...row };
+        // Emulate the column defaults:
+        //   role user_role not null default 'customer'   (001)
+        //   is_active boolean not null default true      (004)
+        const stored = { role: "customer", is_active: true, ...row };
         state.profileRows.push(stored);
         res.writeHead(201, { "Content-Type": "application/json" });
         res.end(JSON.stringify([stored]));
@@ -168,6 +169,7 @@ describe("exchangeCode — Supabase identity bridge", () => {
       email: "staff@ventera.ai",
       full_name: "Rafli Staff",
     });
+    expect(state.inserts[0].last_seen_at).toBeTruthy();
     // The column default applies, so a new arrival is a guest.
     expect(r.body.role).toBe("customer");
   });
@@ -195,10 +197,16 @@ describe("exchangeCode — Supabase identity bridge", () => {
     expect(first.body.role).toBe(second.body.role);
   });
 
+  it("records last_seen_at on a returning sign-in", async () => {
+    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "staff", is_active: true }];
+    await call();
+    expect(state.patches[0].last_seen_at).toBeTruthy();
+  });
+
   it("does not overwrite a role an admin granted after first login", async () => {
     // The admin promoted this user in User Management; signing in again must
     // not undo that.
-    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "admin" }];
+    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "admin", is_active: true }];
     const r = await call();
 
     expect(state.inserts).toHaveLength(0);
@@ -210,9 +218,19 @@ describe("exchangeCode — Supabase identity bridge", () => {
   });
 
   it("reports the stored role, which is what RLS enforces", async () => {
-    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "staff" }];
+    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "staff", is_active: true }];
     const r = await call();
     expect(r.body.role).toBe("staff");
+  });
+
+  it("refuses to mint a token for a deactivated user", async () => {
+    // Even an admin: deactivation outranks the role. No token means the client
+    // falls back to anon and reads only public data.
+    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "admin", is_active: false }];
+    const r = await call();
+    expect(r.status).toBe(200); // the SSO login itself is still valid
+    expect(r.body.supabase_token).toBeNull();
+    expect(r.body.role).toBeNull();
   });
 
   it("reports no role when provisioning fails, rather than guessing one", async () => {

@@ -10,12 +10,27 @@ import { getSession, logout, startLogin, type SsoClaims, type SsoSession } from 
 import type { UserRole } from "@/types/database.types";
 
 /**
- * The SSO subject claim is named `sub`, but callers throughout the app expect
- * `id`. Exposing both from one place keeps every call site working without
- * each one having to remember the mapping.
+ * Callers throughout the app expect `user.id`, and what they invariably mean by
+ * it is `profiles.id` — every foreign key that records who did something
+ * (chat_messages.sender_id, call_logs.agent_id, booking_audit_log.performed_by)
+ * points at that table.
+ *
+ * So `id` is the profile uuid the server derived, **not** the raw SSO subject.
+ * They are different values: profiles.id = uuid_v5(namespace, sub). Using `sub`
+ * here would send an id no row has, and every such write would be rejected as a
+ * foreign key violation.
  */
 export interface AuthUser extends SsoClaims {
   id: string;
+}
+
+function toAuthUser(session: SsoSession): AuthUser {
+  return {
+    ...session.claims,
+    // The fallback only bites when Supabase is unconfigured, in which case
+    // there is no profiles row to point at and no write will succeed anyway.
+    id: session.profile_id ?? session.claims.sub,
+  };
 }
 
 interface AuthContextValue {
@@ -70,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         session,
-        user: session ? { ...session.claims, id: session.claims.sub } : null,
+        user: session ? toAuthUser(session) : null,
         role: session ? resolveRole(session) : null,
         isLoading,
         signIn,
