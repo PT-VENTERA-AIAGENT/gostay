@@ -1,8 +1,15 @@
 # Hotel Management System — Product Requirements Document
 
-**Version:** 1.0.0
-**Date:** April 1, 2026
-**Status:** Draft
+**Version:** 1.1.0
+**Date:** July 15, 2026
+**Status:** Draft — aligned to the implementation as of this date
+
+> **Reading this document.** Sections 1–4 and 6 describe the product *intent* and
+> still stand. Sections 5 and 7 describe *how the system is actually built* and
+> were corrected in v1.1.0 — the original draft specified Next.js App Router and
+> Supabase Auth, neither of which the codebase uses. Section 10 records what is
+> genuinely wired up today versus what is still a static mockup; treat it, not
+> the feature sections, as the source of truth on progress.
 
 ---
 
@@ -17,6 +24,7 @@
 7. [API / Edge Function Requirements](#7-api--edge-function-requirements)
 8. [Non-Functional Requirements](#8-non-functional-requirements)
 9. [Milestones / Phased Rollout](#9-milestones--phased-rollout)
+10. [Implementation Status](#10-implementation-status-as-of-july-15-2026) — **what is actually built**
 
 ---
 
@@ -63,15 +71,30 @@ The system is designed to replace fragmented tools (spreadsheets, third-party PM
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend Framework | Next.js 14+ (App Router, React Server Components) |
-| Styling | Tailwind CSS + shadcn/ui component library |
-| Backend / Database | Supabase (PostgreSQL) |
-| Authentication | Supabase Auth (email/password + magic link) |
+| Frontend Framework | Vite 5 + React 18 + TypeScript — a client-rendered SPA (no SSR, no React Server Components) |
+| Routing | React Router v6 (`BrowserRouter`, routes declared in `src/App.tsx`) |
+| Styling | Tailwind CSS + shadcn/ui (Radix primitives) |
+| Server State | TanStack Query v5 |
+| Backend / Database | Supabase (PostgreSQL), queried directly from the browser via `supabase-js` |
+| Authentication | Ventera SSO — OIDC Authorization Code + PKCE against `https://sso.ventera.ai` |
 | Real-time | Supabase Realtime (Channels + Postgres Changes) |
 | File Storage | Supabase Storage |
-| Server Logic | Next.js Route Handlers + Supabase Edge Functions |
-| Deployment | Vercel (frontend) + Supabase Cloud (backend) |
-| Email Notifications | Resend API via Edge Functions |
+| Server Logic | One Vercel serverless function (`api/sso/token.ts`) for the OIDC token exchange. All other logic runs client-side in `src/services/*`. |
+| Deployment | Vercel (SPA + function) + Supabase Cloud (backend) |
+| Email Notifications | Not implemented (planned — see §7.2) |
+
+**Deliberate departures from the v1.0 draft**
+
+| v1.0 said | Reality | Why |
+|-----------|---------|-----|
+| Next.js 14 App Router + RSC | Vite SPA, React Router | Project was scaffolded from a Vite/shadcn template; no SSR need has materialised. |
+| Supabase Auth (email/password + magic link) | Ventera SSO (OIDC PKCE) | Staff identity is centralised in Ventera. Supabase Auth is not used at all. |
+| Next.js Route Handlers under `/api/*` | One function, `api/sso/token.ts` | Reads and writes go browser → Supabase directly, guarded by RLS. |
+
+> **Note on the auth model.** Because the frontend is a static SPA, every
+> `VITE_*` value is inlined into the JavaScript bundle and is therefore public.
+> The OIDC **client secret must never be a `VITE_*` variable**. It is read only
+> by the server-side token exchange as `SSO_CLIENT_SECRET`. See §5.3.
 
 ---
 
@@ -248,8 +271,8 @@ Full lifecycle management of reservations from initial creation through check-ou
 | ID | Criteria |
 |----|----------|
 | AC-CP-01 | Customer can update full_name, email, and phone from the My Account page |
-| AC-CP-02 | Email changes require re-verification via Supabase Auth (confirmation link sent to new email) |
-| AC-CP-03 | Password change requires current password and a new password (minimum 8 characters) |
+| AC-CP-02 | Email is owned by Ventera SSO and is read-only in this app; changes are made in the SSO account, not here. *(Revised v1.1.0 — Supabase Auth is not used.)* |
+| AC-CP-03 | This app stores no passwords. Password changes happen in Ventera SSO. *(Revised v1.1.0.)* |
 | AC-CP-04 | Profile changes are reflected in the linked `customers` record if one exists |
 
 ---
@@ -363,7 +386,7 @@ A public-facing website (no login required to search; login/register required to
 | AC-PO-04 | If all rooms of a selected type become booked between search and confirmation (race condition), the system redirects to search with a clear "Room no longer available" message. |
 | AC-PO-05 | Cancellation via portal is allowed up to 24 hours before check-in date (configurable by admin). After the cutoff, cancellation shows a policy message and prompts the guest to call. |
 | AC-PO-06 | Portal is fully accessible: WCAG 2.1 AA compliance, keyboard navigable, screen reader friendly. |
-| AC-PO-07 | Customer registration uses Supabase Auth email + password; magic link login also supported. |
+| AC-PO-07 | Customer sign-in goes through Ventera SSO (OIDC PKCE), the same issuer as staff. **Open question:** the SSO realm→role mapping does not currently produce a `customer` role — see §10.2 B. *(Revised v1.1.0.)* |
 
 ---
 
@@ -412,7 +435,7 @@ All tables reside in Supabase PostgreSQL. Row Level Security (RLS) policies enfo
 ---
 
 #### `profiles`
-Extends Supabase Auth `auth.users`. One row per user account.
+One row per user account. The original draft extended Supabase Auth's `auth.users`; that dependency no longer holds, since identity comes from Ventera SSO and Supabase Auth is unused. `profiles.id` is expected to carry the SSO subject (`sub`) claim. Note that the RLS policies still resolve this table via `auth.uid()`, which is always NULL under the current design — see §10.3.
 
 ```
 profiles
@@ -860,38 +883,55 @@ chat_threads (1) ──── (N) chat_read_receipts
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         VERCEL EDGE NETWORK                         │
+│                              VERCEL                                 │
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    NEXT.JS 14 APP ROUTER                    │   │
+│  │        STATIC SPA  (Vite build output, served from /dist)    │   │
+│  │        React Router — all routing happens in the browser     │   │
 │  │                                                             │   │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │   │
-│  │  │  App (Staff) │  │  App (Admin) │  │  Portal (Guest)  │  │   │
-│  │  │  /dashboard  │  │  /admin/*    │  │  /portal/*       │  │   │
-│  │  │  /bookings   │  │  /settings   │  │  /book/*         │  │   │
-│  │  │  /chat       │  │  /analytics  │  │  /my-bookings    │  │   │
-│  │  │  /calls      │  │  /rooms      │  │                  │  │   │
-│  │  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │   │
-│  │         │                 │                    │            │   │
-│  │  ┌──────▼─────────────────▼────────────────────▼─────────┐  │   │
-│  │  │              NEXT.JS ROUTE HANDLERS                   │  │   │
-│  │  │         /api/* (REST endpoints for mutations)         │  │   │
-│  │  └──────────────────────────┬────────────────────────────┘  │   │
-│  └─────────────────────────────┼───────────────────────────────┘   │
-└────────────────────────────────┼────────────────────────────────────┘
-                                 │
-                    ┌────────────▼───────────┐
+│  │  │ Staff/Admin  │  │   Landing    │  │  Portal (Guest)  │  │   │
+│  │  │  /dashboard  │  │      /       │  │  /portal         │  │   │
+│  │  │  /bookings   │  │  (marketing) │  │  /portal/book/*  │  │   │
+│  │  │  /rooms      │  │              │  │  /portal/chat    │  │   │
+│  │  │  /chat       │  │              │  │  /portal/my-...  │  │   │
+│  │  │  /calls      │  │              │  │                  │  │   │
+│  │  │  /analytics  │  │              │  │                  │  │   │
+│  │  │  /users /crm │  │              │  │                  │  │   │
+│  │  └──────┬───────┘  └──────────────┘  └────────┬─────────┘  │   │
+│  │         │                                      │            │   │
+│  │         └───────────────┬──────────────────────┘            │   │
+│  │                         │  src/services/* (supabase-js)     │   │
+│  └─────────────────────────┼───────────────────────────────────┘   │
+│                            │                                        │
+│  ┌─────────────────────────┼───────────────────────────────────┐   │
+│  │   SERVERLESS FUNCTION   │   api/sso/token.ts                │   │
+│  │   The only server-side code. Holds SSO_CLIENT_SECRET and    │   │
+│  │   performs the OIDC code→token exchange on the client's     │   │
+│  │   behalf, so the secret never enters the browser bundle.    │   │
+│  └─────────────┬───────────┼───────────────────────────────────┘   │
+└────────────────┼───────────┼────────────────────────────────────────┘
+                 │           │
+     ┌───────────▼──────┐    │
+     │  VENTERA SSO     │    │
+     │ sso.ventera.ai   │    │
+     │  /oidc/auth      │◄───┼─── browser redirect (PKCE challenge)
+     │  /oidc/token     │◄───┘    server-to-server exchange
+     │  /oidc/session/  │
+     │        end       │
+     └──────────────────┘
+                             │
+                    ┌────────▼───────────────┐
                     │    SUPABASE CLOUD       │
                     │                         │
                     │  ┌───────────────────┐  │
                     │  │  PostgreSQL DB    │  │
-                    │  │  + RLS Policies   │  │
+                    │  │  + RLS Policies   │  │◄── browser queries directly
                     │  └────────┬──────────┘  │
                     │           │              │
-                    │  ┌────────▼──────────┐  │
-                    │  │  Supabase Auth    │  │
-                    │  │  (JWT sessions)   │  │
-                    │  └───────────────────┘  │
+                    │  (Supabase Auth is NOT  │
+                    │   used — identity comes │
+                    │   from Ventera SSO)     │
                     │                         │
                     │  ┌───────────────────┐  │
                     │  │  Supabase         │  │
@@ -919,80 +959,131 @@ chat_threads (1) ──── (N) chat_read_receipts
                     └────────────────────────┘
 ```
 
-### 5.2 Next.js App Router Structure
+### 5.2 Source Structure (Vite SPA)
+
+There is no `app/` directory and no file-system routing. Every route is declared
+in `src/App.tsx`; the tree below is the actual layout on disk.
 
 ```
-app/
-├── (auth)/
-│   ├── login/page.tsx
-│   ├── register/page.tsx
-│   └── forgot-password/page.tsx
+src/
+├── App.tsx                         # All routes + providers (Query, Auth, Router)
+├── main.tsx                        # Entry point
 │
-├── (staff)/                        # Protected: staff + admin only
-│   ├── layout.tsx                  # Staff shell (sidebar, header)
-│   ├── dashboard/page.tsx
-│   ├── bookings/
-│   │   ├── page.tsx                # Booking list + calendar toggle
-│   │   ├── new/page.tsx
-│   │   └── [id]/page.tsx
-│   ├── rooms/
-│   │   ├── page.tsx                # Room grid / status board
-│   │   ├── types/page.tsx
-│   │   └── types/[id]/page.tsx
-│   ├── chat/
-│   │   ├── page.tsx                # Chat inbox
-│   │   └── [threadId]/page.tsx
-│   └── calls/
-│       ├── page.tsx                # Call log list
-│       └── new/page.tsx
+├── contexts/
+│   └── AuthContext.tsx             # SSO session state, exposes useAuth()
 │
-├── (admin)/                        # Protected: admin only
-│   ├── layout.tsx
-│   ├── analytics/page.tsx
-│   ├── settings/page.tsx
-│   └── users/page.tsx
+├── lib/
+│   ├── sso.ts                      # OIDC PKCE: startLogin, handleCallback, logout
+│   ├── supabase.ts                 # Configured supabase-js client
+│   └── utils.ts
 │
-├── (portal)/                       # Public + authenticated customers
-│   ├── layout.tsx                  # Portal shell (header, footer, chat widget)
-│   ├── page.tsx                    # Home / search
-│   ├── rooms/[slug]/page.tsx       # Room type detail
-│   ├── book/
-│   │   ├── page.tsx                # Step 1: Room selection
-│   │   ├── details/page.tsx        # Step 2: Guest details
-│   │   ├── review/page.tsx         # Step 3: Review & confirm
-│   │   └── confirmation/page.tsx   # Step 4: Confirmation
-│   └── my-account/
-│       ├── page.tsx                # Account overview
-│       └── bookings/[id]/page.tsx
+├── components/
+│   ├── layout/                     # StaffLayout, PortalLayout, AppSidebar, TopBar
+│   ├── shared/                     # ProtectedRoute, ThemeToggle, nav, skeletons
+│   ├── dashboard/                  # Dashboard widgets (currently static — see §10)
+│   ├── bookings/BookingCalendar.tsx
+│   ├── portal/ChatWidget.tsx
+│   └── ui/                         # shadcn/ui primitives
 │
-└── api/
-    ├── bookings/
-    │   ├── route.ts                # POST: create booking
-    │   └── [id]/
-    │       ├── route.ts            # GET, PATCH, DELETE
-    │       ├── confirm/route.ts    # POST: confirm
-    │       ├── check-in/route.ts   # POST: check-in
-    │       ├── check-out/route.ts  # POST: check-out
-    │       └── no-show/route.ts    # PATCH: mark as no-show
-    ├── rooms/route.ts
-    ├── calls/route.ts
-    └── availability/route.ts       # GET: available rooms for date range
+├── hooks/                          # useBookings, useRooms, useChat, useCallLogs
+│                                   # (TanStack Query wrappers over services/)
+├── services/                       # All Supabase access lives here
+│   ├── bookingService.ts
+│   ├── roomService.ts
+│   ├── chatService.ts
+│   ├── callLogService.ts
+│   ├── analyticsService.ts         # NOT WIRED UP — no importers (see §10)
+│   └── userService.ts              # NOT WIRED UP — no importers (see §10)
+│
+├── pages/
+│   ├── LandingPage.tsx             # "/" marketing page
+│   ├── Login.tsx, AuthCallback.tsx, Register.tsx, ForgotPassword.tsx
+│   ├── Index.tsx                   # "/dashboard"
+│   ├── Bookings.tsx, BookingDetail.tsx, NewBooking.tsx
+│   ├── Rooms.tsx, RoomTypes.tsx, RoomTypeDetail.tsx
+│   ├── Chat.tsx, CallLogs.tsx, NewCallLog.tsx
+│   ├── Analytics.tsx, UserManagement.tsx, CRM.tsx
+│   ├── NotFound.tsx
+│   └── portal/                     # PortalHome, PortalRoomDetail, BookingDetails,
+│                                   # BookingReview, BookingConfirmation, MyAccount,
+│                                   # PortalBookingDetail, PortalProfile, PortalChat
+└── types/database.types.ts         # Hand-maintained Supabase schema types
+
+api/                                # Vercel serverless functions
+├── _lib/exchange.ts                # Shared OIDC exchange logic ("_" = not a route)
+└── sso/token.ts                    # POST /api/sso/token
+
+supabase/
+├── migrations/001_initial_schema.sql
+├── migrations/002_rls_policies.sql
+└── seed.sql
 ```
+
+Route protection is a component, not middleware: `<ProtectedRoute allowedRoles={[...]}>`
+wraps route elements in `src/App.tsx` and redirects to `/login` when there is no
+session, or to `/` when the role is not permitted.
 
 ### 5.3 Authentication Flow
 
-```
-Customer (Portal):
-  Register/Login → Supabase Auth → JWT in httpOnly cookie
-  → Middleware checks role = 'customer'
-  → Access granted to /portal/* routes
+Identity comes from Ventera SSO. Supabase Auth is not used, and there are no
+`profiles`-backed passwords. The flow is OIDC Authorization Code with PKCE:
 
-Staff/Admin:
-  Login → Supabase Auth → JWT in httpOnly cookie
-  → Middleware checks role = 'staff' | 'admin'
-  → Access granted to /(staff)/* routes
-  → Admin-only routes additionally check role = 'admin'
 ```
+1. User clicks "Login dengan Ventera SSO"           (src/pages/Login.tsx)
+      │
+      ▼
+2. startLogin()                                      (src/lib/sso.ts)
+      • generates code_verifier + S256 challenge
+      • stores verifier + state in sessionStorage
+      • redirects to  sso.ventera.ai/oidc/auth?...code_challenge=...
+      │
+      ▼
+3. User authenticates at Ventera, redirected back to
+   /auth/callback?code=...&state=...                 (src/pages/AuthCallback.tsx)
+      │
+      ▼
+4. handleCallback() verifies `state`, then POSTs
+   { code, code_verifier }  ──►  /api/sso/token      (api/sso/token.ts)
+      │                                 │
+      │                                 ▼
+      │                          SERVER SIDE ONLY:
+      │                          • derives redirect_uri from the request Origin
+      │                            (never trusts a client-supplied value)
+      │                          • rejects origins outside the allowlist
+      │                          • adds SSO_CLIENT_SECRET
+      │                          • POSTs to sso.ventera.ai/oidc/token
+      │                          • returns only id_token, access_token, expires_in
+      ▼
+5. Claims are decoded from id_token; session is stored in sessionStorage
+   under "gostay_sso_session".
+      │
+      ▼
+6. AuthContext maps claims.realm → role:
+      realm === "ventera-employees"  →  "admin"
+      otherwise                      →  "staff"
+```
+
+**Why the exchange is server-side.** A Vite build inlines every `VITE_*` variable
+into the JavaScript it ships, so a `VITE_SSO_CLIENT_SECRET` would be readable by
+anyone opening devtools — it would not be a secret at all. The exchange therefore
+runs in `api/sso/token.ts`, which reads `SSO_CLIENT_SECRET` (no `VITE_` prefix).
+`vite.config.ts` mounts the same handler as dev middleware so local development
+exercises the identical code path.
+
+**Token handling.** The id_token signature is not verified in the browser. This is
+acceptable because the token is delivered to us over TLS directly from the
+issuer's token endpoint via our own server, not through a browser redirect.
+
+**Known gaps** (tracked in §10):
+
+- The session lives in `sessionStorage`, not an httpOnly cookie, so it is
+  reachable from JavaScript and is lost when the tab closes. Moving to an
+  httpOnly cookie would require the function to set the cookie and the client to
+  stop reading tokens directly.
+- There is no refresh-token rotation; the session simply expires.
+- `realmToRole()` recognises only one realm and defaults everyone else to
+  `staff`. The `customer` role is defined in the schema but never assigned by
+  the SSO mapping, so portal-authenticated guests are currently treated as staff.
 
 ### 5.4 Real-time Architecture
 
@@ -1049,7 +1140,7 @@ Booking checked-in/checked-out
 | Booking Step 2 | `/book/details` | Guest details form (name, email, phone, special requests) |
 | Booking Step 3 | `/book/review` | Full booking summary with price breakdown |
 | Booking Confirmation | `/book/confirmation` | Success state with reference number, email sent notice |
-| Login | `/login` | Supabase Auth sign-in form |
+| Login | `/login` | Single "Login dengan Ventera SSO" button; redirects to the OIDC issuer |
 | Register | `/register` | New customer account form |
 | Forgot Password | `/forgot-password` | Password reset email trigger |
 | My Account | `/my-account` | Customer dashboard: upcoming stays, past stays |
@@ -1101,9 +1192,39 @@ Booking checked-in/checked-out
 
 ## 7. API / Edge Function Requirements
 
-### 7.1 Next.js Route Handlers
+### 7.1 HTTP API
 
-All Route Handlers validate the Supabase session server-side using the `@supabase/ssr` package. Unauthorized requests return `401`. Role-insufficient requests return `403`.
+#### 7.1.1 Implemented
+
+**`POST /api/sso/token`** — `api/sso/token.ts`
+
+The only server-side endpoint in the system. Performs the OIDC authorization-code
+exchange so that `SSO_CLIENT_SECRET` never reaches the browser. `vite.config.ts`
+mounts the same handler (`api/_lib/exchange.ts`) as dev middleware, so local and
+production behaviour are identical.
+
+| | |
+|---|---|
+| Request | `{ "code": string, "code_verifier": string }` |
+| Response `200` | `{ id_token, access_token, expires_in, token_type }` |
+| `405` | method other than POST |
+| `400` | `missing_parameters` — code or verifier absent |
+| `403` | `origin_not_allowed` — Origin outside localhost / `*.vercel.app` / `SSO_ALLOWED_ORIGINS` |
+| `502` | `token_exchange_failed` — issuer rejected the code (upstream body never forwarded) |
+
+`redirect_uri` is derived server-side from the request `Origin` and is never read
+from the request body, so a caller cannot aim the client credentials at an
+arbitrary redirect target.
+
+#### 7.1.2 Planned — not implemented
+
+> **Status: none of the endpoints below exist.** There are no Next.js Route
+> Handlers in this project (see §5.2). Reads and writes currently go from the
+> browser straight to Supabase via `src/services/*`, relying on RLS for
+> authorization — a model that is presently broken (§10.3). The specifications
+> below remain the target design for moving mutations server-side; the
+> `@supabase/ssr` session validation they describe does not apply while
+> authentication is handled by Ventera SSO rather than Supabase Auth.
 
 ---
 
@@ -1391,7 +1512,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUN
 - Vercel's built-in edge rate limiting applied to `/api/*` routes.
 - Availability search endpoint: 30 requests/minute per IP.
 - Chat message endpoint: 10 messages/minute per user.
-- Login endpoint: 5 attempts/minute per IP (Supabase Auth built-in).
+- Login attempts are rate-limited by Ventera SSO, not by this app.
 
 **Audit & Compliance:**
 - All booking state changes recorded in `booking_audit_log` (immutable rows).
@@ -1407,8 +1528,8 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUN
 - Read replicas can be added for analytics queries without impacting booking writes.
 
 **Application:**
-- Next.js on Vercel scales automatically (serverless functions per request).
-- Static pages (portal home, room type pages) use ISR (Incremental Static Regeneration) with a 60-second revalidation window to serve cached content under high load.
+- The SPA is static and served from Vercel's CDN, so front-end scaling is a non-issue. The single serverless function (`/api/sso/token`) scales per request.
+- ISR does not apply: there is no server rendering. Portal pages fetch from Supabase on the client, so read load lands on the database rather than on a cache. A caching layer is unaddressed.
 - Supabase Realtime supports up to 500 concurrent WebSocket connections on Pro plan; scale-up path to Team/Enterprise plan available.
 
 **Storage:**
@@ -1453,8 +1574,8 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUN
 
 | Deliverable | Details |
 |-------------|---------|
-| Supabase project setup | Database schema deployed, RLS policies configured, Auth enabled |
-| Next.js project scaffold | App Router structure, Tailwind + shadcn/ui configured, Supabase client set up, middleware for role-based routing |
+| Supabase project setup | Database schema deployed, RLS policies configured. (Auth intentionally unused — see §5.3.) |
+| Vite + React SPA scaffold | React Router structure, Tailwind + shadcn/ui configured, Supabase client set up, `<ProtectedRoute>` for role-based routing |
 | Authentication flows | Login, register, forgot password, session management for all three roles |
 | Room Types CRUD | Admin can create/edit/delete room types with photos and amenities |
 | Individual Rooms CRUD | Admin can create/edit rooms, assign to types, set out-of-service blocks |
@@ -1565,6 +1686,157 @@ Week 19-20 : Phase 6 — Launch
 ──────────────────────────────────────
 Total      : ~20 weeks (5 months)
 ```
+
+---
+
+
+---
+
+## 10. Implementation Status (as of July 15, 2026)
+
+Verified by driving the running app in a headless browser against a stubbed
+Supabase REST layer with an injected SSO session. Where this section and the
+feature sections (§3) disagree, this section is correct.
+
+### 10.1 Page-by-page
+
+Two thirds of the pages are genuinely wired to the data layer. The rest are
+static mockups that look finished but read nothing.
+
+| Page | Route | Status |
+|---|---|---|
+| Landing | `/` | **Live** — static by design (marketing) |
+| Login | `/login` | **Live** — redirects to Ventera SSO |
+| Reservations list | `/bookings` | **Live** — list, filters, counts, Rupiah formatting |
+| Booking detail | `/bookings/:id` | **Live** — includes audit-log fetch |
+| Rooms | `/rooms` | **Live** |
+| Room types | `/rooms/types` | **Live** |
+| Call logs | `/calls` | **Live** |
+| Chat inbox | `/chat` | **Live** — thread list loads; *sending is broken, see §10.2* |
+| CRM | `/crm` | **Live** |
+| Portal home | `/portal` | **Live** |
+| Portal room detail | `/portal/rooms/:slug` | **Live** |
+| **Dashboard** | `/dashboard` | **MOCKUP** — zero network calls. Every figure is hardcoded in `src/components/dashboard/*` (e.g. `StatCards.tsx` ships `value: 840`). Shows US dollars and 2028 dates. |
+| **Analytics** | `/analytics` | **MOCKUP** — `src/services/analyticsService.ts` exists and is fully written, but **no file imports it**. |
+| **User Management** | `/users` | **MOCKUP** — `src/services/userService.ts` exists but **no file imports it**. |
+
+`src/components/layout/TopBar.tsx` hardcodes the operator name **"Jaylon Dorwart"**
+and the role "Admin" on every page; it does not read the SSO session.
+
+### 10.2 Known defects
+
+**A. The SSO migration left `user.id` behind — silent write failures.**
+`SsoClaims` exposes the OIDC subject as `sub`, but five call sites still read
+`user.id`, which is always `undefined`:
+
+| File | Effect |
+|---|---|
+| `src/pages/NewCallLog.tsx:35` | `if (!user?.id) return;` — **a call log can never be saved.** Verified: submitting the form issues no request and the page does not navigate. |
+| `src/pages/Chat.tsx:44` | Same guard in `handleSend` — **staff can never send a chat message.** |
+| `src/pages/Chat.tsx:32` | Threads are never marked read. |
+| `src/pages/portal/PortalChat.tsx:73` | `initThread(undefined)`. |
+| `src/hooks/useBookings.ts:109,129` | Falls back to `"system"`, so audit rows lose attribution (degraded, not fatal). |
+
+Confirmed by A/B experiment: with an identical form, a session whose claims carry
+only `sub` produces no write and stays on the page; adding an `id` field makes the
+same submit succeed and redirect. Suggested fix — map it once, centrally, in
+`AuthContext`: expose `user` as `{ ...claims, id: claims.sub }`.
+
+**B. Any authenticated Ventera user reaches the staff back-office.**
+`realmToRole()` in `src/contexts/AuthContext.tsx` returns `admin` for the
+`ventera-employees` realm and **`staff` for everything else, including guests**:
+
+```ts
+function realmToRole(realm?: string): UserRole {
+  if (realm === "ventera-employees") return "admin";
+  return "staff";   // <-- a guest lands here
+}
+```
+
+The portal's own "Sign In" button links to `/login`, i.e. the same SSO. A session
+with realm `"customers"` (or no realm at all) was verified to reach `/dashboard`,
+`/bookings`, `/rooms`, `/chat`, `/calls`, `/analytics` and `/crm` — the last of
+which lists every guest's name, email and phone. Only `/users` (admin-gated) held.
+The `customer` role is defined in the schema but this mapping never returns it.
+
+### 10.3 The authorization model is currently broken
+
+This is the most consequential gap, and it is why §10.1's "Live" ratings must be
+read with care — they were verified against a *stub*.
+
+`supabase/migrations/002_rls_policies.sql` enables RLS on all twelve tables and
+gates them on `auth.uid()` (13 occurrences), mostly via:
+
+```sql
+create or replace function get_my_role()
+returns user_role language sql stable security definer as $$
+  select role from profiles where id = auth.uid()
+$$;
+```
+
+But the app no longer uses Supabase Auth. It talks to PostgREST with the **anon
+key** and the Ventera session is never handed to Supabase. Therefore `auth.uid()`
+is always `NULL`, `get_my_role()` always returns `NULL`, and every
+staff/admin/customer policy evaluates false.
+
+**Consequence:** against a real Supabase project, the only readable table is
+`room_types` (`"Anyone can view active room types"`). Bookings, customers, chat,
+call logs and rooms would all return zero rows, and every write would be rejected
+— even though the same pages render correctly against a stub. The staff UI is
+built on a data layer it is not currently authorized to reach.
+
+Resolving this requires a decision (see Appendix B):
+
+1. **Mint a Supabase JWT from the SSO identity.** The `api/sso/token.ts` function
+   already runs server-side and holds the client secret; it could additionally
+   sign a Supabase-compatible JWT carrying `sub` and `role` so the existing RLS
+   policies work unchanged. Smallest change; keeps browser→Supabase calls.
+2. **Move reads/writes behind server endpoints** using the service-role key, per
+   the §7.1.2 design. Larger change; removes reliance on RLS.
+3. **Rewrite the policies** around a claim the anon client can present. Weakest —
+   the anon key is public, so this offers little real protection.
+
+Until one is chosen, the staff surface cannot work against real data.
+
+### 10.4 Environment and configuration
+
+- `.env` was committed to the repository. It contained only placeholder values,
+  so no live credential leaked; it is now untracked and ignored.
+- The OIDC client secret was previously read as `VITE_SSO_CLIENT_SECRET` and was
+  therefore compiled into the public JavaScript bundle. It now lives only in
+  `SSO_CLIENT_SECRET`, read exclusively server-side (§5.3, §7.1.1).
+- On Vercel, set `SSO_CLIENT_SECRET`, `SSO_CLIENT_ID` and `SSO_ISSUER` as
+  Environment Variables. Never as `VITE_*`.
+
+### 10.5 Build and type health
+
+- `npm run build` succeeds. The bundle is a single ~1.4 MB chunk (~388 kB
+  gzipped); no code splitting is configured.
+- `tsc --noEmit` reports **65 errors**, so the app ships types it does not
+  satisfy. `vite build` uses esbuild/SWC and strips types without checking, which
+  is why the build passes regardless. Broad groups:
+  - `Property 'id' does not exist on type 'SsoClaims'` — defect A above.
+  - Roughly half are `framer-motion` `Variants` typing in `LandingPage.tsx`
+    (`ease: string` not assignable to `Easing`) — cosmetic.
+  - Supabase service files report `Argument of type '...' is not assignable to
+    parameter of type 'never'`, indicating `src/types/database.types.ts` does not
+    line up with what `supabase-js` expects from `Database`.
+- `playwright.config.ts` and `playwright-fixture.ts` import
+  `lovable-agent-playwright-config`, which is **not in `package.json`**. Any
+  `npx playwright test` run fails at config load. The scaffolding is inert.
+- There is one placeholder test (`src/test/example.test.ts`). No flow in this
+  document has automated coverage.
+
+### 10.6 Suggested order of work
+
+1. Decide the authorization model (§10.3). Everything else on the staff side is
+   blocked behind it.
+2. Fix `user.id` → `claims.sub` centrally (§10.2 A) — small, unblocks chat send
+   and call logging.
+3. Fix `realmToRole()` and map the `customer` role explicitly (§10.2 B).
+4. Wire Dashboard, Analytics and User Management to the services that already
+   exist; make `TopBar` read the session.
+5. Repair the Playwright setup and cover the booking, chat and call-log flows.
 
 ---
 
