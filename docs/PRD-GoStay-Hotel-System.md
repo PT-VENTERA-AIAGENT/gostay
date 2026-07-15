@@ -1720,44 +1720,68 @@ static mockups that look finished but read nothing.
 | **Analytics** | `/analytics` | **MOCKUP** — `src/services/analyticsService.ts` exists and is fully written, but **no file imports it**. |
 | **User Management** | `/users` | **MOCKUP** — `src/services/userService.ts` exists but **no file imports it**. |
 
-`src/components/layout/TopBar.tsx` hardcodes the operator name **"Jaylon Dorwart"**
-and the role "Admin" on every page; it does not read the SSO session.
+`src/components/layout/TopBar.tsx` previously hardcoded the operator name
+"Jaylon Dorwart" and the role "Admin" on every page; it now reads the live SSO
+session (§10.2 C).
 
-### 10.2 Known defects
+### 10.2 Defects found and fixed
 
-**A. The SSO migration left `user.id` behind — silent write failures.**
-`SsoClaims` exposes the OIDC subject as `sub`, but five call sites still read
-`user.id`, which is always `undefined`:
+Both defects below were found by driving the app, and both are now fixed. They
+are kept on the record because each was silent — neither produced an error
+message, and the second one was not visible from the UI at all.
 
-| File | Effect |
+**A. The SSO migration left `user.id` behind — silent write failures. FIXED.**
+`SsoClaims` exposes the OIDC subject as `sub`, but five call sites read
+`user.id`, which was therefore always `undefined`:
+
+| File | Effect while broken |
 |---|---|
-| `src/pages/NewCallLog.tsx:35` | `if (!user?.id) return;` — **a call log can never be saved.** Verified: submitting the form issues no request and the page does not navigate. |
-| `src/pages/Chat.tsx:44` | Same guard in `handleSend` — **staff can never send a chat message.** |
-| `src/pages/Chat.tsx:32` | Threads are never marked read. |
+| `src/pages/NewCallLog.tsx:35` | `if (!user?.id) return;` — a call log could never be saved. |
+| `src/pages/Chat.tsx:44` | Same guard in `handleSend` — staff could never send a chat message. |
+| `src/pages/Chat.tsx:32` | Threads were never marked read. |
 | `src/pages/portal/PortalChat.tsx:73` | `initThread(undefined)`. |
-| `src/hooks/useBookings.ts:109,129` | Falls back to `"system"`, so audit rows lose attribution (degraded, not fatal). |
+| `src/hooks/useBookings.ts:109,129` | Fell back to `"system"`, so audit rows lost attribution (degraded, not fatal). |
 
-Confirmed by A/B experiment: with an identical form, a session whose claims carry
-only `sub` produces no write and stays on the page; adding an `id` field makes the
-same submit succeed and redirect. Suggested fix — map it once, centrally, in
-`AuthContext`: expose `user` as `{ ...claims, id: claims.sub }`.
+Isolated by A/B experiment: with an identical form, a session whose claims carried
+only `sub` produced no write and stayed on the page; adding an `id` field made the
+same submit succeed and redirect.
 
-**B. Any authenticated Ventera user reaches the staff back-office.**
-`realmToRole()` in `src/contexts/AuthContext.tsx` returns `admin` for the
-`ventera-employees` realm and **`staff` for everything else, including guests**:
+Fixed centrally rather than at the five call sites — `AuthContext` now exposes an
+`AuthUser` (`SsoClaims & { id: string }`) built as `{ ...claims, id: claims.sub }`,
+so callers need not know the mapping. Verified afterwards: submitting a call log
+issues `POST /call_logs` and redirects, and sending a chat message issues
+`POST /chat_messages` carrying the correct `sender_id`.
 
-```ts
-function realmToRole(realm?: string): UserRole {
-  if (realm === "ventera-employees") return "admin";
-  return "staff";   // <-- a guest lands here
-}
-```
-
-The portal's own "Sign In" button links to `/login`, i.e. the same SSO. A session
-with realm `"customers"` (or no realm at all) was verified to reach `/dashboard`,
+**B. Any authenticated Ventera user reached the staff back-office. FIXED.**
+`realmToRole()` returned `admin` for the `ventera-employees` realm and **`staff`
+for everything else, including guests** — and the portal's own "Sign In" button
+links to `/login`, i.e. the same SSO. A session with realm `"customers"`, an
+unrecognised realm, or no realm at all was verified to reach `/dashboard`,
 `/bookings`, `/rooms`, `/chat`, `/calls`, `/analytics` and `/crm` — the last of
 which lists every guest's name, email and phone. Only `/users` (admin-gated) held.
-The `customer` role is defined in the schema but this mapping never returns it.
+
+The mapping is now deny-by-default: an unknown or absent realm resolves to
+`customer`, the least-privileged role, and realms are configurable via
+`VITE_SSO_ADMIN_REALMS` / `VITE_SSO_STAFF_REALMS` so granting staff access does
+not require a code change.
+
+`ProtectedRoute` carried a related hole: `allowedRoles && role && !allowedRoles.includes(role)`
+skipped the check entirely when `role` was null, admitting the request. It now
+denies unless the role is present *and* permitted, and sends customers to
+`/portal` rather than the landing page.
+
+Re-verified after the fix: guest, unknown-realm and no-realm sessions reach
+**0 of 8** staff routes; a `ventera-employees` session still reaches all 8, so
+the tightening did not over-reach.
+
+> **This is a UI boundary, not a security boundary.** These checks run in the
+> browser against a session in `sessionStorage`, which a determined user can
+> edit. They stop accidental and casual access, not a deliberate attacker. The
+> real boundary is the database, and it is not currently working — see §10.3.
+
+**C. `TopBar` showed a fabricated identity. FIXED.** It hardcoded
+"Jaylon Dorwart" and the role "Admin" on every page. It now renders the name,
+initials and mapped role from the live session.
 
 ### 10.3 The authorization model is currently broken
 
@@ -1812,10 +1836,11 @@ Until one is chosen, the staff surface cannot work against real data.
 
 - `npm run build` succeeds. The bundle is a single ~1.4 MB chunk (~388 kB
   gzipped); no code splitting is configured.
-- `tsc --noEmit` reports **65 errors**, so the app ships types it does not
-  satisfy. `vite build` uses esbuild/SWC and strips types without checking, which
-  is why the build passes regardless. Broad groups:
-  - `Property 'id' does not exist on type 'SsoClaims'` — defect A above.
+- `tsc --noEmit` reports **53 errors** (down from 65 once defect A was fixed), so
+  the app still ships types it does not satisfy. `vite build` uses esbuild/SWC
+  and strips types without checking, which is why the build passes regardless.
+  Adding a typecheck to CI would have caught defect A on the commit that
+  introduced it. Broad groups:
   - Roughly half are `framer-motion` `Variants` typing in `LandingPage.tsx`
     (`ease: string` not assignable to `Easing`) — cosmetic.
   - Supabase service files report `Argument of type '...' is not assignable to
@@ -1829,14 +1854,24 @@ Until one is chosen, the staff surface cannot work against real data.
 
 ### 10.6 Suggested order of work
 
-1. Decide the authorization model (§10.3). Everything else on the staff side is
-   blocked behind it.
-2. Fix `user.id` → `claims.sub` centrally (§10.2 A) — small, unblocks chat send
-   and call logging.
-3. Fix `realmToRole()` and map the `customer` role explicitly (§10.2 B).
-4. Wire Dashboard, Analytics and User Management to the services that already
-   exist; make `TopBar` read the session.
-5. Repair the Playwright setup and cover the booking, chat and call-log flows.
+1. **Decide the authorization model (§10.3).** Everything else on the staff side
+   is blocked behind it, and until it is resolved the role checks in §10.2 B are
+   cosmetic. This is the one item that cannot be deferred.
+2. Confirm the realm taxonomy at `sso.ventera.ai` and set
+   `VITE_SSO_ADMIN_REALMS` / `VITE_SSO_STAFF_REALMS` accordingly. The default
+   grants `admin` to `ventera-employees` and `customer` to everyone else, which
+   is safe but likely too coarse — front-desk staff should not be admins.
+3. Wire Dashboard, Analytics and User Management to the services that already
+   exist (§10.1). `analyticsService.ts` and `userService.ts` are written and
+   waiting; the work is mostly at the page level.
+4. Repair the Playwright setup (§10.5) and cover the booking, chat and call-log
+   flows so the defects in §10.2 cannot regress unnoticed.
+5. Work down the 65 → 53 remaining `tsc` errors, starting with the
+   `database.types.ts` / `supabase-js` mismatch, which is the group most likely
+   to be hiding a real defect.
+
+~~2. Fix `user.id` → `claims.sub` centrally (§10.2 A).~~ Done.
+~~3. Fix `realmToRole()` and map the `customer` role explicitly (§10.2 B).~~ Done.
 
 ---
 

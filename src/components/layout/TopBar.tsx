@@ -2,6 +2,7 @@ import { Search, Bell } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import ThemeToggle from "@/components/shared/ThemeToggle";
+import { useAuth } from "@/contexts/AuthContext";
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -13,9 +14,24 @@ const pageTitles: Record<string, string> = {
   "/users": "User Management",
 };
 
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+const roleLabels: Record<string, string> = {
+  admin: "Admin",
+  staff: "Staff",
+  customer: "Guest",
+};
+
 export default function TopBar() {
   const { pathname } = useLocation();
   const title = pageTitles[pathname] || "Dashboard";
+  const { user, role } = useAuth();
+
+  const displayName = user?.name ?? user?.email ?? "Unknown user";
+  const roleLabel = role ? roleLabels[role] : "No role";
 
   return (
     <header className="flex items-center justify-between px-4 md:px-8 py-3 md:py-4 bg-card border-b border-border">
@@ -59,11 +75,11 @@ export default function TopBar() {
 
         <div className="hidden sm:flex items-center gap-3 ml-1">
           <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-primary/20 flex items-center justify-center font-semibold text-sm text-primary">
-            JD
+            {initialsOf(displayName)}
           </div>
           <div className="hidden md:block text-right">
-            <p className="text-sm font-semibold text-foreground">Jaylon Dorwart</p>
-            <p className="text-xs text-muted-foreground">Admin</p>
+            <p className="text-sm font-semibold text-foreground">{displayName}</p>
+            <p className="text-xs text-muted-foreground">{roleLabel}</p>
           </div>
         </div>
       </div>

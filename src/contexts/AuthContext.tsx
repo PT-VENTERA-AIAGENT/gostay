@@ -9,9 +9,18 @@ import {
 import { getSession, logout, startLogin, type SsoClaims, type SsoSession } from "@/lib/sso";
 import type { UserRole } from "@/types/database.types";
 
+/**
+ * The SSO subject claim is named `sub`, but callers throughout the app expect
+ * `id`. Exposing both from one place keeps every call site working without
+ * each one having to remember the mapping.
+ */
+export interface AuthUser extends SsoClaims {
+  id: string;
+}
+
 interface AuthContextValue {
   session: SsoSession | null;
-  user: SsoClaims | null;
+  user: AuthUser | null;
   role: UserRole | null;
   isLoading: boolean;
   signIn: (returnTo?: string) => void;
@@ -24,9 +33,29 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function parseRealms(raw: string | undefined, fallback: string[]): string[] {
+  const parsed = (raw ?? "")
+    .split(",")
+    .map((r) => r.trim())
+    .filter(Boolean);
+  return parsed.length ? parsed : fallback;
+}
+
+const ADMIN_REALMS = parseRealms(import.meta.env.VITE_SSO_ADMIN_REALMS, ["ventera-employees"]);
+const STAFF_REALMS = parseRealms(import.meta.env.VITE_SSO_STAFF_REALMS, []);
+
+/**
+ * Maps an SSO realm to an application role, denying by default.
+ *
+ * Anyone who authenticates against the issuer lands here, including guests —
+ * the portal's own "Sign In" points at the same /login. So an unrecognised or
+ * absent realm must resolve to the *least* privileged role, never to `staff`.
+ */
 function realmToRole(realm?: string): UserRole {
-  if (realm === "ventera-employees") return "admin";
-  return "staff";
+  if (!realm) return "customer";
+  if (ADMIN_REALMS.includes(realm)) return "admin";
+  if (STAFF_REALMS.includes(realm)) return "staff";
+  return "customer";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -49,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         session,
-        user: session?.claims ?? null,
+        user: session ? { ...session.claims, id: session.claims.sub } : null,
         role: session ? realmToRole(session.claims.realm) : null,
         isLoading,
         signIn,
