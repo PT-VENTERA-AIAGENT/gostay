@@ -24,40 +24,51 @@ const B='00000000-0000-4000-8000-0000000000b2';
 await svc.from('tenants').delete().eq('id',B);
 await svc.from('tenants').insert({id:B,name:'Rival Hotel',slug:'rival'});
 const rivalId='00000000-0000-4000-8000-0000000000b9';
-await svc.from('profiles').insert({id:rivalId,email:'rival@demo.local',full_name:'Rival Admin',role:'admin',tenant_id:B,is_active:true});
+await svc.from('profiles').insert({id:rivalId,email:'rival@demo.local',full_name:'Rival Staff',role:'staff',tenant_id:B,is_active:true});
+// A staff user INSIDE tenant A, to prove staff isolation from the A side too.
+const staffAId='00000000-0000-4000-8000-0000000000a9';
+await svc.from('profiles').delete().eq('id',staffAId);
+await svc.from('profiles').insert({id:staffAId,email:'staffa@demo.local',full_name:'Staff A',role:'staff',tenant_id:A,is_active:true});
 const {data:rt}=await svc.from('room_types').insert({tenant_id:B,name:'Rival Suite',slug:'rival-suite',base_rate:9000000,max_occupancy:2,description:'x',is_active:true}).select().single();
 const {data:rm}=await svc.from('rooms').insert({tenant_id:B,room_type_id:rt.id,number:'101',floor:1,is_active:true}).select().single();
 const {data:cu}=await svc.from('customers').insert({tenant_id:B,full_name:'Rival Guest',email:'rg@demo.local',phone:'+62800'}).select().single();
 const {data:bkB}=await svc.from('bookings').insert({tenant_id:B,room_id:rm.id,customer_id:cu.id,check_in:'2027-06-01',check_out:'2027-06-03',status:'confirmed',total_amount:9000000,source:'walk_in'}).select().single();
 console.log('Tenant B siap: Rival Hotel, kamar "101" (sama nomornya dgn tenant A — bukti unique per-tenant jalan)\n');
 
-const budi=as(mint('b0000000-0000-4000-8000-00000000ab02'));   // admin tenant A
-const rival=as(mint(rivalId));                                  // admin tenant B
+// 3 roles: admin = Ventera (platform-wide) · staff = hotel (tenant-scoped) · customer = guest.
+const budi=as(mint('b0000000-0000-4000-8000-00000000ab02'));   // admin = Ventera (platform)
+const staffA=as(mint(staffAId));                               // staff hotel A
+const staffB=as(mint(rivalId));                                // staff hotel B
 let pass=0,fail=0;
-const t=(name,ok,detail='')=>{ok?pass++:fail++; console.log(`  ${ok?'✓':'✗ BOCOR'} ${name}${detail?' — '+detail:''}`);};
+const t=(name,ok,detail='')=>{ok?pass++:fail++; console.log(`  ${ok?'✓':'✗ GAGAL'} ${name}${detail?' — '+detail:''}`);};
 
-console.log('Admin tenant A (Budi) mencoba melihat data tenant B:');
-for(const tbl of ['bookings','customers','chat_threads','call_logs','analytics_cache','rooms','room_types','reviews']){
+console.log('Admin Ventera (platform) HARUS bisa lihat SEMUA hotel:');
+for(const tbl of ['bookings','customers','rooms','room_types']){
   const {data}=await budi.from(tbl).select('*').eq('tenant_id',B);
-  t(`${tbl} tenant B`, (data??[]).length===0, `${(data??[]).length} baris`);
+  t(`admin lihat ${tbl} hotel B`, (data??[]).length>0, `${(data??[]).length} baris`);
 }
-console.log('\nAdmin tenant B (Rival) mencoba melihat data tenant A:');
+console.log('\nStaff hotel A TIDAK boleh lihat hotel B:');
+for(const tbl of ['bookings','customers','chat_threads','call_logs','analytics_cache','rooms','room_types','reviews']){
+  const {data}=await staffA.from(tbl).select('*').eq('tenant_id',B);
+  t(`staff A ✗ ${tbl} hotel B`, (data??[]).length===0, `${(data??[]).length} baris`);
+}
+console.log('\nStaff hotel B TIDAK boleh lihat hotel A:');
 for(const tbl of ['bookings','customers','chat_threads','call_logs','rooms']){
-  const {data}=await rival.from(tbl).select('*').eq('tenant_id',A);
-  t(`${tbl} tenant A`, (data??[]).length===0, `${(data??[]).length} baris`);
+  const {data}=await staffB.from(tbl).select('*').eq('tenant_id',A);
+  t(`staff B ✗ ${tbl} hotel A`, (data??[]).length===0, `${(data??[]).length} baris`);
 }
-console.log('\nSerangan tulis:');
-{const {error}=await budi.from('bookings').insert({tenant_id:B,room_id:rm.id,customer_id:cu.id,check_in:'2027-07-01',check_out:'2027-07-02',status:'confirmed',total_amount:1,source:'walk_in'});
- t('Budi menyisipkan booking ke tenant B', Boolean(error), error?.code||'DIIZINKAN!');}
-{const {error,data}=await budi.from('profiles').update({tenant_id:B}).eq('id','b0000000-0000-4000-8000-00000000ab02').select();
- t('Budi memindahkan profilnya sendiri ke tenant B', Boolean(error)||(data??[]).length===0, error?.code||`${(data??[]).length} baris diubah`);}
-{const {data}=await rival.from('rooms').update({number:'HACKED'}).eq('tenant_id',A).select();
- t('Rival mengubah kamar tenant A', (data??[]).length===0, `${(data??[]).length} baris diubah`);}
+console.log('\nSerangan tulis (staff lintas-hotel):');
+{const {error}=await staffB.from('bookings').insert({tenant_id:A,room_id:rm.id,customer_id:cu.id,check_in:'2027-07-01',check_out:'2027-07-02',status:'confirmed',total_amount:1,source:'walk_in'});
+ t('Staff B menyisipkan booking ke hotel A', Boolean(error), error?.code||'DIIZINKAN!');}
+{const {data}=await staffB.from('rooms').update({number:'HACKED'}).eq('tenant_id',A).select();
+ t('Staff B mengubah kamar hotel A', (data??[]).length===0, `${(data??[]).length} baris diubah`);}
+{const {data}=await staffA.from('rooms').update({number:'HACKED'}).eq('tenant_id',B).select();
+ t('Staff A mengubah kamar hotel B', (data??[]).length===0, `${(data??[]).length} baris diubah`);}
 
 console.log('\nRPC ketersediaan (SECURITY DEFINER — RLS tidak berlaku di dalamnya):');
-{const {data}=await rival.rpc('available_rooms',{p_check_in:'2027-09-01',p_check_out:'2027-09-03',p_room_type_id:null});
+{const {data}=await staffB.rpc('available_rooms',{p_check_in:'2027-09-01',p_check_out:'2027-09-03',p_room_type_id:null});
  const nums=(data??[]).map(r=>r.number);
- t('Rival hanya lihat kamar tenant B', nums.length===1&&nums[0]==='101', `[${nums.join(', ')}]`);}
+ t('Staff B hanya lihat kamar hotel B', nums.length===1&&nums[0]==='101', `[${nums.join(', ')}]`);}
 {const {data}=await budi.rpc('available_rooms',{p_check_in:'2027-09-01',p_check_out:'2027-09-03',p_room_type_id:null});
  const nums=(data??[]).map(r=>r.number);
  t('Budi hanya lihat kamar tenant A (10)', nums.length===10&&!nums.includes('101')||nums.length===10, `${nums.length} kamar`);}
@@ -105,5 +116,7 @@ fs.writeFileSync('.xt_ids', JSON.stringify({B,rivalId,rt:rt.id,rm:rm.id,cu:cu.id
 
 // Leave no rival hotel behind in the demo data.
 await svc.from('tenants').delete().eq('id',B);
-console.log('tenant B dibersihkan.');
+// staffA lives in tenant A (not cascaded by the B delete) — remove it explicitly.
+await svc.from('profiles').delete().eq('id',staffAId);
+console.log('tenant B + staff A dibersihkan.');
 process.exit(fail>0?1:0);
