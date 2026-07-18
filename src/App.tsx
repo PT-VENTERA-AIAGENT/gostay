@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,12 +23,12 @@ import CallLogs from "./pages/CallLogs";
 import NewCallLog from "./pages/NewCallLog";
 import Analytics from "./pages/Analytics";
 import UserManagement from "./pages/UserManagement";
+import AddHotel from "./pages/admin/AddHotel";
 import CRM from "./pages/CRM";
+import Reviews from "./pages/Reviews";
 
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
 
 import PortalHome from "./pages/portal/PortalHome";
 import PortalRoomDetail from "./pages/portal/PortalRoomDetail";
@@ -59,7 +59,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <Routes>
             {/* Public landing page */}
@@ -68,8 +68,14 @@ const App = () => (
             {/* Auth pages (no layout, no auth required) */}
             <Route path="/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+
+            {/* Ventera SSO owns registration and passwords — GoStay never sees
+                a password and cannot create an identity. Both pages posted to
+                AuthContext stubs that always returned "Use SSO login", so they
+                could only ever fail. Kept as redirects rather than deleted:
+                they are linked from the wild and from old emails. */}
+            <Route path="/register" element={<Navigate to="/login" replace />} />
+            <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
 
             {/* Staff/Admin pages — require authentication */}
             <Route
@@ -90,11 +96,20 @@ const App = () => (
               <Route path="/calls" element={<CallLogs />} />
               <Route path="/calls/new" element={<NewCallLog />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/reviews" element={<Reviews />} />
               <Route
                 path="/users"
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <UserManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/add-hotel"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AddHotel />
                   </ProtectedRoute>
                 }
               />
