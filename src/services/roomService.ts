@@ -193,24 +193,28 @@ export async function getAvailableRooms(
   checkOut: string,
   roomTypeId?: string
 ): Promise<RoomWithType[]> {
-  let query = supabase
-    .from("rooms")
-    .select(`*, room_types ( id, name, slug, base_rate )`)
-    .eq("is_active", true);
-
-  if (roomTypeId) query = query.eq("room_type_id", roomTypeId);
-
-  const { data: allRooms, error } = await query;
+  // The overlap join runs in Postgres (see 009_availability_rpc.sql), not here.
+  // Subtracting conflicts client-side needed the caller to read `bookings`, and
+  // RLS hands an anonymous visitor zero rows — so nothing was ever subtracted
+  // and every room came back "available", occupied or not.
+  const { data: freeRooms, error } = await supabase.rpc("available_rooms", {
+    p_check_in: checkIn,
+    p_check_out: checkOut,
+    p_room_type_id: roomTypeId ?? null,
+  });
   if (error) throw error;
 
-  // Filter out rooms with overlapping bookings
-  const { data: conflicting } = await supabase
-    .from("bookings")
-    .select("room_id")
-    .in("status", ["confirmed", "checked_in"])
-    .lt("check_in", checkOut)
-    .gt("check_out", checkIn);
+  const ids = (freeRooms ?? []).map((r: { id: string }) => r.id);
+  if (ids.length === 0) return [];
 
-  const blockedIds = new Set((conflicting ?? []).map((b) => b.room_id));
-  return (allRooms as RoomWithType[]).filter((r) => !blockedIds.has(r.id));
+  // The RPC returns room columns only; re-read through PostgREST to attach the
+  // room_types embed callers render.
+  const { data, error: embedError } = await supabase
+    .from("rooms")
+    .select(`*, room_types ( id, name, slug, base_rate )`)
+    .in("id", ids)
+    .order("number");
+  if (embedError) throw embedError;
+
+  return (data ?? []) as RoomWithType[];
 }

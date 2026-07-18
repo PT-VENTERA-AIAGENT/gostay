@@ -1,12 +1,14 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus, Search, Filter, Download, Calendar, List, Eye, CalendarPlus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
+import DatePicker from "@/components/shared/DatePicker";
 import BookingCalendar from "@/components/bookings/BookingCalendar";
 import CopyButton from "@/components/shared/CopyButton";
 import { useBookings } from "@/hooks/useBookings";
+import { exportCSV } from "@/components/analytics/ExportUtils";
 import type { BookingStatus } from "@/types/database.types";
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
@@ -32,17 +34,49 @@ function formatIDR(n: number) {
 }
 
 export default function Bookings() {
-  const [view, setView] = useState<"list" | "calendar">("list");
+  // The view lives in the URL so the sidebar's Calendar link (/bookings?view=calendar)
+  // actually lands on the calendar — it used to be local state, so that link
+  // opened the list and the nav item did nothing.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view: "list" | "calendar" = searchParams.get("view") === "calendar" ? "calendar" : "list";
+  const setView = (v: "list" | "calendar") => {
+    const next = new URLSearchParams(searchParams);
+    if (v === "calendar") next.set("view", "calendar");
+    else next.delete("view");
+    setSearchParams(next, { replace: true });
+  };
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
+  const [showFilter, setShowFilter] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const { data, isLoading, error } = useBookings({
     status: activeTab as BookingStatus | "all",
     search: search || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
   });
 
   const bookings = data?.data ?? [];
   const totalCount = data?.count ?? 0;
+
+  function handleExport() {
+    exportCSV(
+      ["Reference", "Guest", "Room", "Check-in", "Check-out", "Status", "Payment", "Total (IDR)"],
+      bookings.map((b) => [
+        b.reference,
+        b.customers?.full_name ?? "",
+        b.rooms?.number ?? "",
+        b.check_in,
+        b.check_out,
+        b.status,
+        b.payment_status,
+        Number(b.total_amount),
+      ]),
+      `gostay-bookings-${activeTab}.csv`,
+    );
+  }
 
   if (isLoading) {
     return (
@@ -71,7 +105,7 @@ export default function Bookings() {
             <p className="text-sm text-muted-foreground mt-1">{totalCount} total bookings</p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
-            <button className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors btn-press">
+            <button onClick={handleExport} disabled={bookings.length === 0} className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors btn-press disabled:opacity-50 disabled:cursor-not-allowed">
               <Download className="w-4 h-4" /> <span className="hidden md:inline">Export CSV</span>
             </button>
             <Link to="/bookings/new" className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
@@ -86,7 +120,7 @@ export default function Bookings() {
               <Search className="w-4 h-4 text-muted-foreground" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search guest, ref, room..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
             </div>
-            <button className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors btn-press">
+            <button onClick={() => setShowFilter((v) => !v)} className={cn("hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border text-sm font-medium transition-colors btn-press", showFilter || dateFrom || dateTo ? "border-primary text-primary bg-primary/5" : "border-border bg-card text-muted-foreground hover:bg-muted")}>
               <Filter className="w-4 h-4" /> Filter
             </button>
           </div>
@@ -100,6 +134,22 @@ export default function Bookings() {
           </div>
         </div>
 
+        {showFilter && (
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 bg-card border border-border rounded-lg p-3 md:p-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-in dari</label>
+              <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Dari tanggal" className="sm:w-44" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-in sampai</label>
+              <DatePicker value={dateTo} onChange={setDateTo} min={dateFrom || undefined} placeholder="Sampai tanggal" className="sm:w-44" />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-sm text-primary font-medium hover:underline py-2">Reset tanggal</button>
+            )}
+          </div>
+        )}
+
         {view === "list" ? (
           <>
             <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
@@ -111,19 +161,19 @@ export default function Bookings() {
             </div>
 
             {/* Desktop table */}
-            <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
-              <table className="w-full">
+            <div className="hidden md:block bg-card rounded-xl border border-border overflow-x-auto">
+              <table className="w-full min-w-[980px]">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="text-left px-4 py-3 font-medium">Reference</th>
-                    <th className="text-left px-4 py-3 font-medium">Guest</th>
-                    <th className="text-left px-4 py-3 font-medium">Room</th>
-                    <th className="text-left px-4 py-3 font-medium">Check-in</th>
-                    <th className="text-left px-4 py-3 font-medium">Check-out</th>
-                    <th className="text-left px-4 py-3 font-medium">Status</th>
-                    <th className="text-left px-4 py-3 font-medium">Total</th>
-                    <th className="text-left px-4 py-3 font-medium">Source</th>
-                    <th className="text-left px-4 py-3 font-medium"></th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Reference</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Guest</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Room</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Check-in</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Check-out</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Status</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Total</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Source</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap"></th>
                   </tr>
                 </thead>
                 <motion.tbody variants={staggerContainer} initial="hidden" animate="show">
@@ -131,19 +181,19 @@ export default function Bookings() {
                     const sc = statusConfig[b.status];
                     return (
                       <motion.tr key={b.id} variants={staggerItem} className="border-b border-border last:border-0 table-row-hover">
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-4 py-3 text-sm whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <span className="font-mono font-medium text-primary">{b.reference}</span>
                             <CopyButton text={b.reference} />
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-foreground">{b.customers?.full_name}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.rooms?.number} · {b.rooms?.room_types?.name}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.check_in}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{b.check_out}</td>
-                        <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", sc.cls)}>{sc.label}</span></td>
+                        <td className="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">{b.customers?.full_name}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.rooms?.number} · {b.rooms?.room_types?.name}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.check_in}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.check_out}</td>
+                        <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap inline-block", sc.cls)}>{sc.label}</span></td>
                         <td className="px-4 py-3 text-sm font-medium text-foreground tabular-nums">{formatIDR(b.total_amount)}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{b.source.replace("_", " ")}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground capitalize whitespace-nowrap">{b.source.replace("_", " ")}</td>
                         <td className="px-4 py-3">
                           <Link to={`/bookings/${b.id}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
                             <Eye className="w-4 h-4" />
@@ -178,7 +228,7 @@ export default function Bookings() {
                           <p className="text-sm font-semibold text-foreground">{b.customers?.full_name}</p>
                           <p className="text-xs font-mono text-primary">{b.reference}</p>
                         </div>
-                        <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", sc.cls)}>{sc.label}</span>
+                        <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap inline-block", sc.cls)}>{sc.label}</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>{b.rooms?.number} · {b.rooms?.room_types?.name}</span>

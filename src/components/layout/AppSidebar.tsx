@@ -1,34 +1,39 @@
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
-  Package, CalendarDays, DollarSign, Star, ConciergeBell, ChevronDown,
+  CalendarDays, DollarSign, Star,
   Phone, Users, ChevronLeft, ChevronRight, Contact
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { useChatThreads } from "@/hooks/useChat";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: CalendarCheck, label: "Reservations", path: "/bookings" },
   { icon: DoorOpen, label: "Rooms", path: "/rooms" },
-  { icon: MessageSquare, label: "Messages", path: "/chat", badge: 7 },
+  { icon: MessageSquare, label: "Messages", path: "/chat" },
   { icon: Phone, label: "Call Logs", path: "/calls" },
-  { icon: Package, label: "Inventory", path: "/inventory" },
   { icon: CalendarDays, label: "Calendar", path: "/bookings?view=calendar" },
-  { icon: DollarSign, label: "Financials", path: "/analytics", hasSubmenu: true },
+  { icon: DollarSign, label: "Financials", path: "/analytics" },
 ];
 
 const bottomItems = [
   { icon: Contact, label: "CRM Tamu", path: "/crm" },
   { icon: Users, label: "User Management", path: "/users" },
   { icon: Star, label: "Reviews", path: "/reviews" },
-  { icon: ConciergeBell, label: "Concierge", path: "/concierge" },
 ];
 
 export default function AppSidebar() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "true");
+
+  // Real unread total for the Messages badge (was hardcoded to 7). Sums the
+  // per-thread unread counts; realtime keeps it live across the app.
+  const { data: threads = [] } = useChatThreads();
+  const unreadTotal = threads.reduce((n, t) => n + (t.unread_count ?? 0), 0);
+  const badgeFor = (path: string) => (path === "/chat" ? unreadTotal : 0);
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -36,9 +41,22 @@ export default function AppSidebar() {
     localStorage.setItem("sidebar-collapsed", String(next));
   };
 
+  /**
+   * Exactly one item highlights at a time.
+   *
+   * Reservations (/bookings) and Calendar (/bookings?view=calendar) share a
+   * pathname, so comparing pathname alone lit both up. The query string is what
+   * separates them, so it is part of the comparison: an item with ?view=... is
+   * active only when that param matches, and a bare path is active only when no
+   * competing view param is set.
+   */
   const isActive = (path: string) => {
-    if (path === "/") return pathname === "/";
-    return pathname.startsWith(path.split("?")[0]);
+    const [base, query] = path.split("?");
+    if (base === "/dashboard") return pathname === "/dashboard";
+    if (!pathname.startsWith(base)) return false;
+    const wantView = query ? new URLSearchParams(query).get("view") : null;
+    const currentView = new URLSearchParams(search).get("view");
+    return wantView ? currentView === wantView : !currentView;
   };
 
   return (
@@ -92,17 +110,16 @@ export default function AppSidebar() {
                   </motion.span>
                 )}
               </AnimatePresence>
-              {!collapsed && item.badge && (
+              {!collapsed && badgeFor(item.path) > 0 && (
                 <motion.span
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold"
+                  className="bg-destructive text-destructive-foreground text-xs rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center font-semibold"
                 >
-                  {item.badge}
+                  {badgeFor(item.path) > 9 ? "9+" : badgeFor(item.path)}
                 </motion.span>
               )}
-              {!collapsed && item.hasSubmenu && <ChevronDown className="w-4 h-4" />}
-              {collapsed && item.badge && (
+              {collapsed && badgeFor(item.path) > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
               )}
             </Link>

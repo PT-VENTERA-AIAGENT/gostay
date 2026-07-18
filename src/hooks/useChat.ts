@@ -14,6 +14,7 @@ import {
   markMessagesRead,
   subscribeToThread,
   subscribeToThreadList,
+  unsubscribeChannel,
 } from "@/services/chatService";
 import type {
   ChatThreadStatus,
@@ -39,7 +40,7 @@ export function useChatThreads(status?: ChatThreadStatus) {
     const channel = subscribeToThreadList(() => {
       qc.invalidateQueries({ queryKey: ["chat", "threads"] });
     });
-    return () => { channel.unsubscribe(); };
+    return () => { unsubscribeChannel(channel); };
   }, [qc]);
 
   return query;
@@ -58,11 +59,17 @@ export function useChatMessages(threadId: string) {
   useEffect(() => {
     if (!threadId) return;
     const channel = subscribeToThread(threadId, (message) => {
-      qc.setQueryData(chatKeys.messages(threadId), (old: typeof query.data) =>
-        old ? [...old, message] : [message]
-      );
+      qc.setQueryData(chatKeys.messages(threadId), (old: typeof query.data) => {
+        if (!old) return [message];
+        // Dedup by id: the same message arrives both from the refetch that
+        // useSendMessage triggers AND from this realtime event. Appending blind
+        // produced two rows with the same key, which React refuses to reconcile
+        // — the cause of the doubled bubbles and the "must refresh" freezes.
+        if (old.some((m) => m.id === message.id)) return old;
+        return [...old, message];
+      });
     });
-    return () => { channel.unsubscribe(); };
+    return () => { unsubscribeChannel(channel); };
   }, [threadId, qc]);
 
   return query;
@@ -81,9 +88,13 @@ export function useSendMessage() {
 }
 
 export function useMarkMessagesRead() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ threadId, userId }: { threadId: string; userId: string }) =>
       markMessagesRead(threadId, userId),
+    // Refresh the thread list so the unread badge drops immediately. Without
+    // this the DB is updated but the badge stays stale — the "kok gak hilang".
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat", "threads"] }),
   });
 }
 

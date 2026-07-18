@@ -10,6 +10,8 @@ import {
   getTodayDepartures,
   searchCustomers,
   getCustomerBookings,
+  getMyBookings,
+  getBookingsInRange,
 } from "@/services/bookingService";
 import type {
   BookingFilters,
@@ -29,6 +31,8 @@ export const bookingKeys = {
   departures: () => ["bookings", "departures"] as const,
   customerBookings: (customerId: string) =>
     ["bookings", "customer", customerId] as const,
+  mine: (profileId: string) => ["bookings", "mine", profileId] as const,
+  range: (start: string, end: string) => ["bookings", "range", start, end] as const,
 };
 
 export function useBookings(filters?: BookingFilters) {
@@ -75,6 +79,29 @@ export function useCustomerBookings(customerId: string) {
     queryKey: bookingKeys.customerBookings(customerId),
     queryFn: () => getCustomerBookings(customerId),
     enabled: Boolean(customerId),
+  });
+}
+
+/** Bookings overlapping a date window, for the calendar. */
+export function useBookingsInRange(rangeStart: string, rangeEnd: string) {
+  return useQuery({
+    queryKey: bookingKeys.range(rangeStart, rangeEnd),
+    queryFn: () => getBookingsInRange(rangeStart, rangeEnd),
+    enabled: Boolean(rangeStart && rangeEnd),
+  });
+}
+
+/**
+ * The signed-in user's own bookings. Takes no id: passing one would invite a
+ * caller to pass someone else's, and the answer comes from auth.uid() anyway.
+ */
+export function useMyBookings() {
+  const { user } = useAuth();
+  const profileId = user?.id ?? "";
+  return useQuery({
+    queryKey: bookingKeys.mine(profileId),
+    queryFn: () => getMyBookings(profileId),
+    enabled: Boolean(profileId),
   });
 }
 

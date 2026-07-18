@@ -148,8 +148,8 @@ export default function UserManagement() {
         ) : (
           <>
             {/* Desktop table */}
-            <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
-              <table className="w-full">
+            <div className="hidden md:block bg-card rounded-xl border border-border overflow-x-auto">
+              <table className="w-full min-w-[820px]">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
                     <th className="text-left px-4 py-3 font-medium">User</th>

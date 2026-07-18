@@ -52,10 +52,10 @@ export default function BookingList() {
 
   return (
     <div className="bg-card rounded-xl p-5 border border-border">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
-        <h3 className="font-semibold text-foreground">Booking List</h3>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 flex-1 sm:w-56">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between mb-4 gap-3">
+        <h3 className="font-semibold text-foreground shrink-0">Booking List</h3>
+        <div className="flex items-center gap-3 w-full lg:w-auto">
+          <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 flex-1 min-w-0 lg:w-56 lg:flex-none">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input
               value={search}
@@ -68,7 +68,7 @@ export default function BookingList() {
             value={status}
             onChange={(e) => setStatus(e.target.value as BookingStatus | "all")}
             aria-label="Filter by status"
-            className="text-sm bg-muted rounded-lg px-3 py-2 text-foreground border-none outline-none cursor-pointer"
+            className="text-sm bg-muted rounded-lg px-3 py-2 text-foreground border-none outline-none cursor-pointer shrink-0"
           >
             <option value="all">All Status</option>
             {Object.entries(statusLabels).map(([key, s]) => (
@@ -91,17 +91,20 @@ export default function BookingList() {
       ) : (
         <>
           {/* Desktop table */}
+          {/* min-w keeps the columns readable and lets the wrapper scroll. With
+              only w-full the table squeezed to the container instead: headers
+              wrapped onto two lines and the room-type badge folded in half. */}
           <div className="overflow-x-auto hidden md:block">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="text-left py-3 font-medium">Booking ID</th>
-                  <th className="text-left py-3 font-medium">Guest Name</th>
-                  <th className="text-left py-3 font-medium">Room Type</th>
-                  <th className="text-left py-3 font-medium">Room Number</th>
-                  <th className="text-left py-3 font-medium">Duration</th>
-                  <th className="text-left py-3 font-medium">Check-In &amp; Check-Out</th>
-                  <th className="text-left py-3 font-medium">Status</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">Booking ID</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">Guest Name</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">Room Type</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">Room Number</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">Duration</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">Check-In &amp; Check-Out</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">Status</th>
                   <th className="text-left py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -117,17 +120,17 @@ export default function BookingList() {
                           <CopyButton text={b.reference} />
                         </div>
                       </td>
-                      <td className="py-3 text-foreground font-medium">{b.customers?.full_name ?? "—"}</td>
+                      <td className="py-3 text-foreground font-medium whitespace-nowrap">{b.customers?.full_name ?? "—"}</td>
                       <td className="py-3">
-                        <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-md text-primary-foreground", typeColor(type))}>
+                        <span className={cn("inline-block text-xs font-semibold px-2.5 py-1 rounded-md text-primary-foreground whitespace-nowrap", typeColor(type))}>
                           {type}
                         </span>
                       </td>
-                      <td className="py-3 text-foreground">{b.rooms?.number ? "Room " + b.rooms.number : "—"}</td>
-                      <td className="py-3 text-muted-foreground">{nightsOf(b.check_in, b.check_out)} nights</td>
-                      <td className="py-3 text-muted-foreground">{fmtDate(b.check_in)} - {fmtDate(b.check_out)}</td>
+                      <td className="py-3 text-foreground whitespace-nowrap">{b.rooms?.number ? "Room " + b.rooms.number : "—"}</td>
+                      <td className="py-3 text-muted-foreground whitespace-nowrap">{nightsOf(b.check_in, b.check_out)} nights</td>
+                      <td className="py-3 text-muted-foreground whitespace-nowrap">{fmtDate(b.check_in)} - {fmtDate(b.check_out)}</td>
                       <td className="py-3">
-                        <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full", s.cls)}>{s.label}</span>
+                        <span className={cn("inline-block text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap", s.cls)}>{s.label}</span>
                       </td>
                       <td className="py-3">
                         <Link to={"/bookings/" + b.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">

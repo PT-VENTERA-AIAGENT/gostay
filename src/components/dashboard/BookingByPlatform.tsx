@@ -36,15 +36,15 @@ export default function BookingByPlatform({ bySource }: { bySource: SourcePoint[
       animate="show"
       className="bg-card rounded-xl p-5 border border-border card-hover"
     >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground">Booking by Source</h3>
-        <span className="text-xs text-muted-foreground tabular-nums">{total} bookings</span>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h3 className="font-semibold text-foreground min-w-0 truncate">Booking by Source</h3>
+        <span className="text-xs text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">{total} bookings</span>
       </div>
 
       {total === 0 ? (
         <p className="text-xs text-muted-foreground py-12 text-center">No bookings in this period.</p>
       ) : (
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <ResponsiveContainer width={140} height={140}>
             <PieChart>
               <Pie data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" strokeWidth={0} animationDuration={1000}>

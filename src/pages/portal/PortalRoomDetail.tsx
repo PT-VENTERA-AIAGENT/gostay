@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Users, MapPin, Wifi, Wind, Tv, Coffee, Bath, Mountain, Check } from "lucide-react";
+import { ArrowLeft, Users, MapPin, Wifi, Wind, Tv, Coffee, Bath, Mountain, Check, Loader2 } from "lucide-react";
+import { format, parseISO, addDays as addDaysFn } from "date-fns";
 import PageTransition from "@/components/shared/PageTransition";
 import { motion } from "framer-motion";
 import { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
+import DatePicker from "@/components/shared/DatePicker";
 import { getRoomTypeBySlug } from "@/services/roomService";
 import { useAvailableRooms } from "@/hooks/useRooms";
+
+const today = format(new Date(), "yyyy-MM-dd");
 
 const amenityIcons: Record<string, React.ElementType> = { WiFi: Wifi, AC: Wind, TV: Tv, "Mini Bar": Coffee, Bathtub: Bath, "Sea View": Mountain };
 
@@ -26,6 +30,11 @@ function diffNights(checkIn: string, checkOut: string): number {
   const a = new Date(checkIn).getTime();
   const b = new Date(checkOut).getTime();
   return Math.max(0, Math.round((b - a) / (1000 * 60 * 60 * 24)));
+}
+
+/** Shift an ISO 'yyyy-MM-dd' by n days, staying on the date-only string. */
+function addDays(iso: string, n: number): string {
+  return format(addDaysFn(parseISO(iso), n), "yyyy-MM-dd");
 }
 
 export default function PortalRoomDetail() {
@@ -51,6 +60,14 @@ export default function PortalRoomDetail() {
   const nights = diffNights(checkIn, checkOut);
   const isAvailable = availableRooms !== undefined && availableRooms.length > 0;
   const datesSelected = Boolean(checkIn && checkOut);
+
+  // A guest who moves check-in past their check-out would otherwise be left
+  // holding an impossible range and a silently dead Book button; keep the stay
+  // valid by dragging check-out along with it.
+  function pickCheckIn(next: string) {
+    setCheckIn(next);
+    if (next && checkOut && checkOut <= next) setCheckOut(addDays(next, 1));
+  }
 
   function handleBook() {
     if (!room) return;
@@ -99,10 +116,16 @@ export default function PortalRoomDetail() {
         </Link>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 rounded-xl overflow-hidden">
-          <div className="col-span-2 row-span-2 aspect-[4/3] bg-muted flex items-center justify-center text-muted-foreground">Main Photo</div>
+          <div className="col-span-2 row-span-2 aspect-[4/3] bg-muted flex items-center justify-center text-muted-foreground overflow-hidden">
+            {room.photos?.[0]
+              ? <img src={room.photos[0]} alt={room.name} className="w-full h-full object-cover" />
+              : "No photo"}
+          </div>
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="aspect-[4/3] bg-muted items-center justify-center text-muted-foreground text-sm hidden md:flex">
-              Photo {i}
+            <div key={i} className="aspect-[4/3] bg-muted items-center justify-center text-muted-foreground text-sm hidden md:flex overflow-hidden">
+              {room.photos?.[i]
+                ? <img src={room.photos[i]} alt={`${room.name} ${i + 1}`} className="w-full h-full object-cover" />
+                : `Photo ${i}`}
             </div>
           ))}
         </div>
@@ -169,20 +192,20 @@ export default function PortalRoomDetail() {
               <div className="space-y-3 mb-5">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-in</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    onChange={pickCheckIn}
+                    min={today}
+                    placeholder="Pilih tanggal menginap"
                   />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-out</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    onChange={setCheckOut}
+                    min={checkIn ? addDays(checkIn, 1) : today}
+                    placeholder={checkIn ? "Pilih tanggal pulang" : "Pilih check-in dulu"}
                   />
                 </div>
                 <div>
@@ -199,12 +222,33 @@ export default function PortalRoomDetail() {
                 </div>
               </div>
 
+              {/* The button used to just go grey. Say why: checking, sold out,
+                  or how little is left — all three change what a guest does next. */}
+              {datesSelected && (
+                <div className="mb-3 text-xs">
+                  {loadingAvail ? (
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Mengecek ketersediaan…
+                    </span>
+                  ) : isAvailable ? (
+                    <span className="flex items-center gap-1.5 text-success">
+                      <Check className="w-3.5 h-3.5" />
+                      {availableRooms!.length} kamar tersedia untuk tanggal ini
+                    </span>
+                  ) : (
+                    <span className="text-destructive">
+                      Kamar tipe ini penuh pada tanggal tersebut. Coba geser tanggalnya.
+                    </span>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={handleBook}
-                disabled={!checkIn || !checkOut || (datesSelected && !loadingAvail && !isAvailable)}
+                disabled={!datesSelected || (!loadingAvail && !isAvailable)}
                 className="block w-full bg-primary text-primary-foreground py-3 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity text-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Book Now
+                {!datesSelected ? "Pilih tanggal dulu" : "Book Now"}
               </button>
 
               {nights > 0 && (

@@ -11,9 +11,9 @@ export default function ReservationsChart({ data }: { data: ReservationPoint[] }
       animate="show"
       className="bg-card rounded-xl p-5 border border-border card-hover"
     >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground">Reservations</h3>
-        <span className="text-xs text-muted-foreground">Last 7 days</span>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h3 className="font-semibold text-foreground min-w-0 truncate">Reservations</h3>
+        <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">Last 7 days</span>
       </div>
 
       <ResponsiveContainer width="100%" height={220}>

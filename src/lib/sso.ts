@@ -147,10 +147,18 @@ export function clearSession() {
 }
 
 export function logout() {
+  // Local sign-out: drop our session and return to the landing page.
+  //
+  // We deliberately do NOT bounce through the issuer's /oidc/session/end with a
+  // post_logout_redirect_uri — that URI must be registered on the client at
+  // Ventera, and while it is not, the end-session page answers
+  // "post_logout_redirect_uri not registered" and strands the user on an error.
+  // Clearing our own session is what actually logs them out of this app.
+  //
+  // Trade-off: the Ventera SSO session itself stays alive, so the next sign-in
+  // may not re-prompt for credentials. To get a full single-logout, register
+  // `${origin}/` as a post_logout_redirect_uri for the `gostay` client at
+  // Ventera, then this can call /oidc/session/end again.
   clearSession();
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    post_logout_redirect_uri: `${window.location.origin}/`,
-  });
-  window.location.assign(`${SSO_ISSUER}/oidc/session/end?${params}`);
+  window.location.assign("/");
 }

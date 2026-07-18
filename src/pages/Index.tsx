@@ -47,15 +47,15 @@ export default function Index() {
 
   return (
     <PageTransition>
-      <div className="flex flex-col lg:flex-row flex-1 gap-6 p-4 md:p-6 overflow-auto">
+      <div className="flex flex-col xl:flex-row flex-1 gap-6 p-4 md:p-6 overflow-auto">
         {/* Main content */}
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="flex-1 flex flex-col gap-6 min-w-0">
           <motion.div variants={staggerItem}><StatCards data={data} /></motion.div>
-          <motion.div variants={staggerItem} className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-2"><RoomAvailability rooms={rooms ?? []} /></div>
-            <div className="lg:col-span-3"><RevenueChart monthly={data.monthlyRevenue} /></div>
+          <motion.div variants={staggerItem} className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+            <div className="xl:col-span-2"><RoomAvailability rooms={rooms ?? []} /></div>
+            <div className="xl:col-span-3"><RevenueChart monthly={data.monthlyRevenue} /></div>
           </motion.div>
-          <motion.div variants={staggerItem} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <motion.div variants={staggerItem} className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <ReservationsChart data={data.reservationsTrend} />
             <BookingByPlatform bySource={data.bySource} />
           </motion.div>
@@ -65,7 +65,7 @@ export default function Index() {
         {/* Right sidebar */}
         <motion.div
           variants={staggerContainer} initial="hidden" animate="show"
-          className="w-full lg:w-72 shrink-0 flex flex-col gap-6"
+          className="w-full xl:w-72 shrink-0 flex flex-col gap-6"
         >
           <motion.div variants={staggerItem}><RecentActivities /></motion.div>
         </motion.div>

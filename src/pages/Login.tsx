@@ -2,11 +2,11 @@ import { useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Hotel } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, roleHome } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
-  const { session, signIn } = useAuth();
+  const { session, role, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -14,8 +14,11 @@ export default function Login() {
 
   const from = (location.state as { from?: string })?.from ?? "/";
 
+  // Already signed in: don't sit on the login screen. Honour a real returnTo,
+  // otherwise send them to their role's home rather than back to "/", which is
+  // the marketing page and would just show "Masuk" again.
   useEffect(() => {
-    if (session) navigate(from, { replace: true });
+    if (session) navigate(from !== "/" ? from : roleHome(role), { replace: true });
   }, [session]);
 
   useEffect(() => {

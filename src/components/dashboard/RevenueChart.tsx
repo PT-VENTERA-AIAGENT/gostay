@@ -25,9 +25,9 @@ export default function RevenueChart({ monthly }: { monthly: MonthlyPoint[] }) {
       animate="show"
       className="bg-card rounded-xl p-5 border border-border card-hover"
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <h3 className="font-semibold text-foreground">Revenue</h3>
-        <span className="text-xs text-muted-foreground">Last 6 months</span>
+        <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">Last 6 months</span>
       </div>
 
       <div className="mb-2">

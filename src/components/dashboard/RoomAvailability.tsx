@@ -29,9 +29,9 @@ export default function RoomAvailability({ rooms }: { rooms: RoomWithType[] }) {
       animate="show"
       className="bg-card rounded-xl p-5 border border-border card-hover"
     >
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="font-semibold text-foreground">Room Availability</h3>
-        <span className="text-xs text-muted-foreground tabular-nums">{total} rooms</span>
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <h3 className="font-semibold text-foreground min-w-0 truncate">Room Availability</h3>
+        <span className="text-xs text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">{total} rooms</span>
       </div>
 
       {total === 0 ? (
@@ -50,12 +50,12 @@ export default function RoomAvailability({ rooms }: { rooms: RoomWithType[] }) {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
             {segments.map((r) => (
               <div key={r.label} className="flex items-center gap-2">
                 <span className={`w-3 h-3 rounded-sm ${r.color}`} />
-                <span className="text-xs text-muted-foreground">{r.label}</span>
-                <span className="text-sm font-bold text-foreground ml-auto tabular-nums">
+                <span className="text-xs text-muted-foreground truncate">{r.label}</span>
+                <span className="text-sm font-bold text-foreground ml-auto tabular-nums shrink-0 pl-2">
                   <AnimatedValue value={r.value} />
                 </span>
               </div>

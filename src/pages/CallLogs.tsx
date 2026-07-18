@@ -100,8 +100,8 @@ export default function CallLogs() {
         </div>
 
         {/* Desktop table */}
-        <div className="hidden lg:block bg-card rounded-xl border border-border overflow-hidden">
-          <table className="w-full">
+        <div className="hidden lg:block bg-card rounded-xl border border-border overflow-x-auto">
+          <table className="w-full min-w-[860px]">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
                 <th className="text-left px-4 py-3 font-medium">Direction</th>

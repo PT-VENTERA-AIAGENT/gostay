@@ -1,12 +1,23 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-import { Search, Plus, Settings, DoorOpen, Loader2 } from "lucide-react";
+import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
-import { useRooms } from "@/hooks/useRooms";
-import { deriveRoomStatus as deriveStatus, type RoomStatus } from "@/lib/roomStatus";
+import { useRooms, useRoomTypes } from "@/hooks/useRooms";
+import { useBookingsInRange } from "@/hooks/useBookings";
+import { statusForDate, type RoomStatus } from "@/lib/roomStatus";
+import RoomFormDialog from "@/components/rooms/RoomFormDialog";
+import DatePicker from "@/components/shared/DatePicker";
+import type { Room } from "@/types/database.types";
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+function nextDay(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 const statusConfig: Record<RoomStatus, { label: string; colorClass: string; dotClass: string }> = {
   available:       { label: "Available",     colorClass: "bg-secondary text-secondary-foreground", dotClass: "bg-success" },
@@ -15,8 +26,6 @@ const statusConfig: Record<RoomStatus, { label: string; colorClass: string; dotC
   reserved:        { label: "Reserved",      colorClass: "badge-warning",     dotClass: "bg-warning" },
   out_of_service:  { label: "Out of Service",colorClass: "badge-destructive", dotClass: "bg-destructive" },
 };
-
-const roomTypeFilters = ["All", "Standard", "Deluxe", "Suite", "Family", "Presidential"];
 
 function AnimatedCount({ value }: { value: number }) {
   const animated = useAnimatedCounter(value, 800);
@@ -27,21 +36,49 @@ export default function Rooms() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState("All");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [date, setDate] = useState(todayISO());
 
   const { data: rooms = [], isLoading, error } = useRooms();
+  const { data: roomTypes = [] } = useRoomTypes();
+  // Bookings that cover the selected night, to colour each room for THAT date.
+  const { data: dayBookings = [] } = useBookingsInRange(date, nextDay(date));
+
+  // Filter chips come from the room types staff actually configured — the old
+  // hardcoded list ("Standard…Presidential") both missed new types and offered
+  // ones that do not exist.
+  const roomTypeFilters = useMemo(
+    () => ["All", ...roomTypes.map((t) => t.name)],
+    [roomTypes],
+  );
+
+  // room_id → status of the booking occupying it that night (if any).
+  const bookingStatusByRoom = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const b of dayBookings) {
+      // checked_in wins over a mere reservation if somehow both exist.
+      const cur = m.get(b.room_id);
+      if (!cur || b.status === "checked_in") m.set(b.room_id, b.status);
+    }
+    return m;
+  }, [dayBookings]);
+
+  const statusOf = (room: Room) => statusForDate(room.is_active, bookingStatusByRoom.get(room.id));
+
+  function openAdd() { setEditingRoom(null); setDialogOpen(true); }
+  function openEdit(room: Room) { setEditingRoom(room); setDialogOpen(true); }
 
   const filtered = rooms.filter((r) => {
-    const status = deriveStatus(r);
+    const status = statusOf(r);
     const typeName = r.room_types?.name ?? "";
     if (statusFilter !== "all" && status !== statusFilter) return false;
     if (typeFilter !== "All" && typeName !== typeFilter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const guestName = r.current_booking ? "" : "";
-      if (!r.number.includes(q) && !guestName.toLowerCase().includes(q)) return false;
-    }
+    if (search && !r.number.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+  const isToday = date === todayISO();
 
   const floors = [...new Set(filtered.map((r) => r.floor))].sort((a, b) => a - b);
 
@@ -70,22 +107,34 @@ export default function Rooms() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">Room Status Board</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {rooms.length} total rooms · {rooms.filter((r) => deriveStatus(r) === "available").length} available
+              {rooms.length} total rooms · {rooms.filter((r) => statusOf(r) === "available").length} available {isToday ? "hari ini" : `pada ${new Date(date + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`}
             </p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <Link to="/rooms/types" className="px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2 btn-press">
               <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Room Types</span>
             </Link>
-            <button className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
+            <button onClick={openAdd} className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Room</span>
             </button>
           </div>
         </div>
 
+        {/* Date selector — the board reflects room status for this night. */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <CalendarDays className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Status untuk tanggal:</span>
+          <div className="w-44">
+            <DatePicker value={date} onChange={(v) => setDate(v || todayISO())} placeholder="Pilih tanggal" />
+          </div>
+          {!isToday && (
+            <button onClick={() => setDate(todayISO())} className="text-sm text-primary font-medium hover:underline">Hari ini</button>
+          )}
+        </div>
+
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {(Object.entries(statusConfig) as [RoomStatus, typeof statusConfig[RoomStatus]][]).map(([key, config]) => {
-            const count = rooms.filter((r) => deriveStatus(r) === key).length;
+            const count = rooms.filter((r) => statusOf(r) === key).length;
             const isActive = statusFilter === key;
             return (
               <motion.button
@@ -106,14 +155,18 @@ export default function Rooms() {
           })}
         </motion.div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 w-full sm:max-w-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background transition-shadow">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search room number..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
+        {/* Search keeps a fixed width (shrink-0) and the type chips take the rest
+            and scroll. Previously the chip row had no min-w-0, so overflow-x-auto
+            never engaged: it forced its full intrinsic width and crushed the
+            search box down to a sliver once there were more than a few types. */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 w-full sm:w-64 md:w-72 shrink-0 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background transition-shadow">
+            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search room number..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full min-w-0" />
           </div>
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1 overflow-x-auto">
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1 flex-1 min-w-0 overflow-x-auto">
             {roomTypeFilters.map((t) => (
-              <button key={t} onClick={() => setTypeFilter(t)} className={cn("px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap touch-target btn-press", typeFilter === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+              <button key={t} onClick={() => setTypeFilter(t)} className={cn("px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 touch-target btn-press", typeFilter === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
                 {t}
               </button>
             ))}
@@ -125,7 +178,7 @@ export default function Rooms() {
             <h3 className="text-sm font-semibold text-muted-foreground mb-3">Floor {floor}</h3>
             <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
               {filtered.filter((r) => r.floor === floor).map((room) => {
-                const status = deriveStatus(room);
+                const status = statusOf(room);
                 const config = statusConfig[status];
                 return (
                   <motion.div
@@ -133,6 +186,7 @@ export default function Rooms() {
                     variants={staggerItem}
                     whileHover={{ scale: 1.03, y: -3 }}
                     whileTap={{ scale: 0.98 }}
+                    onClick={() => openEdit(room)}
                     className="bg-card rounded-xl border border-border p-3 md:p-4 hover:shadow-md transition-shadow cursor-pointer"
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -156,6 +210,8 @@ export default function Rooms() {
             <button onClick={() => { setSearch(""); setStatusFilter("all"); setTypeFilter("All"); }} className="text-sm text-primary font-medium hover:underline">Clear filters</button>
           </div>
         )}
+
+        <RoomFormDialog open={dialogOpen} onOpenChange={setDialogOpen} room={editingRoom} />
       </div>
     </PageTransition>
   );

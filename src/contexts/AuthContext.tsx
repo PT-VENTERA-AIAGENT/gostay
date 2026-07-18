@@ -41,9 +41,6 @@ interface AuthContextValue {
   signIn: (returnTo?: string) => void;
   signOut: () => void;
   refreshSession: () => void;
-  // Legacy compat stubs (pages that call these will degrade gracefully)
-  signUp: () => Promise<{ error: Error | null }>;
-  resetPassword: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -63,6 +60,22 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
  */
 function resolveRole(session: SsoSession): UserRole | null {
   return session.role ?? null;
+}
+
+/**
+ * Where a signed-in user belongs after login.
+ *
+ * Staff and admin run the back office at /dashboard; everyone else — customers,
+ * and users whose role has not resolved yet — get the guest portal, which is
+ * public and never bounces them. Sending a null-role user to /dashboard would
+ * only get them denied by ProtectedRoute and dumped back here.
+ *
+ * The landing page at "/" is marketing, not an app home: routing a logged-in
+ * user there leaves them staring at a "Masuk" button, which is exactly the
+ * "kok cuma refresh" symptom.
+ */
+export function roleHome(role: UserRole | null): string {
+  return role === "admin" || role === "staff" ? "/dashboard" : "/portal";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -91,8 +104,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signOut,
         refreshSession,
-        signUp: async () => ({ error: new Error("Use SSO login") }),
-        resetPassword: async () => ({ error: new Error("Use SSO login") }),
       }}
     >
       {children}

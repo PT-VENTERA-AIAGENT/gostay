@@ -21,6 +21,26 @@ export function deriveRoomStatus(room: RoomWithType): RoomStatus {
   return "available";
 }
 
+/**
+ * A room's status on a specific date, given whichever booking overlaps that
+ * date (or none). Used by the date-aware Room Status Board: pick a date, and
+ * every room reports how it stands that night rather than "right now".
+ *   checked_in  → a guest is in the room that night
+ *   occupied    → a completed (checked-out) stay covered that night (past dates)
+ *   reserved    → booked (confirmed/pending) but not yet checked in
+ *   available   → nothing booked over that night
+ */
+export function statusForDate(isActive: boolean, bookingStatus?: string): RoomStatus {
+  if (!isActive) return "out_of_service";
+  switch (bookingStatus) {
+    case "checked_in": return "checked_in";
+    case "checked_out": return "occupied";
+    case "confirmed":
+    case "pending": return "reserved";
+    default: return "available";
+  }
+}
+
 export interface RoomStatusCounts {
   total: number;
   available: number;

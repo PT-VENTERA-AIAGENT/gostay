@@ -6,7 +6,7 @@ export type BookingStatus =
   | "checked_out"
   | "cancelled"
   | "no_show";
-export type BookingSource = "portal" | "phone" | "walk_in" | "staff";
+export type BookingSource = "portal" | "phone" | "walk_in" | "staff" | "whatsapp";
 export type PaymentStatus = "pending" | "partial" | "paid" | "refunded";
 export type CallDirection = "inbound" | "outbound";
 export type RoomStatus =
@@ -78,6 +78,11 @@ export interface Database {
         Row: AnalyticsCache;
         Insert: AnalyticsCacheInsert;
         Update: AnalyticsCacheUpdate;
+      };
+      reviews: {
+        Row: Review;
+        Insert: ReviewInsert;
+        Update: ReviewUpdate;
       };
     };
     Views: Record<string, never>;
@@ -268,7 +273,7 @@ export type ChatThreadInsert = Omit<
 export type ChatThreadUpdate = Partial<ChatThreadInsert>;
 
 export interface ChatThreadWithRelations extends ChatThread {
-  customers: Pick<Customer, "id" | "full_name" | "email">;
+  customers: Pick<Customer, "id" | "full_name" | "email" | "phone" | "profile_id">;
   last_message?: Pick<ChatMessage, "content" | "created_at"> | null;
   unread_count?: number;
 }
@@ -316,4 +321,23 @@ export interface AnalyticsCache {
   updated_at: string;
 }
 export type AnalyticsCacheInsert = Omit<AnalyticsCache, "id">;
+
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+export interface Review {
+  id: string;
+  customer_id: string;
+  booking_id: string | null;
+  rating: number;
+  comment: string | null;
+  is_published: boolean;
+  created_at: string;
+}
+export type ReviewInsert = Omit<Review, "id" | "created_at" | "is_published"> & {
+  is_published?: boolean;
+};
+export type ReviewUpdate = Partial<Omit<Review, "id" | "created_at">>;
+
+export interface ReviewWithCustomer extends Review {
+  customers: Pick<Customer, "id" | "full_name"> | null;
+}
 export type AnalyticsCacheUpdate = Partial<AnalyticsCacheInsert>;
