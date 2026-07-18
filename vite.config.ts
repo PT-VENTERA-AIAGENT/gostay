@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { exchangeCode } from "./api/_lib/exchange";
+import waInbound from "./api/wa/inbound";
 
 // In production /api/sso/token is served by the Vercel function in api/sso/.
 // `vite dev` does not run those, so mount the same handler on the dev server —
@@ -43,6 +44,44 @@ function ssoDevApi(): Plugin {
   };
 }
 
+// The same idea for the WhatsApp inbound webhook. In production api/wa/inbound.ts
+// is a Vercel function; `vite dev` does not run it, so mount the very same
+// default handler here — a local wa-ventera can then POST inbound messages to
+// http://localhost:8080/api/wa/inbound during dev. Node's req/res are adapted to
+// the tiny Vercel-style surface the handler expects.
+function waDevApi(): Plugin {
+  return {
+    name: "wa-dev-api",
+    configureServer(server) {
+      server.middlewares.use("/api/wa/inbound", async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const raw = Buffer.concat(chunks).toString("utf8");
+
+        const vres = {
+          statusCode: 200,
+          status(code: number) { this.statusCode = code; res.statusCode = code; return vres; },
+          setHeader(name: string, value: string) { res.setHeader(name, value); return vres; },
+          json(body: unknown) {
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(body));
+          },
+        };
+
+        try {
+          await (waInbound as unknown as (q: unknown, s: unknown) => Promise<void>)(
+            { method: req.method, headers: req.headers, body: raw },
+            vres,
+          );
+        } catch {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "dev_handler_error" }));
+        }
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Prefix "" loads unprefixed vars too (SSO_CLIENT_SECRET), which Vite keeps
@@ -60,7 +99,7 @@ export default defineConfig(({ mode }) => {
         overlay: false,
       },
     },
-    plugins: [react(), ssoDevApi()],
+    plugins: [react(), ssoDevApi(), waDevApi()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
