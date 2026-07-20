@@ -180,7 +180,7 @@ export async function getSessionQr(
  */
 export async function getSessionStatus(
   slug: string,
-): Promise<{ status: string; connected: boolean; error?: string }> {
+): Promise<{ status: string; connected: boolean; number?: string; error?: string }> {
   const { baseUrl, intKey } = config();
   if (!baseUrl || !intKey) {
     return { status: "not_configured", connected: false, error: "gateway_not_configured" };
@@ -204,6 +204,7 @@ export async function getSessionStatus(
     state?: unknown;
     connection?: unknown;
     connected?: unknown;
+    number?: unknown;
   };
 
   // Prefer an explicit status string; fall back through the common field names.
@@ -214,8 +215,9 @@ export async function getSessionStatus(
     "";
   const status = raw || "unknown";
   const connected = body.connected === true || (raw !== "" && isConnectedStatus(raw));
+  const number = typeof body.number === "string" && body.number ? body.number : undefined;
 
-  return { status, connected };
+  return { status, connected, number };
 }
 
 /**

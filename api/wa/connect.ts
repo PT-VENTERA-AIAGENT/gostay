@@ -57,13 +57,23 @@ async function tenantSlug(tenantId: string): Promise<{ slug: string; name: strin
   return rows[0] ?? null;
 }
 
-async function upsertMapping(slug: string, tenantId: string, isActive: boolean): Promise<void> {
+async function upsertMapping(
+  slug: string,
+  tenantId: string,
+  isActive: boolean,
+  botNumber?: string,
+): Promise<void> {
   const { url, serviceKey } = serviceConfig();
   if (!url || !serviceKey) return;
   await fetch(`${url}/rest/v1/wa_hotel_sessions?on_conflict=session_id`, {
     method: "POST",
     headers: { ...serviceHeaders(serviceKey), Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({ session_id: slug, tenant_id: tenantId, is_active: isActive }),
+    body: JSON.stringify({
+      session_id: slug,
+      tenant_id: tenantId,
+      is_active: isActive,
+      ...(botNumber ? { bot_number: botNumber } : {}),
+    }),
   }).catch(() => {});
 }
 
@@ -111,8 +121,8 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     // GET — poll status + QR.
     const st = await getSessionStatus(slug);
     if (st.connected) {
-      await upsertMapping(slug, tenantId, true); // finalise: route inbound to this hotel
-      res.status(200).json({ status: "open", connected: true });
+      await upsertMapping(slug, tenantId, true, st.number); // finalise + store bot number
+      res.status(200).json({ status: "open", connected: true, linkedNumber: st.number ?? null });
       return;
     }
     const qr = await getSessionQr(slug);
