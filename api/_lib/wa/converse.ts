@@ -110,7 +110,11 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     // ── 2. Understand the message ───────────────────────────────────────────
     const intent = await extractBookingIntent(trimmed, knownFromPending(pending));
 
-    if (intent.intent !== "book") {
+    // If the guest is mid-collection, a short answer ("23", "deluxe") is filling
+    // a slot we asked for — stay in the booking flow even when the model reads it
+    // as small talk. Only greet when there's NO booking in progress.
+    const collecting = pending?.kind === "collecting";
+    if (intent.intent !== "book" && !collecting) {
       await reply(
         "Halo! 👋 Saya asisten reservasi hotel. Untuk memesan kamar, sebutkan " +
           "tanggal menginap, jumlah tamu, dan tipe kamar yang diinginkan ya.",

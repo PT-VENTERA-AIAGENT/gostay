@@ -117,6 +117,8 @@ ATURAN:
 
 Slot yang sudah terkumpul dari percakapan sebelumnya (pertahankan bila tamu tidak mengubahnya): ${context}
 
+LANJUTAN: bila slot di atas SUDAH ada isinya dan pesan tamu berupa angka/tanggal singkat, itu jawaban untuk slot yang MASIH kosong — set intent="book" dan isi slot itu. Contoh: check_in sudah "2026-07-21", tamu kirim "23" → check_out="2026-07-23" (bulan & tahun sama). Angka setelah ditanya jumlah tamu → guests.
+
 Kembalikan HANYA objek JSON tersebut.`;
 }
 
