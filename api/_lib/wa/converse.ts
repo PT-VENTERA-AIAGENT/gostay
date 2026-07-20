@@ -22,6 +22,7 @@ import { extractBookingIntent, type BookingSlots } from "./ai";
 import { getPending, setPending, clearPending } from "./pending";
 import {
   findRoomType,
+  listRoomTypes,
   getAvailableRoomsSrv,
   computeTotal,
   createWaBooking,
@@ -175,12 +176,26 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const checkOut = intent.check_out as string;
     const guests = intent.guests as number;
 
-    const roomType = await findRoomType(tenantId, intent.room_type_hint);
+    // Resolve the room TYPE. If none was clearly named (or the guest gave a room
+    // NUMBER like "101", which isn't a type), show the real menu with prices and
+    // keep the dates/guests so their next reply picks a type and continues.
+    const roomType = intent.room_type_hint
+      ? await findRoomType(tenantId, intent.room_type_hint)
+      : null;
     if (!roomType) {
-      await reply(
-        "Maaf, tipe kamar itu belum tersedia di hotel kami. Mau coba tipe lain " +
-          "(mis. standard, deluxe, suite)?",
-      );
+      const types = await listRoomTypes(tenantId);
+      await setPending(tenantId, phoneJid, "collecting", {
+        check_in: checkIn,
+        check_out: checkOut,
+        guests,
+        room_type_hint: null,
+      });
+      if (types.length === 0) {
+        await reply("Mohon maaf, belum ada tipe kamar yang bisa dipesan saat ini. Silakan hubungi kami langsung ya. 🙏");
+        return;
+      }
+      const menu = types.map((t) => `• *${t.name}* — ${formatIDR(t.base_rate)}/malam`).join("\n");
+      await reply(`Tipe kamar yang tersedia untuk ${checkIn} s/d ${checkOut}:\n${menu}\n\nMau pilih tipe yang mana?`);
       return;
     }
 

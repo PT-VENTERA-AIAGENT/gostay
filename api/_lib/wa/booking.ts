@@ -63,6 +63,16 @@ export async function findRoomType(
   return rows[0] ?? null;
 }
 
+/** All active room types of a tenant, cheapest first — for the "pick a type" menu. */
+export async function listRoomTypes(tenantId: string): Promise<RoomTypeLite[]> {
+  const res = await serviceGet(
+    `room_types?tenant_id=eq.${encodeURIComponent(tenantId)}&is_active=eq.true` +
+      `&select=id,name,base_rate,max_occupancy&order=base_rate.asc`,
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as RoomTypeLite[];
+}
+
 // ─── Availability ──────────────────────────────────────────────────────────────
 
 /**

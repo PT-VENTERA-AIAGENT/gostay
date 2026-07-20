@@ -112,7 +112,7 @@ ATURAN:
 - intent: "book" bila tamu ingin memesan/menanyakan ketersediaan kamar; "chat" untuk sapaan/obrolan biasa; "other" bila di luar konteks reservasi.
 - check_in / check_out: tanggal format "YYYY-MM-DD". Hari ini adalah ${today}; asumsikan tahun berjalan bila tamu tidak menyebut tahun. null bila tidak disebut. Untuk rentang seperti "20-22 juli", check_in="…-07-20" dan check_out="…-07-22".
 - guests: jumlah tamu sebagai bilangan bulat (mis. "2 orang" -> 2). null bila tidak disebut.
-- room_type_hint: kata tipe kamar yang disebut tamu apa adanya (mis. "deluxe", "suite", "standard"). null bila tidak disebut.
+- room_type_hint: kata TIPE kamar (mis. "deluxe", "suite", "standard", "family"). null bila tidak disebut. JANGAN ambil NOMOR kamar sebagai tipe — "kamar 101" / "no 101" itu nomor kamar (bukan tipe), set null.
 - confidence: keyakinanmu 0..1.
 
 Slot yang sudah terkumpul dari percakapan sebelumnya (pertahankan bila tamu tidak mengubahnya): ${context}

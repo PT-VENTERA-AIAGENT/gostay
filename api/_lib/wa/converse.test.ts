@@ -17,6 +17,7 @@ const { ai, pending, booking, guest, send, crm, WaRateLimitError } = vi.hoisted(
     pending: { getPending: vi.fn(), setPending: vi.fn(), clearPending: vi.fn() },
     booking: {
       findRoomType: vi.fn(),
+      listRoomTypes: vi.fn(),
       getAvailableRoomsSrv: vi.fn(),
       computeTotal: vi.fn(),
       createWaBooking: vi.fn(),
@@ -56,6 +57,10 @@ beforeEach(() => {
   crm.getOrCreateBotProfile.mockResolvedValue("bot-1");
   crm.getOrCreateThread.mockResolvedValue("thread-1");
   crm.logMessage.mockResolvedValue(undefined);
+  booking.listRoomTypes.mockResolvedValue([
+    { id: "rt-1", name: "Deluxe", base_rate: 500000, max_occupancy: 2 },
+    { id: "rt-2", name: "Suite", base_rate: 900000, max_occupancy: 2 },
+  ]);
 });
 
 describe("handleGuestMessage — intent routing", () => {
@@ -115,14 +120,22 @@ describe("handleGuestMessage — quoting", () => {
     expect(booking.createWaBooking).not.toHaveBeenCalled(); // not yet — waiting for YA
   });
 
-  it("apologises (no confirm) when the room type is unknown", async () => {
+  it("shows the room-type menu when the hint matches no type", async () => {
     ai.extractBookingIntent.mockResolvedValue(fullIntent);
-    booking.findRoomType.mockResolvedValue(null);
+    booking.findRoomType.mockResolvedValue(null); // hint "deluxe" matched nothing here
 
-    await handleGuestMessage({ ...BASE, text: "20-22 juli 2 orang xyz" });
+    await handleGuestMessage({ ...BASE, text: "20-22 juli 2 orang kamar 101" });
 
-    expect(pending.setPending).not.toHaveBeenCalled();
-    expect(repliesText().toLowerCase()).toContain("tipe kamar");
+    // Keeps the dates/guests (collecting) and lists the real types with prices.
+    expect(pending.setPending).toHaveBeenCalledWith(
+      "tenant-x", BASE.phoneJid, "collecting",
+      expect.objectContaining({ check_in: "2026-07-20", check_out: "2026-07-22", guests: 2, room_type_hint: null }),
+    );
+    const reply = repliesText();
+    expect(reply.toLowerCase()).toContain("tipe kamar");
+    expect(reply).toContain("Deluxe");
+    expect(reply).toContain("Suite");
+    expect(booking.createWaBooking).not.toHaveBeenCalled();
   });
 
   it("apologises when the type exists but no room is free", async () => {
