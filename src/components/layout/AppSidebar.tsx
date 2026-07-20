@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
   CalendarDays, DollarSign, Star,
-  Phone, Users, ChevronLeft, ChevronRight, Contact
+  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -21,6 +21,7 @@ const navItems = [
 
 const bottomItems = [
   { icon: Contact, label: "CRM Tamu", path: "/crm" },
+  { icon: MessageCircle, label: "Sambungkan WhatsApp", path: "/settings/whatsapp" },
   { icon: Users, label: "User Management", path: "/users" },
   { icon: Star, label: "Reviews", path: "/reviews" },
 ];
