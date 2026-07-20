@@ -48,7 +48,9 @@ export class WaProvisionError extends Error {
  * server suffix and anything non-numeric (a `:device` part, `+`, spaces).
  */
 export function phoneDigits(jid: string): string {
-  return jid.replace(/@s\.whatsapp\.net$/i, "").replace(/\D/g, "");
+  // Strip ANY server suffix — @s.whatsapp.net, and also @lid (WhatsApp's privacy
+  // "Linked ID" address, which is not a real phone number) — then keep digits.
+  return jid.replace(/@.*$/i, "").replace(/\D/g, "");
 }
 
 // How many provisions one number may trigger before it's throttled. Generous
@@ -110,9 +112,20 @@ export async function resolveOrProvisionGuest(
   const allowed = await checkRateLimit(phoneJid);
   if (!allowed) throw new WaRateLimitError();
 
-  // 3. Mint (or fetch, idempotently) the Ventera SSO account. Anything short of
-  //    a 200 with a `sub` is fatal — we must not book a guest we can't identify.
-  const sub = await provisionVentera(digits, displayName);
+  // 3. Identity for this guest. Prefer a real Ventera SSO account (a returning
+  //    guest is then the same person on web + WA). But a guest may present a
+  //    privacy `@lid` address instead of a phone — Ventera rightly rejects that —
+  //    and a provisioning hiccup must never block booking or chat. So fall back to
+  //    a local, WA-scoped subject keyed on the JID; profiles.id derives from it
+  //    deterministically either way. A local guest simply can't log into the web
+  //    portal with it (they interact over WhatsApp), which is fine.
+  let sub: string;
+  try {
+    sub = await provisionVentera(digits, displayName);
+  } catch (e) {
+    console.error(`[wa/guest] Ventera provision → local fallback: ${(e as Error).message}`);
+    sub = `wa:${phoneJid}`;
+  }
 
   // 4. profileId is derived from the SSO subject, exactly as the web flow does
   //    (identity.ts) — so the same person is one profile across web and WA.

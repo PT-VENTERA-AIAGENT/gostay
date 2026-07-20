@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
-import { resolveOrProvisionGuest, WaRateLimitError, WaProvisionError, phoneDigits } from "./guest";
+import { resolveOrProvisionGuest, WaRateLimitError, phoneDigits } from "./guest";
 import { profileIdFor } from "../identity";
 
 const PHONE_JID = "628123456789@s.whatsapp.net";
@@ -227,23 +227,27 @@ describe("resolveOrProvisionGuest", () => {
     expect(state.identityInserts).toHaveLength(0);
   });
 
-  it("(d) throws WaProvisionError and creates nothing when Ventera fails", async () => {
+  it("(d) falls back to a local identity when Ventera fails", async () => {
     state.venteraStatus = 500;
 
-    await expect(resolveOrProvisionGuest(PHONE_JID, TENANT, "Budi")).rejects.toBeInstanceOf(WaProvisionError);
+    const out = await resolveOrProvisionGuest(PHONE_JID, TENANT, "Budi");
 
-    // Ventera was attempted, but nothing downstream was written.
+    // Ventera was attempted; a local WA-scoped identity was used instead, and the
+    // guest is still fully provisioned (profile + customer + identity).
     expect(state.venteraCalls).toHaveLength(1);
-    expect(state.profileInserts).toHaveLength(0);
-    expect(state.customerInserts).toHaveLength(0);
-    expect(state.identityInserts).toHaveLength(0);
+    expect(out.ssoSub).toBe(`wa:${PHONE_JID}`);
+    expect(out.profileId).toBe(profileIdFor(`wa:${PHONE_JID}`));
+    expect(state.profileInserts).toHaveLength(1);
+    expect(state.customerInserts).toHaveLength(1);
+    expect(state.identityInserts).toHaveLength(1);
   });
 
-  it("(d') throws when Ventera returns 200 but no sub", async () => {
+  it("(d') falls back to local when Ventera returns 200 but no sub", async () => {
     state.venteraSub = undefined;
 
-    await expect(resolveOrProvisionGuest(PHONE_JID, TENANT, "Budi")).rejects.toBeInstanceOf(WaProvisionError);
-    expect(state.profileInserts).toHaveLength(0);
+    const out = await resolveOrProvisionGuest(PHONE_JID, TENANT, "Budi");
+    expect(out.ssoSub).toBe(`wa:${PHONE_JID}`);
+    expect(state.profileInserts).toHaveLength(1);
   });
 
   it("patches a half-provisioned identity row instead of inserting a duplicate", async () => {
