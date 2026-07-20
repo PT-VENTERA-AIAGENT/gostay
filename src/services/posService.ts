@@ -123,6 +123,19 @@ export async function listRecentOrders(limit = 20): Promise<PosOrder[]> {
   return (data ?? []) as PosOrder[];
 }
 
+/** Paid orders whose created_at falls in [startISO, endISO) — for the daily recap. */
+export async function listOrdersBetween(startISO: string, endISO: string): Promise<PosOrder[]> {
+  const { data, error } = await db
+    .from("pos_orders")
+    .select("*")
+    .eq("status", "paid")
+    .gte("created_at", startISO)
+    .lt("created_at", endISO)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as PosOrder[];
+}
+
 // ─── Folio targets (in-house bookings to post a charge onto) ────────────────────
 
 /**

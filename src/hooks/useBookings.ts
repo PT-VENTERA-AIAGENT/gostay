@@ -3,6 +3,7 @@ import {
   getBookings,
   getBookingById,
   createBooking,
+  createWalkInCheckIn,
   updateBookingStatus,
   updateBooking,
   getAuditLog,
@@ -13,12 +14,15 @@ import {
   getMyBookings,
   getBookingsInRange,
 } from "@/services/bookingService";
+import { addPayment } from "@/services/frontDeskService";
+import type { PaymentMethod } from "@/services/frontDeskService";
 import type {
   BookingFilters,
   BookingInsert,
   BookingUpdate,
   BookingStatus,
 } from "@/services/bookingService";
+import type { WalkInInput } from "@/services/bookingService";
 import type { BookingUpdate as BookingUpdateType } from "@/types/database.types";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -117,6 +121,41 @@ export function useCreateBooking() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: BookingInsert) => createBooking(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: bookingKeys.all }),
+  });
+}
+
+/**
+ * Walk-in check-in: create the guest + a checked_in booking, then optionally
+ * record a first payment (its trigger recomputes the balance). Invalidates the
+ * whole booking tree so the list, arrivals and calendar all refresh.
+ */
+export function useWalkInCheckIn() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({
+      input,
+      payment,
+    }: {
+      input: Omit<WalkInInput, "createdBy">;
+      payment?: { amount: number; method: PaymentMethod } | null;
+    }) => {
+      const { booking, customer } = await createWalkInCheckIn({
+        ...input,
+        createdBy: user?.id ?? null,
+      });
+      if (payment && payment.amount > 0) {
+        await addPayment({
+          booking_id: booking.id,
+          amount: payment.amount,
+          method: payment.method,
+          note: "Pembayaran walk-in",
+          created_by: user?.id ?? null,
+        });
+      }
+      return { booking, customer };
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: bookingKeys.all }),
   });
 }

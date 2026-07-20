@@ -5,6 +5,7 @@ import {
   setProductActive,
   createWalkInOrder,
   listRecentOrders,
+  listOrdersBetween,
   listFolioTargets,
 } from "@/services/posService";
 import type { CreateProductInput, CreateWalkInOrderInput } from "@/services/posService";
@@ -17,6 +18,7 @@ export const posKeys = {
   products: ["pos", "products"] as const,
   orders: ["pos", "orders"] as const,
   folioTargets: ["pos", "folio-targets"] as const,
+  today: (day: string) => ["pos", "today", day] as const,
 };
 
 export function useProducts() {
@@ -25,6 +27,22 @@ export function useProducts() {
 
 export function useRecentOrders() {
   return useQuery({ queryKey: posKeys.orders, queryFn: () => listRecentOrders(20) });
+}
+
+/**
+ * Today's paid walk-in sales, bounded by the browser's local midnight so the
+ * recap matches the cashier's day rather than UTC. Refreshed whenever a new sale
+ * invalidates posKeys.orders isn't automatic here, so we also key by the day.
+ */
+export function useTodayOrders() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(start.getTime() + 86_400_000);
+  const dayKey = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()}`;
+  return useQuery({
+    queryKey: posKeys.today(dayKey),
+    queryFn: () => listOrdersBetween(start.toISOString(), end.toISOString()),
+  });
 }
 
 export function useFolioTargets() {
@@ -52,7 +70,10 @@ export function useCreateWalkInOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateWalkInOrderInput) => createWalkInOrder(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: posKeys.orders }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: posKeys.orders });
+      qc.invalidateQueries({ queryKey: ["pos", "today"] });
+    },
   });
 }
 

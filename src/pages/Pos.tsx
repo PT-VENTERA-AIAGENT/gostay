@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   ShoppingCart, Plus, Minus, Trash2, Loader2, CreditCard, BedDouble,
-  Store, Package, X, Check,
+  Store, Package, X, Check, Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
   useProducts, useFolioTargets, useCreateProduct, useSetProductActive,
-  useCreateWalkInOrder, usePostToFolio,
+  useCreateWalkInOrder, usePostToFolio, useTodayOrders,
 } from "@/hooks/usePos";
 import type { PosProduct, PosOrderItem } from "@/services/posService";
 import type { PosCategory, PaymentMethod } from "@/services/frontDeskService";
@@ -48,6 +48,7 @@ export default function Pos() {
   const [guestName, setGuestName] = useState("");
   const [targetBooking, setTargetBooking] = useState("");
   const [showProductForm, setShowProductForm] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
 
   const categories = useMemo(() => {
     const set = new Set<PosCategory>(products.map((p) => p.category));
@@ -146,12 +147,20 @@ export default function Pos() {
               Jual item outlet — bayar langsung atau tagihkan ke folio kamar.
             </p>
           </div>
-          <button
-            onClick={() => setShowProductForm(true)}
-            className="flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors self-start"
-          >
-            <Package className="w-4 h-4" /> Kelola produk
-          </button>
+          <div className="flex items-center gap-2 self-start">
+            <button
+              onClick={() => setShowRecap(true)}
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
+            >
+              <Receipt className="w-4 h-4" /> Rekap hari ini
+            </button>
+            <button
+              onClick={() => setShowProductForm(true)}
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
+            >
+              <Package className="w-4 h-4" /> Kelola produk
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 md:gap-6">
@@ -314,8 +323,79 @@ export default function Pos() {
         {showProductForm && (
           <ProductManager products={products} onClose={() => setShowProductForm(false)} />
         )}
+        {showRecap && <DailyRecap onClose={() => setShowRecap(false)} />}
       </AnimatePresence>
     </PageTransition>
+  );
+}
+
+// ─── Daily recap / cashier close ────────────────────────────────────────────────
+
+function DailyRecap({ onClose }: { onClose: () => void }) {
+  const { data: orders = [], isLoading } = useTodayOrders();
+
+  const total = orders.reduce((s, o) => s + Number(o.subtotal), 0);
+  const byMethod = orders.reduce<Record<string, { count: number; sum: number }>>((acc, o) => {
+    const m = o.payment_method;
+    acc[m] = acc[m] ?? { count: 0, sum: 0 };
+    acc[m].count += 1;
+    acc[m].sum += Number(o.subtotal);
+    return acc;
+  }, {});
+  const today = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-card rounded-xl border border-border w-full max-w-md max-h-[85vh] flex flex-col"
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <div>
+            <h2 className="font-semibold text-foreground flex items-center gap-2"><Receipt className="w-4 h-4" /> Rekap kasir</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{today}</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Tutup"><X className="w-5 h-5" /></button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="p-4 space-y-4 overflow-y-auto">
+            <div className="rounded-xl border border-border bg-muted/40 p-4 text-center">
+              <p className="text-xs text-muted-foreground">Total penjualan langsung hari ini</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{formatIDR(total)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{orders.length} transaksi</p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Per metode bayar</p>
+              {Object.keys(byMethod).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">Belum ada penjualan hari ini.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {(Object.keys(byMethod) as PaymentMethod[]).map((m) => (
+                    <div key={m} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted">
+                      <span className="text-foreground">{METHOD_LABELS[m] ?? m} <span className="text-xs text-muted-foreground">· {byMethod[m].count}×</span></span>
+                      <span className="font-medium text-foreground">{formatIDR(byMethod[m].sum)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              Rekap ini hanya mencakup penjualan “Bayar langsung”. Item yang ditagihkan ke folio kamar masuk ke tagihan booking masing-masing.
+            </p>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }
 

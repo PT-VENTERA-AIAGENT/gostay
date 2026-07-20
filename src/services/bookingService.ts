@@ -400,6 +400,82 @@ export async function getCustomerBookings(
   return data as BookingWithRelations[];
 }
 
+/** Plain customer insert (no dedup) — used by the walk-in flow. */
+export async function createCustomer(payload: CustomerInsert): Promise<Customer> {
+  const { data, error } = await supabase
+    .from("customers")
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ─── Walk-in check-in (front-desk fast path) ────────────────────────────────────
+
+export interface WalkInInput {
+  fullName: string;
+  email?: string | null;
+  phone?: string | null;
+  roomId: string;
+  checkIn: string;
+  checkOut: string;
+  adults: number;
+  children: number;
+  total: number;
+  createdBy: string | null;
+}
+
+/**
+ * One-shot walk-in: resolve/create the guest, then book the room as already
+ * checked_in (the guest is standing at the desk). Payment is recorded separately
+ * by the caller via addPayment so the recompute trigger runs.
+ *
+ * customers.email is NOT NULL, so when the guest gives no email we mint a unique
+ * synthetic one — enough to satisfy the constraint without colliding with a real
+ * guest. When an email IS given we dedup through getOrCreateCustomer so a repeat
+ * visitor reuses their record.
+ */
+export async function createWalkInCheckIn(
+  input: WalkInInput,
+): Promise<{ booking: Booking; customer: Customer }> {
+  const email = input.email?.trim();
+  const customer = email
+    ? await getOrCreateCustomer({
+        full_name: input.fullName.trim(),
+        email,
+        phone: input.phone?.trim() || null,
+        nationality: null,
+        profile_id: null,
+      })
+    : await createCustomer({
+        full_name: input.fullName.trim(),
+        email: `walkin-${Date.now()}-${Math.floor(Math.random() * 1000)}@guest.local`,
+        phone: input.phone?.trim() || null,
+        nationality: null,
+        profile_id: null,
+      });
+
+  const booking = await createBooking({
+    customer_id: customer.id,
+    room_id: input.roomId,
+    check_in: input.checkIn,
+    check_out: input.checkOut,
+    num_adults: input.adults,
+    num_children: input.children,
+    status: "checked_in", // walk-in guest is physically here
+    total_amount: input.total,
+    amount_paid: 0,
+    payment_status: "pending",
+    source: "walk_in",
+    special_requests: null,
+    internal_notes: null,
+    created_by: input.createdBy,
+  });
+
+  return { booking, customer };
+}
+
 // ─── Dashboard helpers ────────────────────────────────────────────────────────
 
 export async function getTodayArrivals(): Promise<BookingWithRelations[]> {

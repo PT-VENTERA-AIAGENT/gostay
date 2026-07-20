@@ -1,11 +1,12 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search, Filter, Download, Calendar, List, Eye, CalendarPlus, Loader2 } from "lucide-react";
+import { Plus, Search, Filter, Download, Calendar, List, Eye, CalendarPlus, Loader2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import DatePicker from "@/components/shared/DatePicker";
 import BookingCalendar from "@/components/bookings/BookingCalendar";
+import QuickWalkIn from "@/components/bookings/QuickWalkIn";
 import CopyButton from "@/components/shared/CopyButton";
 import { useBookings } from "@/hooks/useBookings";
 import { exportCSV } from "@/components/analytics/ExportUtils";
@@ -48,6 +49,7 @@ export default function Bookings() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
+  const [showWalkIn, setShowWalkIn] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -107,6 +109,9 @@ export default function Bookings() {
           <div className="flex items-center gap-2 md:gap-3">
             <button onClick={handleExport} disabled={bookings.length === 0} className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors btn-press disabled:opacity-50 disabled:cursor-not-allowed">
               <Download className="w-4 h-4" /> <span className="hidden md:inline">Export CSV</span>
+            </button>
+            <button onClick={() => setShowWalkIn(true)} className="border border-primary/40 text-primary bg-primary/5 px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/10 transition-colors flex items-center gap-2 btn-press">
+              <Zap className="w-4 h-4" /> <span className="hidden sm:inline">Walk-in</span>
             </button>
             <Link to="/bookings/new" className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Booking</span>
@@ -253,6 +258,10 @@ export default function Bookings() {
           <BookingCalendar />
         )}
       </div>
+
+      <AnimatePresence>
+        {showWalkIn && <QuickWalkIn onClose={() => setShowWalkIn(false)} />}
+      </AnimatePresence>
     </PageTransition>
   );
 }
