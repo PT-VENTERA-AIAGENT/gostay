@@ -14,6 +14,7 @@ import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import Bookings from "./pages/Bookings";
 import BookingDetail from "./pages/BookingDetail";
+import Pos from "./pages/Pos";
 import NewBooking from "./pages/NewBooking";
 import Rooms from "./pages/Rooms";
 import RoomTypes from "./pages/RoomTypes";
@@ -120,6 +121,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "staff"]}>
                     <GuestRequests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pos"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <Pos />
                   </ProtectedRoute>
                 }
               />
