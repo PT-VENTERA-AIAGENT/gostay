@@ -22,6 +22,7 @@ interface MockState {
   patches: Array<Record<string, unknown>>;
   realm: string | undefined;
   tokenStatus: number;
+  tokenError: string;
 }
 
 let server: Server;
@@ -45,7 +46,13 @@ beforeAll(async () => {
       state.tokenRequests.push(Object.fromEntries(new URLSearchParams(body)));
       if (state.tokenStatus !== 200) {
         res.writeHead(state.tokenStatus, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "invalid_grant", client_secret: "LEAKED" }));
+        res.end(JSON.stringify({
+          error: state.tokenError,
+          // An issuer can echo the request back at us, secret and all. Whatever
+          // the handler returns must never contain this.
+          error_description: "the request included client_secret=LEAKED",
+          client_secret: "LEAKED",
+        }));
         return;
       }
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -109,7 +116,7 @@ afterAll(() => new Promise<void>((r) => server.close(() => r())));
 beforeEach(() => {
   state = {
     tokenRequests: [], profileRows: [], inserts: [], patches: [],
-    realm: "ventera-employees", tokenStatus: 200,
+    realm: "ventera-employees", tokenStatus: 200, tokenError: "invalid_grant",
   };
 });
 
@@ -135,7 +142,27 @@ describe("exchangeCode — OIDC leg", () => {
     const r = await call();
     expect(r.status).toBe(502);
     expect(JSON.stringify(r.body)).not.toContain("LEAKED");
+    // error_description is free text and is dropped entirely.
+    expect(JSON.stringify(r.body)).not.toContain("error_description");
+  });
+
+  it("passes through the OAuth error code so a dead login is diagnosable", async () => {
+    // A bare 502 gives the operator nothing: a missing client secret and an
+    // expired code look identical. The code itself is a closed vocabulary.
+    state.tokenStatus = 401;
+    state.tokenError = "invalid_client";
+    const r = await call();
+    expect(r.body).toEqual({ error: "token_exchange_failed", reason: "invalid_client" });
+  });
+
+  it("drops an upstream error code that is not a known OAuth one", async () => {
+    // Anything outside RFC 6749 §5.2 could be arbitrary text from the issuer,
+    // so it is not echoed to the browser.
+    state.tokenStatus = 400;
+    state.tokenError = "secret was LEAKED and here it is";
+    const r = await call();
     expect(r.body).toEqual({ error: "token_exchange_failed" });
+    expect(JSON.stringify(r.body)).not.toContain("LEAKED");
   });
 });
 

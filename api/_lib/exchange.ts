@@ -76,7 +76,19 @@ export async function exchangeCode({
     code,
     code_verifier,
   });
-  if (clientSecret) params.set("client_secret", clientSecret);
+  if (clientSecret) {
+    params.set("client_secret", clientSecret);
+  } else {
+    // Not fatal on its own — the issuer advertises `none` as an auth method, so
+    // a public client is legal. But `gostay` is registered confidential, so in
+    // practice this means SSO_CLIENT_SECRET is missing from the environment and
+    // the issuer is about to answer invalid_client. Say so once, loudly: the
+    // symptom otherwise surfaces as a bare 502 with nothing to go on.
+    console.error(
+      "[sso] SSO_CLIENT_SECRET is not set — sending no client authentication. " +
+        "If the token exchange fails with invalid_client, that is why. See .env.example.",
+    );
+  }
 
   const res = await fetch(`${issuer}/oidc/token`, {
     method: "POST",
@@ -85,8 +97,24 @@ export async function exchangeCode({
   });
 
   if (!res.ok) {
-    // Upstream errors can quote the client_secret back; never forward the body.
-    return { status: 502, body: { error: "token_exchange_failed" } };
+    // The body is not forwarded wholesale: an issuer can echo the request back
+    // in error_description, client_secret included. But answering with a bare
+    // 502 leaves the operator with a dead login and no way to tell a missing
+    // secret from a bad code, so the OAuth error *code* is passed through —
+    // it is a fixed vocabulary from RFC 6749 §5.2 and carries no credentials.
+    const reason = await safeErrorCode(res);
+    console.error(
+      `[sso] token exchange failed: HTTP ${res.status}` +
+        (reason ? ` (${reason})` : "") +
+        (reason === "invalid_client" ? " — check SSO_CLIENT_SECRET / SSO_CLIENT_ID" : "") +
+        (reason === "invalid_grant" ? " — code expired, reused, or redirect_uri mismatch" : ""),
+    );
+    return {
+      status: 502,
+      body: reason
+        ? { error: "token_exchange_failed", reason }
+        : { error: "token_exchange_failed" },
+    };
   }
 
   const tokens = (await res.json()) as Record<string, unknown>;
@@ -114,6 +142,33 @@ export async function exchangeCode({
       profile_id: supabase?.profileId ?? null,
     },
   };
+}
+
+/**
+ * The upstream OAuth error code, and nothing else.
+ *
+ * Allowlisted rather than passed through: `error` is a closed vocabulary in
+ * RFC 6749 §5.2, so matching against it cannot smuggle out anything the issuer
+ * put in the body — an arbitrary string could. error_description is dropped for
+ * exactly that reason; it is free text and may quote the request back.
+ */
+const OAUTH_ERROR_CODES = new Set([
+  "invalid_request",
+  "invalid_client",
+  "invalid_grant",
+  "unauthorized_client",
+  "unsupported_grant_type",
+  "invalid_scope",
+]);
+
+async function safeErrorCode(res: Response): Promise<string | null> {
+  try {
+    const body = (await res.json()) as { error?: unknown };
+    const code = typeof body.error === "string" ? body.error : null;
+    return code && OAUTH_ERROR_CODES.has(code) ? code : null;
+  } catch {
+    return null;
+  }
 }
 
 interface IdTokenClaims {
