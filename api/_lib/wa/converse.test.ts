@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // be built inside vi.hoisted() (also hoisted) rather than as plain top-level
 // consts — otherwise the factories run before those consts initialise
 // ("Cannot access 'ai' before initialization").
-const { ai, pending, booking, guest, send, WaRateLimitError } = vi.hoisted(() => {
+const { ai, pending, booking, guest, send, crm, WaRateLimitError } = vi.hoisted(() => {
   // A real error class so `instanceof WaRateLimitError` works inside converse.
   class WaRateLimitError extends Error {}
   return {
@@ -23,6 +23,7 @@ const { ai, pending, booking, guest, send, WaRateLimitError } = vi.hoisted(() =>
     },
     guest: { resolveOrProvisionGuest: vi.fn(), WaRateLimitError },
     send: { sendText: vi.fn() },
+    crm: { getOrCreateBotProfile: vi.fn(), getOrCreateThread: vi.fn(), logMessage: vi.fn() },
     WaRateLimitError,
   };
 });
@@ -32,6 +33,7 @@ vi.mock("./pending", () => pending);
 vi.mock("./booking", () => booking);
 vi.mock("./guest", () => guest);
 vi.mock("./send", () => send);
+vi.mock("./crm", () => crm);
 
 import { handleGuestMessage } from "./converse";
 
@@ -48,6 +50,12 @@ beforeEach(() => {
   pending.getPending.mockResolvedValue(null);
   pending.setPending.mockResolvedValue(undefined);
   pending.clearPending.mockResolvedValue(undefined);
+  // The guest is now provisioned at the START of every message (for CRM/Messages);
+  // default it to succeed, and stub the chat-logging leaves.
+  guest.resolveOrProvisionGuest.mockResolvedValue({ profileId: "prof-1", customerId: "cust-1", ssoSub: "sub-1" });
+  crm.getOrCreateBotProfile.mockResolvedValue("bot-1");
+  crm.getOrCreateThread.mockResolvedValue("thread-1");
+  crm.logMessage.mockResolvedValue(undefined);
 });
 
 describe("handleGuestMessage — intent routing", () => {
@@ -158,7 +166,7 @@ describe("handleGuestMessage — confirmation", () => {
     await handleGuestMessage({ ...BASE, text: "batal" });
 
     expect(pending.clearPending).toHaveBeenCalled();
-    expect(guest.resolveOrProvisionGuest).not.toHaveBeenCalled();
+    // Guest is provisioned on contact now (for CRM/Messages), but NO booking is made.
     expect(booking.createWaBooking).not.toHaveBeenCalled();
     expect(repliesText().toLowerCase()).toContain("dibatalkan");
   });
