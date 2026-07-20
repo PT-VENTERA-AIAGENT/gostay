@@ -9,10 +9,32 @@
 // hotel's tenant slug — the same id wa_hotel_sessions maps back to the tenant, so
 // the inbound webhook keeps resolving tenant from sessionId exactly as before.
 
+import QRCode from "qrcode";
 import { requireTenantMember } from "../_lib/admin/tenant-auth";
 import { serviceConfig, serviceHeaders, serviceGet } from "../_lib/wa/client";
 import { createSession, getSessionQr, getSessionStatus, deleteSession } from "../_lib/wa/gateway";
 import { authHeader, readJson, type VercelReq, type VercelRes } from "../_lib/admin/http";
+
+/**
+ * wa-ventera emits the raw Baileys QR payload (sometimes wrapped as {"qr":"..."})
+ * rather than an image. Unwrap it and render it to a data-url PNG so the browser
+ * can show it with a plain <img>, no client-side QR library needed.
+ */
+async function toQrImage(raw: string): Promise<string | null> {
+  let payload = raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.qr === "string") payload = parsed.qr;
+  } catch {
+    /* not JSON — use as-is */
+  }
+  if (payload.startsWith("data:image")) return payload; // already an image
+  try {
+    return await QRCode.toDataURL(payload, { width: 320, margin: 1 });
+  } catch {
+    return null;
+  }
+}
 
 type UiStatus = "none" | "pairing" | "qr" | "connecting" | "open" | "closed";
 
@@ -95,8 +117,11 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     }
     const qr = await getSessionQr(slug);
     if (qr.qr) {
-      res.status(200).json({ status: "qr", qr: qr.qr, connected: false });
-      return;
+      const image = await toQrImage(qr.qr);
+      if (image) {
+        res.status(200).json({ status: "qr", qr: image, connected: false });
+        return;
+      }
     }
     res.status(200).json({ status: mapStatus(st.status || qr.status, false), connected: false });
   } catch (err) {
