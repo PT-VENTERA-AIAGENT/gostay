@@ -1,11 +1,43 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, LogOut, LogIn, XCircle, Clock, FileText, User, MapPin, CreditCard, MoreHorizontal, Loader2 } from "lucide-react";
+import { ArrowLeft, LogOut, LogIn, XCircle, Clock, FileText, User, MapPin, CreditCard, MoreHorizontal, Loader2, Receipt, Wallet, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import CopyButton from "@/components/shared/CopyButton";
 import { useBooking, useBookingAuditLog, useUpdateBookingStatus } from "@/hooks/useBookings";
+import {
+  useCharges,
+  usePayments,
+  useAddCharge,
+  useDeleteCharge,
+  useAddPayment,
+  useDeletePayment,
+} from "@/hooks/useFrontDesk";
+import type {
+  PosCharge,
+  Payment,
+  PosCategory,
+  PaymentMethod,
+} from "@/services/frontDeskService";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+
+const CATEGORY_LABELS: Record<PosCategory, string> = {
+  fnb: "Makanan & Minuman",
+  minibar: "Minibar",
+  laundry: "Laundry",
+  spa: "Spa",
+  other: "Lainnya",
+};
+
+const METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "Tunai",
+  transfer: "Transfer",
+  card: "Kartu",
+  qris: "QRIS",
+  other: "Lainnya",
+};
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
   pending:     { label: "Pending",     cls: "bg-warning/10 text-warning" },
@@ -138,6 +170,8 @@ export default function BookingDetail() {
               </div>
             </motion.div>
 
+            <FolioCard bookingId={id!} roomTotal={booking.total_amount} amountPaid={booking.amount_paid} />
+
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
               <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><FileText className="w-4 h-4" /> Notes</h2>
               <div className="space-y-3 text-sm">
@@ -177,6 +211,8 @@ export default function BookingDetail() {
               </div>
             </motion.div>
 
+            <PaymentCard bookingId={id!} />
+
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
               <h2 className="font-semibold text-foreground mb-4">Nightly Breakdown</h2>
               <div className="space-y-2">
@@ -196,5 +232,239 @@ export default function BookingDetail() {
         </div>
       </div>
     </PageTransition>
+  );
+}
+
+// ─── Folio (POS charges) ────────────────────────────────────────────────────────
+
+function lineTotal(c: Pick<PosCharge, "unit_price" | "quantity">) {
+  return c.unit_price * c.quantity;
+}
+
+function FolioCard({ bookingId, roomTotal, amountPaid }: { bookingId: string; roomTotal: number; amountPaid: number }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { data: charges = [], isLoading } = useCharges(bookingId);
+  const addCharge = useAddCharge(bookingId);
+  const deleteCharge = useDeleteCharge(bookingId);
+
+  const [showForm, setShowForm] = useState(false);
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<PosCategory>("fnb");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [quantity, setQuantity] = useState("1");
+
+  const chargesTotal = charges.reduce((sum, c) => sum + lineTotal(c), 0);
+  const totalTagihan = roomTotal + chargesTotal;
+  const sisa = totalTagihan - amountPaid;
+
+  function resetForm() {
+    setDescription("");
+    setCategory("fnb");
+    setUnitPrice("");
+    setQuantity("1");
+    setShowForm(false);
+  }
+
+  function handleAdd() {
+    const price = Number(unitPrice);
+    const qty = Number(quantity);
+    if (!description.trim()) {
+      toast({ title: "Deskripsi wajib diisi", variant: "destructive" });
+      return;
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      toast({ title: "Harga tidak valid", variant: "destructive" });
+      return;
+    }
+    if (!Number.isInteger(qty) || qty <= 0) {
+      toast({ title: "Jumlah tidak valid", variant: "destructive" });
+      return;
+    }
+    addCharge.mutate(
+      { booking_id: bookingId, description: description.trim(), category, unit_price: price, quantity: qty, created_by: user?.id ?? null },
+      {
+        onSuccess: () => {
+          toast({ title: "Biaya ditambahkan" });
+          resetForm();
+        },
+        onError: (e) => toast({ title: "Gagal menambah biaya", description: (e as Error).message, variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleDelete(c: PosCharge) {
+    deleteCharge.mutate(c.id, {
+      onSuccess: () => toast({ title: "Biaya dihapus" }),
+      onError: (e) => toast({ title: "Gagal menghapus biaya", description: (e as Error).message, variant: "destructive" }),
+    });
+  }
+
+  const inputCls = "w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40";
+
+  return (
+    <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-foreground flex items-center gap-2"><Receipt className="w-4 h-4" /> Folio</h2>
+        {!showForm && (
+          <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 text-sm font-medium text-primary hover:opacity-80 transition-opacity">
+            <Plus className="w-4 h-4" /> Tambah biaya
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2"><Loader2 className="w-4 h-4 animate-spin" /> Memuat biaya…</div>
+      ) : charges.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Belum ada biaya lain.</p>
+      ) : (
+        <div className="space-y-2">
+          {charges.map((c) => (
+            <div key={c.id} className="flex items-start justify-between gap-3 text-sm p-2 rounded-lg bg-muted">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground truncate">{c.description}</p>
+                <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[c.category] ?? c.category} · {c.quantity} × {formatIDR(c.unit_price)}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-medium text-foreground">{formatIDR(lineTotal(c))}</span>
+                <button onClick={() => handleDelete(c)} disabled={deleteCharge.isPending} className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50" aria-label="Hapus biaya">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="mt-3 space-y-2 p-3 rounded-lg border border-border">
+          <input className={inputCls} placeholder="Deskripsi (mis. Nasi goreng)" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <div className="grid grid-cols-2 gap-2">
+            <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value as PosCategory)}>
+              {(Object.keys(CATEGORY_LABELS) as PosCategory[]).map((k) => (
+                <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
+              ))}
+            </select>
+            <input className={inputCls} type="number" min="1" step="1" placeholder="Jumlah" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          </div>
+          <input className={inputCls} type="number" min="0" step="1000" placeholder="Harga satuan (Rp)" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+          <div className="flex items-center gap-2 pt-1">
+            <button onClick={handleAdd} disabled={addCharge.isPending} className="flex-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60">
+              {addCharge.isPending ? "Menyimpan…" : "Simpan"}
+            </button>
+            <button onClick={resetForm} className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">Batal</button>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 pt-3 border-t border-border space-y-2 text-sm">
+        <div className="flex justify-between"><span className="text-muted-foreground">Kamar</span><span className="font-medium text-foreground">{formatIDR(roomTotal)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Biaya lain</span><span className="font-medium text-foreground">{formatIDR(chargesTotal)}</span></div>
+        <div className="flex justify-between pt-2 border-t border-border"><span className="font-semibold text-foreground">Total tagihan</span><span className="font-semibold text-foreground">{formatIDR(totalTagihan)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Terbayar</span><span className="font-medium text-success">{formatIDR(amountPaid)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Sisa</span><span className={cn("font-semibold", sisa > 0 ? "text-warning" : "text-success")}>{formatIDR(sisa)}</span></div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Pembayaran (payments) ───────────────────────────────────────────────────────
+
+function PaymentCard({ bookingId }: { bookingId: string }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { data: payments = [], isLoading } = usePayments(bookingId);
+  const addPayment = useAddPayment(bookingId);
+  const deletePayment = useDeletePayment(bookingId);
+
+  const [showForm, setShowForm] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [note, setNote] = useState("");
+
+  function resetForm() {
+    setAmount("");
+    setMethod("cash");
+    setNote("");
+    setShowForm(false);
+  }
+
+  function handleAdd() {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      toast({ title: "Jumlah pembayaran tidak valid", variant: "destructive" });
+      return;
+    }
+    addPayment.mutate(
+      { booking_id: bookingId, amount: value, method, note: note.trim() || null, created_by: user?.id ?? null },
+      {
+        onSuccess: () => {
+          toast({ title: "Pembayaran dicatat" });
+          resetForm();
+        },
+        onError: (e) => toast({ title: "Gagal mencatat pembayaran", description: (e as Error).message, variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleDelete(p: Payment) {
+    deletePayment.mutate(p.id, {
+      onSuccess: () => toast({ title: "Pembayaran dihapus" }),
+      onError: (e) => toast({ title: "Gagal menghapus pembayaran", description: (e as Error).message, variant: "destructive" }),
+    });
+  }
+
+  const inputCls = "w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40";
+
+  return (
+    <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-foreground flex items-center gap-2"><Wallet className="w-4 h-4" /> Pembayaran</h2>
+        {!showForm && (
+          <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 text-sm font-medium text-primary hover:opacity-80 transition-opacity">
+            <Plus className="w-4 h-4" /> Catat Pembayaran
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2"><Loader2 className="w-4 h-4 animate-spin" /> Memuat pembayaran…</div>
+      ) : payments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Belum ada pembayaran.</p>
+      ) : (
+        <div className="space-y-2">
+          {payments.map((p) => (
+            <div key={p.id} className="flex items-start justify-between gap-3 text-sm p-2 rounded-lg bg-muted">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{formatIDR(p.amount)} · {METHOD_LABELS[p.method] ?? p.method}</p>
+                {p.note && <p className="text-xs text-muted-foreground truncate">{p.note}</p>}
+                <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleString("id-ID")}</p>
+              </div>
+              <button onClick={() => handleDelete(p)} disabled={deletePayment.isPending} className="text-muted-foreground hover:text-destructive transition-colors shrink-0 disabled:opacity-50" aria-label="Hapus pembayaran">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="mt-3 space-y-2 p-3 rounded-lg border border-border">
+          <input className={inputCls} type="number" min="0" step="1000" placeholder="Jumlah (Rp)" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <select className={inputCls} value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
+            {(Object.keys(METHOD_LABELS) as PaymentMethod[]).map((k) => (
+              <option key={k} value={k}>{METHOD_LABELS[k]}</option>
+            ))}
+          </select>
+          <input className={inputCls} placeholder="Catatan (opsional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="flex items-center gap-2 pt-1">
+            <button onClick={handleAdd} disabled={addPayment.isPending} className="flex-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60">
+              {addPayment.isPending ? "Menyimpan…" : "Simpan"}
+            </button>
+            <button onClick={resetForm} className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">Batal</button>
+          </div>
+        </div>
+      )}
+    </motion.div>
   );
 }

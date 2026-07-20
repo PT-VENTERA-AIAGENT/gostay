@@ -15,11 +15,23 @@ const roleConfig: Record<UserRole, { label: string; cls: string }> = {
 };
 
 const tabs: Array<{ key: "all" | UserRole; label: string }> = [
-  { key: "all", label: "All Users" },
+  { key: "all", label: "All Team" },
   { key: "admin", label: "Admin" },
   { key: "staff", label: "Staff" },
-  { key: "customer", label: "Customers" },
 ];
+
+/**
+ * This page manages the team (admin & staff) only. Guests (`customer`) live in
+ * CRM Tamu, and synthetic WhatsApp bot rows — sso_sub `wa-bot:*` or an
+ * `@bot.gostay.local` email — are not real users, so both are hidden here.
+ */
+function isBotProfile(u: Profile): boolean {
+  return (u.sso_sub?.startsWith("wa-bot:") ?? false) || u.email.endsWith("@bot.gostay.local");
+}
+
+function isTeamMember(u: Profile): boolean {
+  return (u.role === "admin" || u.role === "staff") && !isBotProfile(u);
+}
 
 function initialsOf(name: string, email: string): string {
   const source = name.trim() || email;
@@ -47,7 +59,8 @@ export default function UserManagement() {
   const { toast } = useToast();
 
   const all = users ?? [];
-  const filtered = all.filter((u) => {
+  const team = all.filter(isTeamMember);
+  const filtered = team.filter((u) => {
     if (activeTab !== "all" && u.role !== activeTab) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -86,8 +99,9 @@ export default function UserManagement() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">User Management</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {isLoading ? "Loading…" : `${all.length} total users`}
+            Kelola tim (admin &amp; staff) · {isLoading ? "Loading…" : `${team.length} anggota`}
           </p>
+          <p className="text-xs text-muted-foreground mt-0.5">Tamu ada di CRM Tamu.</p>
         </div>
 
         {/* There is no "invite" here: identities live in Ventera SSO, and this
@@ -108,9 +122,9 @@ export default function UserManagement() {
           </div>
         )}
 
-        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-3 gap-3 md:gap-4">
           {tabs.map((tab) => {
-            const inTab = tab.key === "all" ? all : all.filter((u) => u.role === tab.key);
+            const inTab = tab.key === "all" ? team : team.filter((u) => u.role === tab.key);
             return (
               <motion.button
                 key={tab.key}
@@ -142,7 +156,7 @@ export default function UserManagement() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-sm text-muted-foreground">
-              {all.length === 0 ? "No one has signed in yet." : "No users match this filter."}
+              {team.length === 0 ? "No team members yet." : "No users match this filter."}
             </p>
           </div>
         ) : (

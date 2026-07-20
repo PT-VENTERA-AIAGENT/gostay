@@ -21,6 +21,7 @@ import RoomTypeDetail from "./pages/RoomTypeDetail";
 import Chat from "./pages/Chat";
 import CallLogs from "./pages/CallLogs";
 import NewCallLog from "./pages/NewCallLog";
+import GuestRequests from "./pages/GuestRequests";
 import Analytics from "./pages/Analytics";
 import UserManagement from "./pages/UserManagement";
 import AddHotel from "./pages/admin/AddHotel";
@@ -111,6 +112,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AddHotel />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/requests"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <GuestRequests />
                   </ProtectedRoute>
                 }
               />

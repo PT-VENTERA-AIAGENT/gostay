@@ -117,6 +117,30 @@ export async function deleteRoom(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── Housekeeping status ──────────────────────────────────────────────────────
+
+// Values of the `housekeeping_status` enum (migrated separately). This is the
+// cleaning state of a room and is distinct from booking/availability status.
+export type HousekeepingStatus =
+  | "clean"
+  | "dirty"
+  | "cleaning"
+  | "inspected"
+  | "maintenance";
+
+export async function setHousekeeping(
+  roomId: string,
+  status: HousekeepingStatus
+): Promise<void> {
+  // `housekeeping_status` is not yet in database.types (RoomUpdate), so cast the
+  // payload to keep the update strongly-typed callers happy.
+  const { error } = await supabase
+    .from("rooms")
+    .update({ housekeeping_status: status } as unknown as RoomUpdate)
+    .eq("id", roomId);
+  if (error) throw error;
+}
+
 // ─── Seasonal Pricing ─────────────────────────────────────────────────────────
 
 export async function getSeasonalPricing(

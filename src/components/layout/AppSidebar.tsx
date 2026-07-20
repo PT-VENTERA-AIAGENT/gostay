@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
   CalendarDays, DollarSign, Star,
-  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle
+  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -15,6 +15,7 @@ const navItems = [
   { icon: DoorOpen, label: "Rooms", path: "/rooms" },
   { icon: MessageSquare, label: "Messages", path: "/chat" },
   { icon: Phone, label: "Call Logs", path: "/calls" },
+  { icon: ConciergeBell, label: "Permintaan Tamu", path: "/requests" },
   { icon: CalendarDays, label: "Calendar", path: "/bookings?view=calendar" },
   { icon: DollarSign, label: "Financials", path: "/analytics" },
 ];

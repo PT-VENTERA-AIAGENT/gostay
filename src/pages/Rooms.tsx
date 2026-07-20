@@ -1,13 +1,24 @@
 import { useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays } from "lucide-react";
+import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
-import { useRooms, useRoomTypes } from "@/hooks/useRooms";
+import { useRooms, useRoomTypes, roomKeys } from "@/hooks/useRooms";
 import { useBookingsInRange } from "@/hooks/useBookings";
 import { statusForDate, type RoomStatus } from "@/lib/roomStatus";
+import { setHousekeeping, type HousekeepingStatus } from "@/services/roomService";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import RoomFormDialog from "@/components/rooms/RoomFormDialog";
 import DatePicker from "@/components/shared/DatePicker";
 import type { Room } from "@/types/database.types";
@@ -26,6 +37,65 @@ const statusConfig: Record<RoomStatus, { label: string; colorClass: string; dotC
   reserved:        { label: "Reserved",      colorClass: "badge-warning",     dotClass: "bg-warning" },
   out_of_service:  { label: "Out of Service",colorClass: "badge-destructive", dotClass: "bg-destructive" },
 };
+
+// Housekeeping (cleaning) status — separate from booking/availability status.
+// Labels are Indonesian; each status gets a distinct colour.
+const HOUSEKEEPING_ORDER: HousekeepingStatus[] = ["clean", "dirty", "cleaning", "inspected", "maintenance"];
+const housekeepingConfig: Record<HousekeepingStatus, { label: string; badgeClass: string; dotClass: string }> = {
+  clean:       { label: "Bersih",      badgeClass: "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400", dotClass: "bg-green-500" },
+  dirty:       { label: "Kotor",       badgeClass: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400",         dotClass: "bg-red-500" },
+  cleaning:    { label: "Dibersihkan", badgeClass: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400", dotClass: "bg-amber-500" },
+  inspected:   { label: "Diperiksa",   badgeClass: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",     dotClass: "bg-blue-500" },
+  maintenance: { label: "Perbaikan",   badgeClass: "bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300",     dotClass: "bg-gray-400" },
+};
+
+function HousekeepingBadge({ room }: { room: Room }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  // `housekeeping_status` is migrated but not yet in the Room type — read it via cast.
+  const current = ((room as unknown as { housekeeping_status?: HousekeepingStatus }).housekeeping_status
+    ?? "clean") as HousekeepingStatus;
+
+  const mutation = useMutation({
+    mutationFn: (status: HousekeepingStatus) => setHousekeeping(room.id, status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: roomKeys.list() }),
+    onError: () =>
+      toast({ variant: "destructive", title: "Gagal memperbarui housekeeping", description: "Silakan coba lagi." }),
+  });
+
+  const config = housekeepingConfig[current];
+
+  return (
+    <DropdownMenu>
+      {/* stopPropagation so opening the menu doesn't also open the room edit dialog */}
+      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          className={cn(
+            "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full transition-opacity hover:opacity-80 disabled:opacity-50",
+            config.badgeClass,
+          )}
+        >
+          <span className={cn("w-1.5 h-1.5 rounded-full", config.dotClass)} />
+          {config.label}
+          <ChevronDown className="w-3 h-3 opacity-70" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuLabel>Housekeeping</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={current} onValueChange={(v) => mutation.mutate(v as HousekeepingStatus)}>
+          {HOUSEKEEPING_ORDER.map((status) => (
+            <DropdownMenuRadioItem key={status} value={status}>
+              <span className={cn("w-2 h-2 rounded-full mr-2", housekeepingConfig[status].dotClass)} />
+              {housekeepingConfig[status].label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function AnimatedCount({ value }: { value: number }) {
   const animated = useAnimatedCounter(value, 800);
@@ -194,7 +264,10 @@ export default function Rooms() {
                       <span className={cn("w-2.5 h-2.5 rounded-full", config.dotClass)} />
                     </div>
                     <p className="text-xs text-muted-foreground mb-1">{room.room_types?.name}</p>
-                    <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full", config.colorClass)}>{config.label}</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full", config.colorClass)}>{config.label}</span>
+                      <HousekeepingBadge room={room} />
+                    </div>
                   </motion.div>
                 );
               })}
