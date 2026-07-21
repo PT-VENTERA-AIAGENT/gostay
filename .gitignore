@@ -49,3 +49,10 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local scratch, screenshots, and secrets — must never enter the repo.
+# devtools_login.txt carries live Supabase JWTs; _*.mjs are throwaway probes.
+devtools_login.txt
+.xt_ids
+_*.mjs
+shot_*.png
