@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 import { staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
 import { countRoomStatuses } from "@/lib/roomStatus";
@@ -10,6 +11,7 @@ function AnimatedValue({ value }: { value: number }) {
 }
 
 export default function RoomAvailability({ rooms }: { rooms: RoomWithType[] }) {
+  const t = useT();
   // `rooms` has no status column — status is derived from each room's live
   // booking. "Occupied" means a guest is in it; "Reserved" is confirmed but not
   // yet arrived; "Not Ready" is a deactivated room.
@@ -30,12 +32,12 @@ export default function RoomAvailability({ rooms }: { rooms: RoomWithType[] }) {
       className="bg-card rounded-xl p-5 border border-border card-hover"
     >
       <div className="flex items-center justify-between gap-3 mb-5">
-        <h3 className="font-semibold text-foreground min-w-0 truncate">Room Availability</h3>
-        <span className="text-xs text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">{total} rooms</span>
+        <h3 className="font-semibold text-foreground min-w-0 truncate">{t("Room Availability")}</h3>
+        <span className="text-xs text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">{total} {t("rooms")}</span>
       </div>
 
       {total === 0 ? (
-        <p className="text-xs text-muted-foreground py-8 text-center">No rooms configured yet.</p>
+        <p className="text-xs text-muted-foreground py-8 text-center">{t("No rooms configured yet.")}</p>
       ) : (
         <>
           <div className="flex rounded-lg overflow-hidden h-8 mb-5 bg-muted">
@@ -54,7 +56,7 @@ export default function RoomAvailability({ rooms }: { rooms: RoomWithType[] }) {
             {segments.map((r) => (
               <div key={r.label} className="flex items-center gap-2">
                 <span className={`w-3 h-3 rounded-sm ${r.color}`} />
-                <span className="text-xs text-muted-foreground truncate">{r.label}</span>
+                <span className="text-xs text-muted-foreground truncate">{t(r.label)}</span>
                 <span className="text-sm font-bold text-foreground ml-auto tabular-nums shrink-0 pl-2">
                   <AnimatedValue value={r.value} />
                 </span>

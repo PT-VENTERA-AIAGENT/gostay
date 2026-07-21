@@ -1,5 +1,6 @@
 import { CalendarPlus, CheckCircle2, LogIn, LogOut, XCircle, Pencil, Loader2, Activity } from "lucide-react";
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
@@ -48,6 +49,7 @@ function describe(a: ActivityEntry) {
 }
 
 export default function RecentActivities() {
+  const t = useT();
   const { data, isLoading, error } = useQuery({
     queryKey: ["recent-activity"],
     queryFn: () => getRecentActivity(6),
@@ -58,9 +60,9 @@ export default function RecentActivities() {
   return (
     <div className="bg-card rounded-xl p-5 border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground">Recent Activities</h3>
+        <h3 className="font-semibold text-foreground">{t("Recent Activities")}</h3>
         <Link to="/bookings" className="text-xs text-primary font-medium hover:underline px-2 py-1 rounded hover:bg-primary/5 transition-colors">
-          View All
+          {t("View All")}
         </Link>
       </div>
 
@@ -83,7 +85,7 @@ export default function RecentActivities() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground">{timeAgo(a.created_at)}</p>
-                  <p className="text-xs font-semibold text-foreground">{meta.label}</p>
+                  <p className="text-xs font-semibold text-foreground">{t(meta.label)}</p>
                   <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5 break-words">{describe(a)}</p>
                 </div>
               </motion.div>

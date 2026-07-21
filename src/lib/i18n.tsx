@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
-import { EN } from "./translations";
+import { EN, ID } from "./translations";
 
 export type Lang = "id" | "en";
 
@@ -28,7 +28,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const t = useCallback((s: string) => (lang === "en" ? EN[s] ?? s : s), [lang]);
+  // Two source languages coexist: the portal is written in Indonesian (EN maps
+  // it to English), the staff pages in English (ID maps them to Indonesian). A
+  // string only lives in one map, so the other direction falls through to the
+  // original — correct in both cases.
+  const t = useCallback((s: string) => (lang === "en" ? EN[s] ?? s : ID[s] ?? s), [lang]);
 
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>;
 }
