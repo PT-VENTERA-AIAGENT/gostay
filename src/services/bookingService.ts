@@ -478,6 +478,20 @@ export async function createWalkInCheckIn(
 
 // ─── Dashboard helpers ────────────────────────────────────────────────────────
 
+/**
+ * How many bookings are still pending — the ones a front-desk needs to act on
+ * (confirm or reject). Drives the sidebar badge. head+count so no rows travel;
+ * RLS scopes it to the caller's own hotel automatically.
+ */
+export async function countPendingBookings(): Promise<number> {
+  const { count, error } = await supabase
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending");
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function getTodayArrivals(): Promise<BookingWithRelations[]> {
   const today = new Date().toISOString().split("T")[0];
   const { data, error } = await supabase

@@ -8,6 +8,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useChatThreads } from "@/hooks/useChat";
+import { usePendingBookingsCount } from "@/hooks/useBookings";
 import { useTenant } from "@/hooks/useTenant";
 
 const navItems = [
@@ -38,9 +39,14 @@ export default function AppSidebar() {
   const { data: threads = [] } = useChatThreads();
   const unreadTotal = threads.reduce((n, t) => n + (t.unread_count ?? 0), 0);
 
+  // Pending reservations waiting on the front desk — same badge treatment as
+  // unread Messages, so new bookings are visible from any page.
+  const { data: pendingBookings = 0 } = usePendingBookingsCount();
+
   // Brand the shell with the caller's actual hotel, not a hardcoded name.
   const { name: hotelName, initial: hotelInitial } = useTenant();
-  const badgeFor = (path: string) => (path === "/chat" ? unreadTotal : 0);
+  const badgeFor = (path: string) =>
+    path === "/chat" ? unreadTotal : path === "/bookings" ? pendingBookings : 0;
 
   const toggleCollapsed = () => {
     const next = !collapsed;

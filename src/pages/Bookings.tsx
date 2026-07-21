@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Search, Filter, Download, Calendar, List, Eye, CalendarPlus, Loader2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -39,6 +39,7 @@ export default function Bookings() {
   // actually lands on the calendar — it used to be local state, so that link
   // opened the list and the nav item did nothing.
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const view: "list" | "calendar" = searchParams.get("view") === "calendar" ? "calendar" : "list";
   const setView = (v: "list" | "calendar") => {
     const next = new URLSearchParams(searchParams);
@@ -185,11 +186,20 @@ export default function Bookings() {
                   {bookings.map((b) => {
                     const sc = statusConfig[b.status];
                     return (
-                      <motion.tr key={b.id} variants={staggerItem} className="border-b border-border last:border-0 table-row-hover">
+                      <motion.tr
+                        key={b.id}
+                        variants={staggerItem}
+                        onClick={() => navigate(`/bookings/${b.id}`)}
+                        className="border-b border-border last:border-0 table-row-hover cursor-pointer"
+                      >
                         <td className="px-4 py-3 text-sm whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <span className="font-mono font-medium text-primary">{b.reference}</span>
-                            <CopyButton text={b.reference} />
+                            {/* The copy button lives inside a clickable row: swallow the
+                                click so copying a reference doesn't also open the detail. */}
+                            <span onClick={(e) => e.stopPropagation()}>
+                              <CopyButton text={b.reference} />
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm font-medium text-foreground whitespace-nowrap">{b.customers?.full_name}</td>
@@ -200,7 +210,7 @@ export default function Bookings() {
                         <td className="px-4 py-3 text-sm font-medium text-foreground tabular-nums">{formatIDR(b.total_amount)}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground capitalize whitespace-nowrap">{b.source.replace("_", " ")}</td>
                         <td className="px-4 py-3">
-                          <Link to={`/bookings/${b.id}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
+                          <Link to={`/bookings/${b.id}`} onClick={(e) => e.stopPropagation()} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
                             <Eye className="w-4 h-4" />
                           </Link>
                         </td>

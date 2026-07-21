@@ -13,6 +13,7 @@ import {
   getCustomerBookings,
   getMyBookings,
   getBookingsInRange,
+  countPendingBookings,
 } from "@/services/bookingService";
 import { addPayment } from "@/services/frontDeskService";
 import type { PaymentMethod } from "@/services/frontDeskService";
@@ -37,7 +38,17 @@ export const bookingKeys = {
     ["bookings", "customer", customerId] as const,
   mine: (profileId: string) => ["bookings", "mine", profileId] as const,
   range: (start: string, end: string) => ["bookings", "range", start, end] as const,
+  pendingCount: () => ["bookings", "pending-count"] as const,
 };
+
+/** Count of pending bookings, for the sidebar's Reservations badge. */
+export function usePendingBookingsCount() {
+  return useQuery({
+    queryKey: bookingKeys.pendingCount(),
+    queryFn: countPendingBookings,
+    refetchInterval: 60_000,
+  });
+}
 
 export function useBookings(filters?: BookingFilters) {
   return useQuery({
@@ -178,6 +189,8 @@ export function useUpdateBookingStatus() {
       qc.invalidateQueries({ queryKey: bookingKeys.list() });
       qc.invalidateQueries({ queryKey: bookingKeys.arrivals() });
       qc.invalidateQueries({ queryKey: bookingKeys.departures() });
+      // Confirming/cancelling a pending booking changes the sidebar badge.
+      qc.invalidateQueries({ queryKey: bookingKeys.pendingCount() });
     },
   });
 }
