@@ -298,6 +298,12 @@ export default function GuestRequests() {
                         {statusConfig[req.status].label}
                       </span>
                     </div>
+                    {(req.customers?.full_name || req.rooms?.number) && (
+                      <p className="text-xs font-medium text-foreground mt-1">
+                        {req.customers?.full_name ?? "Tamu"}
+                        {req.rooms?.number ? ` · Kamar ${req.rooms.number}` : ""}
+                      </p>
+                    )}
                     {req.description && (
                       <p className="text-sm text-muted-foreground mt-1.5">{req.description}</p>
                     )}

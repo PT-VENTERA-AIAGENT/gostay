@@ -22,8 +22,8 @@ const categoryLabels: Record<string, string> = {
 };
 
 const statusLabels: Record<string, { label: string; cls: string }> = {
-  open: { label: "Diterima", cls: "bg-primary/15 text-primary" },
-  in_progress: { label: "Diproses", cls: "bg-warning/15 text-warning" },
+  open: { label: "Menunggu konfirmasi", cls: "bg-warning/15 text-warning" },
+  in_progress: { label: "Diproses", cls: "bg-primary/15 text-primary" },
   done: { label: "Selesai", cls: "bg-success/15 text-success" },
   cancelled: { label: "Dibatalkan", cls: "bg-muted text-muted-foreground" },
 };
