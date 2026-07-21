@@ -1,6 +1,6 @@
 import { CalendarPlus, LogIn, LogOut, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
-import { useT } from "@/lib/i18n";
+import { useT, compactIDR } from "@/lib/i18n";
 import { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
 import type { AnalyticsData } from "@/services/analyticsService";
@@ -15,10 +15,7 @@ type Stat = {
 };
 
 function formatIDR(n: number) {
-  if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(2)}M`;
-  if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}jt`;
-  if (n >= 1_000) return `Rp ${(n / 1_000).toFixed(0)}rb`;
-  return `Rp ${Math.round(n)}`;
+  return compactIDR(n);
 }
 
 function AnimatedStat({ value, format }: { value: number; format: (n: number) => string }) {

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, useLang } from "@/lib/i18n";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -69,6 +69,7 @@ function parseDateOnly(s: string): Date {
 
 export default function BookingCalendar() {
   const t = useT();
+  const { lang } = useLang();
   // Opens on the current week rather than a pinned date: this was `new Date(2026, 3, 1)`
   // with a matching `const today = new Date(2026, 3, 5) // Mock today`, so the
   // grid always showed April 2026 no matter when it was opened.
@@ -138,7 +139,7 @@ export default function BookingCalendar() {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-sm font-semibold text-foreground min-w-[180px] text-center">
-            {dates[0].toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            {dates[0].toLocaleDateString(lang === "en" ? "en-US" : "id-ID", { month: "long", year: "numeric" })}
           </span>
           <button onClick={() => navigate(1)} aria-label="Next week" className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
             <ChevronRight className="w-4 h-4" />
@@ -149,8 +150,8 @@ export default function BookingCalendar() {
         </div>
         <div className="flex items-center gap-3 text-xs flex-wrap">
           {[
-            { label: "Pending", cls: "bg-warning/80" },
-            { label: "Confirmed", cls: "bg-info/80" },
+            { label: t("Pending"), cls: "bg-warning/80" },
+            { label: t("Confirmed"), cls: "bg-info/80" },
             { label: "Checked In", cls: "bg-primary/80" },
             { label: "Checked Out", cls: "bg-muted" },
           ].map((s) => (
@@ -182,7 +183,7 @@ export default function BookingCalendar() {
                   )}
                 >
                   <p className={cn("text-xs font-medium", isToday ? "text-primary" : "text-muted-foreground")}>
-                    {d.toLocaleDateString("en-US", { weekday: "short" })}
+                    {d.toLocaleDateString(lang === "en" ? "en-US" : "id-ID", { weekday: "short" })}
                   </p>
                   <p className={cn("text-sm font-semibold", isToday ? "text-primary" : "text-foreground")}>{d.getDate()}</p>
                 </div>

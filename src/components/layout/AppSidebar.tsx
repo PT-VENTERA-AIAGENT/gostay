@@ -84,7 +84,7 @@ export default function AppSidebar() {
     <motion.aside
       animate={{ width: collapsed ? 64 : 224 }}
       transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-      className="hidden md:flex flex-col min-h-screen bg-card border-r border-sidebar-border px-2 py-6 shrink-0 relative"
+      className="hidden md:flex flex-col sticky top-0 h-screen self-start bg-card border-r border-sidebar-border px-2 py-6 shrink-0 overflow-y-auto"
     >
       <div className={cn("flex items-center gap-2 px-2 mb-8", collapsed && "justify-center")}>
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden">

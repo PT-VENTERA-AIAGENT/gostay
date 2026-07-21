@@ -21,7 +21,7 @@ export default function Reviews() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Reviews")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {reviews.length} ulasan
+              {reviews.length} {t("ulasan")}
               {stats && stats.count > 0 && ` · rata-rata ${stats.average.toFixed(1)}/5 dari ${stats.count} yang tampil`}
             </p>
           </div>
@@ -67,7 +67,7 @@ export default function Reviews() {
                     }`}
                     title={r.is_published ? "Sembunyikan dari portal" : "Tampilkan di portal"}
                   >
-                    {r.is_published ? <><EyeOff className="w-3.5 h-3.5" /> Sembunyikan</> : <><Eye className="w-3.5 h-3.5" /> Tampilkan</>}
+                    {r.is_published ? <><EyeOff className="w-3.5 h-3.5" /> {t("Sembunyikan")}</> : <><Eye className="w-3.5 h-3.5" /> {t("Tampilkan")}</>}
                   </button>
                 </div>
               </motion.div>
