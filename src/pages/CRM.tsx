@@ -5,6 +5,7 @@ import { Search, Users, Phone, Mail, Calendar, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -134,17 +135,17 @@ function GuestPanel({
           </div>
           <div className="flex gap-2 flex-wrap pt-1">
             {isVIP(customer) && (
-              <Badge className="bg-amber-500/10 text-amber-600 border-amber-300/30 border">VIP</Badge>
+              <Badge className="bg-amber-500/10 text-amber-600 border-amber-300/30 border">{t("VIP")}</Badge>
             )}
             {isNew(customer) && (
-              <Badge className="bg-success/10 text-success border-success/20 border">New</Badge>
+              <Badge className="bg-success/10 text-success border-success/20 border">{t("New")}</Badge>
             )}
           </div>
         </SheetHeader>
 
         {/* Profile info */}
         <div className="space-y-3 mb-6">
-          <h3 className="text-sm font-semibold text-foreground">Guest Profile</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("Guest Profile")}</h3>
           <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
             {customer.phone && (
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -164,20 +165,20 @@ function GuestPanel({
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-card border border-border rounded-lg p-3 text-center">
               <p className="text-xl font-bold text-foreground">{customer.bookings.length}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Total Bookings</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t("Total Bookings")}</p>
             </div>
             <div className="bg-card border border-border rounded-lg p-3 text-center">
               <p className="text-sm font-bold text-foreground">{formatCurrency(totalSpend)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Total Spend</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t("Total Spend")}</p>
             </div>
           </div>
         </div>
 
         {/* Booking history */}
         <div className="space-y-3 mb-6">
-          <h3 className="text-sm font-semibold text-foreground">Booking History</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("Booking History")}</h3>
           {customer.bookings.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No bookings yet.</p>
+            <p className="text-sm text-muted-foreground">{t("No bookings yet.")}</p>
           ) : (
             <div className="space-y-2">
               {customer.bookings.map((booking) => {
@@ -194,7 +195,7 @@ function GuestPanel({
                         </p>
                       </div>
                       <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full border shrink-0", sc.cls)}>
-                        {sc.label}
+                        {t(sc.label)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1.5">
@@ -222,6 +223,7 @@ function GuestPanel({
 // ─── CRM Page ─────────────────────────────────────────────────────────────────
 
 export default function CRM() {
+  const t = useT();
   const [search, setSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithBookings | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -253,7 +255,7 @@ export default function CRM() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">CRM</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("CRM")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {isLoading ? "Loading..." : `${customers.length} guests`}
             </p>
@@ -264,7 +266,7 @@ export default function CRM() {
               className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Booking</span>
+              <span className="hidden sm:inline">{t("New Booking")}</span>
             </Link>
           </div>
         </div>
@@ -281,11 +283,11 @@ export default function CRM() {
             },
           ].map((stat) => (
             <motion.div
-              key={stat.label}
+              key={t(stat.label)}
               variants={staggerItem}
               className="bg-card rounded-xl border border-border p-3 md:p-4"
             >
-              <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
+              <p className="text-xs text-muted-foreground mb-1">{t(stat.label)}</p>
               <p className="text-xl md:text-2xl font-bold text-foreground">{stat.value}</p>
             </motion.div>
           ))}
@@ -314,12 +316,12 @@ export default function CRM() {
           <table className="w-full min-w-[820px]">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                <th className="text-left px-4 py-3 font-medium">Guest</th>
-                <th className="text-left px-4 py-3 font-medium">Phone</th>
-                <th className="text-left px-4 py-3 font-medium">Bookings</th>
-                <th className="text-left px-4 py-3 font-medium">Last Stay</th>
-                <th className="text-left px-4 py-3 font-medium">Total Spend</th>
-                <th className="text-left px-4 py-3 font-medium">Status</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Guest")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Phone")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Bookings")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Last Stay")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Total Spend")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Status")}</th>
               </tr>
             </thead>
             <motion.tbody variants={staggerContainer} initial="hidden" animate="show">
@@ -404,7 +406,7 @@ export default function CRM() {
         {/* Mobile cards */}
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="md:hidden space-y-3">
           {isLoading ? (
-            <div className="text-center text-sm text-muted-foreground py-8">Loading guests...</div>
+            <div className="text-center text-sm text-muted-foreground py-8">{t("Loading guests...")}</div>
           ) : filtered.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-8">
               <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
@@ -449,15 +451,15 @@ export default function CRM() {
                   <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                     <div>
                       <p className="font-medium text-foreground">{customer.bookings.length}</p>
-                      <p>Bookings</p>
+                      <p>{t("Bookings")}</p>
                     </div>
                     <div>
                       <p className="font-medium text-foreground">{lastStay ? formatDate(lastStay) : "—"}</p>
-                      <p>Last Stay</p>
+                      <p>{t("Last Stay")}</p>
                     </div>
                     <div>
                       <p className="font-medium text-foreground text-right">{formatCurrency(totalSpend)}</p>
-                      <p className="text-right">Spent</p>
+                      <p className="text-right">{t("Spent")}</p>
                     </div>
                   </div>
                 </motion.div>

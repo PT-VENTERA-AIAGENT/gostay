@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useProfiles, useUpdateUserRole, useSetUserActive } from "@/hooks/useUsers";
@@ -50,6 +51,7 @@ function formatLastSeen(iso: string | null): string {
 }
 
 export default function UserManagement() {
+  const t = useT();
   const [activeTab, setActiveTab] = useState<"all" | UserRole>("all");
   const [search, setSearch] = useState("");
   const { data: users, isLoading, error } = useProfiles();
@@ -97,11 +99,11 @@ export default function UserManagement() {
     <PageTransition>
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">User Management</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("User Management")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Kelola tim (admin &amp; staff) · {isLoading ? "Loading…" : `${team.length} anggota`}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Tamu ada di CRM Tamu.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("Tamu ada di CRM Tamu.")}</p>
         </div>
 
         {/* There is no "invite" here: identities live in Ventera SSO, and this
@@ -111,7 +113,7 @@ export default function UserManagement() {
           <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground leading-relaxed">
             Users appear here after their first sign-in with Ventera SSO — accounts cannot be created
-            from this page. Everyone starts as <span className="font-medium text-foreground">Customer</span>;
+            from this page. Everyone starts as <span className="font-medium text-foreground">{t("Customer")}</span>;
             grant staff or admin access below. Deactivating someone revokes their access immediately.
           </p>
         </div>
@@ -134,7 +136,7 @@ export default function UserManagement() {
                 onClick={() => setActiveTab(tab.key)}
                 className={cn("bg-card rounded-xl border p-3 md:p-4 text-left transition-all hover:shadow-sm", activeTab === tab.key ? "border-primary ring-1 ring-primary/30" : "border-border")}
               >
-                <p className="text-xs text-muted-foreground mb-1">{tab.label}</p>
+                <p className="text-xs text-muted-foreground mb-1">{t(tab.label)}</p>
                 <p className="text-xl md:text-2xl font-bold text-foreground">{inTab.length}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{inTab.filter((u) => u.is_active).length} active</p>
               </motion.button>
@@ -166,11 +168,11 @@ export default function UserManagement() {
               <table className="w-full min-w-[820px]">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="text-left px-4 py-3 font-medium">User</th>
-                    <th className="text-left px-4 py-3 font-medium">Role</th>
-                    <th className="text-left px-4 py-3 font-medium">Phone</th>
-                    <th className="text-left px-4 py-3 font-medium">Status</th>
-                    <th className="text-left px-4 py-3 font-medium">Last Login</th>
+                    <th className="text-left px-4 py-3 font-medium">{t("User")}</th>
+                    <th className="text-left px-4 py-3 font-medium">{t("Role")}</th>
+                    <th className="text-left px-4 py-3 font-medium">{t("Phone")}</th>
+                    <th className="text-left px-4 py-3 font-medium">{t("Status")}</th>
+                    <th className="text-left px-4 py-3 font-medium">{t("Last Login")}</th>
                     <th className="text-right px-4 py-3 font-medium"></th>
                   </tr>
                 </thead>
@@ -211,9 +213,9 @@ export default function UserManagement() {
                                 roleConfig[u.role].cls,
                               )}
                             >
-                              <option value="admin">Admin</option>
-                              <option value="staff">Staff</option>
-                              <option value="customer">Customer</option>
+                              <option value="admin">{t("Admin")}</option>
+                              <option value="staff">{t("Staff")}</option>
+                              <option value="customer">{t("Customer")}</option>
                             </select>
                           )}
                         </td>
@@ -280,9 +282,9 @@ export default function UserManagement() {
                           aria-label={`Role for ${u.full_name || u.email}`}
                           className="flex-1 text-xs bg-muted border border-border rounded-lg px-2 py-2 text-foreground outline-none"
                         >
-                          <option value="admin">Admin</option>
-                          <option value="staff">Staff</option>
-                          <option value="customer">Customer</option>
+                          <option value="admin">{t("Admin")}</option>
+                          <option value="staff">{t("Staff")}</option>
+                          <option value="customer">{t("Customer")}</option>
                         </select>
                         <button
                           onClick={() => toggleActive(u)}
