@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { Link } from "react-router-dom";
 import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
@@ -62,7 +62,7 @@ function HousekeepingBadge({ room }: { room: Room }) {
     mutationFn: (status: HousekeepingStatus) => setHousekeeping(room.id, status),
     onSuccess: () => qc.invalidateQueries({ queryKey: roomKeys.list() }),
     onError: () =>
-      toast({ variant: "destructive", title: "Gagal memperbarui housekeeping", description: "Silakan coba lagi." }),
+      toast({ variant: "destructive", title: tr("Gagal memperbarui housekeeping"), description: tr("Silakan coba lagi.") }),
   });
 
   const config = housekeepingConfig[current];

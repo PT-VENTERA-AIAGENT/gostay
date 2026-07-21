@@ -17,6 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { RoomType, Room, SeasonalPricing } from "@/types/database.types";
+import { tr } from "@/lib/i18n";
 
 const amenityIcons: Record<string, React.ElementType> = {
   WiFi: Wifi, AC: Wind, TV: Tv, "Mini Bar": Coffee, Bathtub: Bath, "Sea View": Mountain,
@@ -76,10 +77,10 @@ export default function RoomTypeDetail() {
   async function handleDelete() {
     try {
       await deleteType.mutateAsync(id!);
-      toast({ title: "Tipe kamar dinonaktifkan", description: roomType?.name });
+      toast({ title: tr("Tipe kamar dinonaktifkan"), description: roomType?.name });
       navigate("/rooms/types");
     } catch (e) {
-      toast({ title: "Gagal menghapus", description: e instanceof Error ? e.message : "", variant: "destructive" });
+      toast({ title: tr("Gagal menghapus"), description: e instanceof Error ? e.message : "", variant: "destructive" });
     }
   }
 
@@ -96,7 +97,7 @@ export default function RoomTypeDetail() {
       const { data: pub } = supabase.storage.from("room-photos").getPublicUrl(path);
       await updateType.mutateAsync({ id: roomType.id, payload: { photos: [...roomType.photos, pub.publicUrl] } });
       qc.invalidateQueries({ queryKey: ["room-types", id] });
-      toast({ title: "Foto diunggah" });
+      toast({ title: tr("Foto diunggah") });
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Gagal mengunggah foto.");
     } finally {
@@ -110,7 +111,7 @@ export default function RoomTypeDetail() {
       await updateType.mutateAsync({ id: roomType.id, payload: { photos: roomType.photos.filter((p) => p !== url) } });
       qc.invalidateQueries({ queryKey: ["room-types", id] });
     } catch (e) {
-      toast({ title: "Gagal menghapus foto", variant: "destructive" });
+      toast({ title: tr("Gagal menghapus foto"), variant: "destructive" });
     }
   }
 

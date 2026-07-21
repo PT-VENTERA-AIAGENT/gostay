@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, User, Calendar, MapPin, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { useMemo, useState } from "react";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import DatePicker from "@/components/shared/DatePicker";
@@ -120,7 +120,7 @@ export default function NewBooking() {
         created_by: user?.id ?? null,
       });
 
-      toast({ title: "Booking created", description: `${booking.reference} for ${customer.full_name}.` });
+      toast({ title: tr("Booking created"), description: `${booking.reference} for ${customer.full_name}.` });
       navigate(`/bookings/${booking.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create the booking.");

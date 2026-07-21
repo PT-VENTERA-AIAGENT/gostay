@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, LogOut, LogIn, XCircle, Clock, FileText, User, MapPin, CreditCard, MoreHorizontal, Loader2, Receipt, Wallet, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import CopyButton from "@/components/shared/CopyButton";
@@ -74,7 +74,7 @@ export default function BookingDetail() {
       { id: id!, status },
       {
         onSuccess: () => toast({ title: `Booking ${status.replace("_", " ")}` }),
-        onError: (e) => toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
+        onError: (e) => toast({ title: tr("Error"), description: (e as Error).message, variant: "destructive" }),
       }
     );
   }
@@ -273,33 +273,33 @@ function FolioCard({ bookingId, roomTotal, amountPaid }: { bookingId: string; ro
     const price = Number(unitPrice);
     const qty = Number(quantity);
     if (!description.trim()) {
-      toast({ title: "Deskripsi wajib diisi", variant: "destructive" });
+      toast({ title: tr("Deskripsi wajib diisi"), variant: "destructive" });
       return;
     }
     if (!Number.isFinite(price) || price <= 0) {
-      toast({ title: "Harga tidak valid", variant: "destructive" });
+      toast({ title: tr("Harga tidak valid"), variant: "destructive" });
       return;
     }
     if (!Number.isInteger(qty) || qty <= 0) {
-      toast({ title: "Jumlah tidak valid", variant: "destructive" });
+      toast({ title: tr("Jumlah tidak valid"), variant: "destructive" });
       return;
     }
     addCharge.mutate(
       { booking_id: bookingId, description: description.trim(), category, unit_price: price, quantity: qty, created_by: user?.id ?? null },
       {
         onSuccess: () => {
-          toast({ title: "Biaya ditambahkan" });
+          toast({ title: tr("Biaya ditambahkan") });
           resetForm();
         },
-        onError: (e) => toast({ title: "Gagal menambah biaya", description: (e as Error).message, variant: "destructive" }),
+        onError: (e) => toast({ title: tr("Gagal menambah biaya"), description: (e as Error).message, variant: "destructive" }),
       }
     );
   }
 
   function handleDelete(c: PosCharge) {
     deleteCharge.mutate(c.id, {
-      onSuccess: () => toast({ title: "Biaya dihapus" }),
-      onError: (e) => toast({ title: "Gagal menghapus biaya", description: (e as Error).message, variant: "destructive" }),
+      onSuccess: () => toast({ title: tr("Biaya dihapus") }),
+      onError: (e) => toast({ title: tr("Gagal menghapus biaya"), description: (e as Error).message, variant: "destructive" }),
     });
   }
 
@@ -396,25 +396,25 @@ function PaymentCard({ bookingId }: { bookingId: string }) {
   function handleAdd() {
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
-      toast({ title: "Jumlah pembayaran tidak valid", variant: "destructive" });
+      toast({ title: tr("Jumlah pembayaran tidak valid"), variant: "destructive" });
       return;
     }
     addPayment.mutate(
       { booking_id: bookingId, amount: value, method, note: note.trim() || null, created_by: user?.id ?? null },
       {
         onSuccess: () => {
-          toast({ title: "Pembayaran dicatat" });
+          toast({ title: tr("Pembayaran dicatat") });
           resetForm();
         },
-        onError: (e) => toast({ title: "Gagal mencatat pembayaran", description: (e as Error).message, variant: "destructive" }),
+        onError: (e) => toast({ title: tr("Gagal mencatat pembayaran"), description: (e as Error).message, variant: "destructive" }),
       }
     );
   }
 
   function handleDelete(p: Payment) {
     deletePayment.mutate(p.id, {
-      onSuccess: () => toast({ title: "Pembayaran dihapus" }),
-      onError: (e) => toast({ title: "Gagal menghapus pembayaran", description: (e as Error).message, variant: "destructive" }),
+      onSuccess: () => toast({ title: tr("Pembayaran dihapus") }),
+      onError: (e) => toast({ title: tr("Gagal menghapus pembayaran"), description: (e as Error).message, variant: "destructive" }),
     });
   }
 

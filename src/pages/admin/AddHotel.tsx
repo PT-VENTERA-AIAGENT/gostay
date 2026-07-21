@@ -16,6 +16,7 @@ import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { tr } from "@/lib/i18n";
 
 /**
  * "Tambah Hotel" onboarding wizard (platform-admin only).
@@ -147,7 +148,7 @@ export default function AddHotel() {
 
     const finalSlug = toKebab(slug);
     if (!name.trim() || !finalSlug || !staffFullName.trim() || !staffEmail.trim() || !staffPhone.trim()) {
-      toast({ title: "Lengkapi data", description: "Semua kolom wajib diisi kecuali WA hotel.", variant: "destructive" });
+      toast({ title: tr("Lengkapi data"), description: tr("Semua kolom wajib diisi kecuali WA hotel."), variant: "destructive" });
       return;
     }
 
@@ -174,9 +175,9 @@ export default function AddHotel() {
       setQr(null);
       setPairingStatus("pending");
       setStep(2);
-      toast({ title: "Hotel dibuat", description: "Lanjut hubungkan WhatsApp." });
+      toast({ title: tr("Hotel dibuat"), description: tr("Lanjut hubungkan WhatsApp.") });
     } catch (err) {
-      toast({ title: "Gagal menambah hotel", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("Gagal menambah hotel"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -232,9 +233,9 @@ export default function AddHotel() {
           method: "POST",
         });
       }
-      toast({ title: "Dibatalkan", description: "Penyambungan WhatsApp dibatalkan." });
+      toast({ title: tr("Dibatalkan"), description: tr("Penyambungan WhatsApp dibatalkan.") });
     } catch (err) {
-      toast({ title: "Gagal membatalkan", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("Gagal membatalkan"), description: (err as Error).message, variant: "destructive" });
     }
   }
 

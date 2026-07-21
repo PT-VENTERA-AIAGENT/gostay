@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Hotel } from "lucide-react";
 import { useAuth, roleHome } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { tr } from "@/lib/i18n";
 
 export default function Login() {
   const { session, role, signIn } = useAuth();
@@ -24,8 +25,8 @@ export default function Login() {
   useEffect(() => {
     if (searchParams.get("error") === "sso_failed") {
       toast({
-        title: "Login gagal",
-        description: "Tidak dapat memverifikasi sesi SSO. Coba lagi.",
+        title: tr("Login gagal"),
+        description: tr("Tidak dapat memverifikasi sesi SSO. Coba lagi."),
         variant: "destructive",
       });
     }

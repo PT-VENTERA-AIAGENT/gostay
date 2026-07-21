@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { Search, Send, Paperclip, CheckCheck, MoreVertical, Phone, User, ArrowLeft, Loader2, CheckCircle, RotateCcw, Paperclip as PaperclipIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerItem } from "@/components/shared/PageTransition";
@@ -50,7 +50,7 @@ export default function Chat() {
           { onSuccess: () => resolve(), onError: (err) => reject(err) },
         ));
     } catch {
-      toast({ title: "Gagal mengunggah lampiran", variant: "destructive" });
+      toast({ title: tr("Gagal mengunggah lampiran"), variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -58,7 +58,7 @@ export default function Chat() {
 
   function callCustomer() {
     const phone = selectedThread?.customers?.phone;
-    if (!phone) { toast({ title: "Nomor telepon tamu tidak tersedia" }); return; }
+    if (!phone) { toast({ title: tr("Nomor telepon tamu tidak tersedia") }); return; }
     window.location.href = `tel:${phone.replace(/\s+/g, "")}`;
   }
 
@@ -88,7 +88,7 @@ export default function Chat() {
     setMessageText("");
     sendMessage.mutate(
       { thread_id: selectedThreadId, sender_id: user.id, content, attachment_url: null, is_read: false },
-      { onError: () => toast({ title: "Failed to send message", variant: "destructive" }) }
+      { onError: () => toast({ title: tr("Failed to send message"), variant: "destructive" }) }
     );
   }
 

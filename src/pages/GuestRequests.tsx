@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, Loader2, ConciergeBell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
@@ -85,7 +85,7 @@ export default function GuestRequests() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: guestRequestKeys.all });
-      toast({ title: "Permintaan tamu dibuat" });
+      toast({ title: tr("Permintaan tamu dibuat") });
       setTitle("");
       setDescription("");
       setPriority("normal");
@@ -94,7 +94,7 @@ export default function GuestRequests() {
     },
     onError: (e) =>
       toast({
-        title: "Gagal membuat permintaan",
+        title: tr("Gagal membuat permintaan"),
         description: (e as Error).message,
         variant: "destructive",
       }),
@@ -109,7 +109,7 @@ export default function GuestRequests() {
     },
     onError: (e) =>
       toast({
-        title: "Gagal mengubah status",
+        title: tr("Gagal mengubah status"),
         description: (e as Error).message,
         variant: "destructive",
       }),
@@ -118,7 +118,7 @@ export default function GuestRequests() {
   function submitForm(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) {
-      toast({ title: "Judul wajib diisi", variant: "destructive" });
+      toast({ title: tr("Judul wajib diisi"), variant: "destructive" });
       return;
     }
     createMutation.mutate();

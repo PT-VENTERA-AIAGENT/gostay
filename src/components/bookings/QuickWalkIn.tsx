@@ -7,6 +7,7 @@ import { useRoomTypes, useAvailableRooms } from "@/hooks/useRooms";
 import { useWalkInCheckIn } from "@/hooks/useBookings";
 import { useToast } from "@/hooks/use-toast";
 import type { PaymentMethod } from "@/services/frontDeskService";
+import { tr } from "@/lib/i18n";
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "Tunai", transfer: "Transfer", card: "Kartu", qris: "QRIS", other: "Lainnya",
@@ -65,11 +66,11 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
 
   function submit() {
     const room = roomId ? rooms.find((r) => r.id === roomId) : rooms[0];
-    if (!room) { toast({ title: "Tidak ada kamar tipe ini yang kosong", variant: "destructive" }); return; }
+    if (!room) { toast({ title: tr("Tidak ada kamar tipe ini yang kosong"), variant: "destructive" }); return; }
 
     const amount = payNow ? Number(payAmount || total) : 0;
     if (payNow && (!Number.isFinite(amount) || amount <= 0)) {
-      toast({ title: "Jumlah pembayaran tidak valid", variant: "destructive" });
+      toast({ title: tr("Jumlah pembayaran tidak valid"), variant: "destructive" });
       return;
     }
 
@@ -83,10 +84,10 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
       },
       {
         onSuccess: ({ booking }) => {
-          toast({ title: "Check-in walk-in berhasil", description: `${booking.reference} · Kamar ${room.number}` });
+          toast({ title: tr("Check-in walk-in berhasil"), description: `${booking.reference} · Kamar ${room.number}` });
           navigate(`/bookings/${booking.id}`);
         },
-        onError: (e) => toast({ title: "Gagal check-in", description: (e as Error).message, variant: "destructive" }),
+        onError: (e) => toast({ title: tr("Gagal check-in"), description: (e as Error).message, variant: "destructive" }),
       },
     );
   }

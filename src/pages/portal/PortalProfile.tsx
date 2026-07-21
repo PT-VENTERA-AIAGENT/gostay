@@ -7,6 +7,7 @@ import { useMyProfile, useUpdateMyProfile } from "@/hooks/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import { useToast } from "@/hooks/use-toast";
+import { tr } from "@/lib/i18n";
 
 const SSO_ACCOUNT_URL = (import.meta.env.VITE_SSO_ISSUER as string) ?? "https://sso.ventera.ai";
 
@@ -44,7 +45,7 @@ export default function PortalProfile() {
     setError(null);
     try {
       await updateProfile.mutateAsync({ phone: phone.trim() || null });
-      toast({ title: "Profile updated", description: "Your phone number has been saved." });
+      toast({ title: tr("Profile updated"), description: tr("Your phone number has been saved.") });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save your profile.");
     }

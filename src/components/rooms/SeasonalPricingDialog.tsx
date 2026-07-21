@@ -7,6 +7,7 @@ import {
 import DatePicker from "@/components/shared/DatePicker";
 import { createSeasonalPricing } from "@/services/roomService";
 import { useToast } from "@/hooks/use-toast";
+import { tr } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -34,7 +35,7 @@ export default function SeasonalPricingDialog({ open, onOpenChange, roomTypeId }
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["seasonal-pricing", roomTypeId] });
-      toast({ title: "Aturan harga ditambahkan", description: form.label });
+      toast({ title: tr("Aturan harga ditambahkan"), description: form.label });
       onOpenChange(false);
     },
     onError: (e) => setError(e instanceof Error ? e.message : "Gagal menyimpan."),
