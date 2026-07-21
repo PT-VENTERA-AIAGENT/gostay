@@ -29,6 +29,12 @@ await svc.from('profiles').insert({id:rivalId,email:'rival@demo.local',full_name
 const staffAId='00000000-0000-4000-8000-0000000000a9';
 await svc.from('profiles').delete().eq('id',staffAId);
 await svc.from('profiles').insert({id:staffAId,email:'staffa@demo.local',full_name:'Staff A',role:'staff',tenant_id:A,is_active:true});
+// A dedicated platform admin (Ventera). Seeded here rather than reusing a demo
+// account, whose role can drift (Budi was demoted staff→admin→staff), which
+// silently turned the "admin sees all" assertions into false failures.
+const adminId='00000000-0000-4000-8000-0000000000ad';
+await svc.from('profiles').delete().eq('id',adminId);
+await svc.from('profiles').insert({id:adminId,email:'ventera@demo.local',full_name:'Ventera Admin',role:'admin',tenant_id:A,is_active:true});
 const {data:rt}=await svc.from('room_types').insert({tenant_id:B,name:'Rival Suite',slug:'rival-suite',base_rate:9000000,max_occupancy:2,description:'x',is_active:true}).select().single();
 const {data:rm}=await svc.from('rooms').insert({tenant_id:B,room_type_id:rt.id,number:'101',floor:1,is_active:true}).select().single();
 const {data:cu}=await svc.from('customers').insert({tenant_id:B,full_name:'Rival Guest',email:'rg@demo.local',phone:'+62800'}).select().single();
@@ -36,7 +42,7 @@ const {data:bkB}=await svc.from('bookings').insert({tenant_id:B,room_id:rm.id,cu
 console.log('Tenant B siap: Rival Hotel, kamar "101" (sama nomornya dgn tenant A — bukti unique per-tenant jalan)\n');
 
 // 3 roles: admin = Ventera (platform-wide) · staff = hotel (tenant-scoped) · customer = guest.
-const budi=as(mint('b0000000-0000-4000-8000-00000000ab02'));   // admin = Ventera (platform)
+const admin=as(mint(adminId));                                 // admin = Ventera (platform)
 const staffA=as(mint(staffAId));                               // staff hotel A
 const staffB=as(mint(rivalId));                                // staff hotel B
 let pass=0,fail=0;
@@ -44,7 +50,7 @@ const t=(name,ok,detail='')=>{ok?pass++:fail++; console.log(`  ${ok?'✓':'✗ G
 
 console.log('Admin Ventera (platform) HARUS bisa lihat SEMUA hotel:');
 for(const tbl of ['bookings','customers','rooms','room_types']){
-  const {data}=await budi.from(tbl).select('*').eq('tenant_id',B);
+  const {data}=await admin.from(tbl).select('*').eq('tenant_id',B);
   t(`admin lihat ${tbl} hotel B`, (data??[]).length>0, `${(data??[]).length} baris`);
 }
 console.log('\nStaff hotel A TIDAK boleh lihat hotel B:');
@@ -69,9 +75,9 @@ console.log('\nRPC ketersediaan (SECURITY DEFINER — RLS tidak berlaku di dalam
 {const {data}=await staffB.rpc('available_rooms',{p_check_in:'2027-09-01',p_check_out:'2027-09-03',p_room_type_id:null});
  const nums=(data??[]).map(r=>r.number);
  t('Staff B hanya lihat kamar hotel B', nums.length===1&&nums[0]==='101', `[${nums.join(', ')}]`);}
-{const {data}=await budi.rpc('available_rooms',{p_check_in:'2027-09-01',p_check_out:'2027-09-03',p_room_type_id:null});
+{const {data}=await staffA.rpc('available_rooms',{p_check_in:'2027-09-01',p_check_out:'2027-09-03',p_room_type_id:null});
  const nums=(data??[]).map(r=>r.number);
- t('Budi hanya lihat kamar tenant A (10)', nums.length===10&&!nums.includes('101')||nums.length===10, `${nums.length} kamar`);}
+ t('Staff A hanya lihat kamar tenant A (10)', nums.length===10&&!nums.includes('101')||nums.length===10, `${nums.length} kamar`);}
 
 // ── WhatsApp tables: service-role only (RLS enabled, NO policy). The whole WA
 // booking flow bypasses RLS and re-imposes the tenant boundary in code, so these
@@ -88,19 +94,20 @@ const {data:waMsg}=await svc.from('wa_inbound_messages').insert({wa_message_id:w
 
 const anonC=createClient(URL,ANON);
 for(const tbl of ['wa_hotel_sessions','wa_guest_identities','wa_pending_actions','wa_inbound_messages']){
-  const {data:da}=await budi.from(tbl).select('*');
+  const {data:da}=await admin.from(tbl).select('*');
   t(`${tbl} tak terbaca authenticated`, (da??[]).length===0, `${(da??[]).length} baris`);
   const {data:dn}=await anonC.from(tbl).select('*');
   t(`${tbl} tak terbaca anon`, (dn??[]).length===0, `${(dn??[]).length} baris`);
 }
-// Budi is tenant A's admin: even a wa_hotel_sessions row filed under A stays hidden.
-{const {data}=await budi.from('wa_hotel_sessions').select('*').eq('tenant_id',A);
- t('wa_hotel_sessions tenant-A sendiri pun tersembunyi dari admin-nya', (data??[]).length===0, `${(data??[]).length} baris`);}
+// Even a platform admin — who CAN read every tenant's bookings — is blocked
+// from the WA tables: they carry no policy at all, only the service role sees them.
+{const {data}=await admin.from('wa_hotel_sessions').select('*').eq('tenant_id',A);
+ t('wa_hotel_sessions tersembunyi bahkan dari platform admin', (data??[]).length===0, `${(data??[]).length} baris`);}
 // Writes by a non-service caller must be denied outright.
-{const {error}=await budi.from('wa_hotel_sessions').insert({session_id:`hack-${randomUUID()}`,tenant_id:A,bot_number:'x'});
- t('Budi menyisipkan wa_hotel_sessions', Boolean(error), error?.code||'DIIZINKAN!');}
-{const {error}=await budi.from('wa_guest_identities').insert({tenant_id:A,phone_jid:'hack@s.whatsapp.net'});
- t('Budi menyisipkan wa_guest_identities', Boolean(error), error?.code||'DIIZINKAN!');}
+{const {error}=await admin.from('wa_hotel_sessions').insert({session_id:`hack-${randomUUID()}`,tenant_id:A,bot_number:'x'});
+ t('Admin menyisipkan wa_hotel_sessions', Boolean(error), error?.code||'DIIZINKAN!');}
+{const {error}=await admin.from('wa_guest_identities').insert({tenant_id:A,phone_jid:'hack@s.whatsapp.net'});
+ t('Admin menyisipkan wa_guest_identities', Boolean(error), error?.code||'DIIZINKAN!');}
 {const {error}=await anonC.from('wa_pending_actions').insert({tenant_id:B,phone_jid:'hack@s.whatsapp.net',kind:'collecting',payload:{}});
  t('Anon menyisipkan wa_pending_actions', Boolean(error), error?.code||'DIIZINKAN!');}
 
@@ -116,7 +123,8 @@ fs.writeFileSync('.xt_ids', JSON.stringify({B,rivalId,rt:rt.id,rm:rm.id,cu:cu.id
 
 // Leave no rival hotel behind in the demo data.
 await svc.from('tenants').delete().eq('id',B);
-// staffA lives in tenant A (not cascaded by the B delete) — remove it explicitly.
-await svc.from('profiles').delete().eq('id',staffAId);
-console.log('tenant B + staff A dibersihkan.');
+// staffA and the seeded admin live in tenant A (not cascaded by the B delete) —
+// remove them explicitly.
+await svc.from('profiles').delete().in('id',[staffAId,adminId]);
+console.log('tenant B + staff A + admin ter-seed dibersihkan.');
 process.exit(fail>0?1:0);
