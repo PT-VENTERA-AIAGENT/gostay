@@ -11,6 +11,7 @@ import { useChatThreads } from "@/hooks/useChat";
 import { usePendingBookingsCount } from "@/hooks/useBookings";
 import { useOpenRequestsCount } from "@/hooks/useGuestRequests";
 import { useTenant } from "@/hooks/useTenant";
+import { useT } from "@/lib/i18n";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dasbor", path: "/dashboard" },
@@ -33,6 +34,7 @@ const bottomItems = [
 ];
 
 export default function AppSidebar() {
+  const t = useT();
   const { pathname, search } = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "true");
 
@@ -109,10 +111,10 @@ export default function AppSidebar() {
 
       <nav className="flex-1 flex flex-col gap-1">
         {navItems.map((item) => (
-          <motion.div key={item.label} whileHover={{ x: collapsed ? 0 : 2 }} whileTap={{ scale: 0.97 }}>
+          <motion.div key={item.path} whileHover={{ x: collapsed ? 0 : 2 }} whileTap={{ scale: 0.97 }}>
             <Link
               to={item.path}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t(item.label) : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
                 collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
@@ -130,7 +132,7 @@ export default function AppSidebar() {
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 text-left overflow-hidden whitespace-nowrap"
                   >
-                    {item.label}
+                    {t(item.label)}
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -153,10 +155,10 @@ export default function AppSidebar() {
 
       <div className="flex flex-col gap-1 mt-4 pt-4 border-t border-sidebar-border">
         {bottomItems.map((item) => (
-          <motion.div key={item.label} whileHover={{ x: collapsed ? 0 : 2 }} whileTap={{ scale: 0.97 }}>
+          <motion.div key={item.path} whileHover={{ x: collapsed ? 0 : 2 }} whileTap={{ scale: 0.97 }}>
             <Link
               to={item.path}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t(item.label) : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
                 collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
@@ -174,7 +176,7 @@ export default function AppSidebar() {
                     exit={{ opacity: 0, width: 0 }}
                     className="overflow-hidden whitespace-nowrap"
                   >
-                    {item.label}
+                    {t(item.label)}
                   </motion.span>
                 )}
               </AnimatePresence>

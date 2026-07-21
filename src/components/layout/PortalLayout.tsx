@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import RealtimeSync from "@/components/shared/RealtimeSync";
+import LanguageToggle from "@/components/shared/LanguageToggle";
+import { useT } from "@/lib/i18n";
 
 const portalNav = [
   { label: "Beranda", path: "/portal", icon: Search },
@@ -23,6 +25,7 @@ export default function PortalLayout() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const { session, user, signOut } = useAuth();
   const { name: hotelName, initial: hotelInitial, tenant } = useTenant();
+  const t = useT();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -47,7 +50,7 @@ export default function PortalLayout() {
               <Link
                 key={item.path}
                 to={item.path}
-                title={item.label}
+                title={t(item.label)}
                 className={cn(
                   "relative flex items-center gap-2 px-3 lg:px-4 py-2 rounded-lg text-sm font-medium transition-colors btn-press",
                   active
@@ -58,13 +61,14 @@ export default function PortalLayout() {
                 <item.icon className="w-4 h-4 shrink-0" />
                 {/* Labels only from lg — at md the header (logo + 4 labelled
                     links + name + Keluar) ran past the viewport. */}
-                <span className="hidden lg:inline">{item.label}</span>
+                <span className="hidden lg:inline">{t(item.label)}</span>
               </Link>
             );
           })}
         </nav>
 
         <div className="flex items-center gap-2 md:gap-3">
+          <LanguageToggle />
           <ThemeToggle />
           {/* There is no "Register": Ventera SSO owns the accounts, so signing
               in is the only door — the old button led to a form that always
@@ -82,12 +86,12 @@ export default function PortalLayout() {
                 onClick={signOut}
                 className="hidden sm:inline-flex items-center gap-2 text-sm font-medium border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors btn-press"
               >
-                <LogOut className="w-4 h-4" /> Keluar
+                <LogOut className="w-4 h-4" /> {t("Keluar")}
               </button>
             </>
           ) : (
             <Link to="/login" className="hidden sm:inline text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity btn-press">
-              Masuk
+              {t("Masuk")}
             </Link>
           )}
           <button className="md:hidden w-9 h-9 flex items-center justify-center text-muted-foreground touch-target" onClick={() => setMobileMenu(!mobileMenu)}>
@@ -118,7 +122,7 @@ export default function PortalLayout() {
                   )}
                 >
                   <item.icon className="w-4 h-4" />
-                  {item.label}
+                  {t(item.label)}
                 </Link>
               ))}
               <div className="flex gap-2 pt-2 border-t border-border">
@@ -127,10 +131,10 @@ export default function PortalLayout() {
                     onClick={() => { setMobileMenu(false); signOut(); }}
                     className="flex-1 text-center text-sm font-medium border border-border py-2.5 rounded-lg hover:bg-muted touch-target"
                   >
-                    Keluar
+                    {t("Keluar")}
                   </button>
                 ) : (
-                  <Link to="/login" className="flex-1 text-center text-sm font-medium bg-primary text-primary-foreground py-2.5 rounded-lg touch-target" onClick={() => setMobileMenu(false)}>Masuk</Link>
+                  <Link to="/login" className="flex-1 text-center text-sm font-medium bg-primary text-primary-foreground py-2.5 rounded-lg touch-target" onClick={() => setMobileMenu(false)}>{t("Masuk")}</Link>
                 )}
               </div>
             </div>
@@ -161,18 +165,18 @@ export default function PortalLayout() {
               </div>
               <span className="font-bold text-foreground">{hotelName}</span>
             </div>
-            <p className="text-sm text-muted-foreground">Menginap sempurnamu menanti. Booking langsung untuk harga terbaik dan keuntungan eksklusif.</p>
+            <p className="text-sm text-muted-foreground">{t("Menginap sempurnamu menanti. Booking langsung untuk harga terbaik dan keuntungan eksklusif.")}</p>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground text-sm mb-3">Tautan Cepat</h4>
+            <h4 className="font-semibold text-foreground text-sm mb-3">{t("Tautan Cepat")}</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <Link to="/portal" className="block hover:text-foreground transition-colors">Beranda</Link>
-              <Link to="/portal/my-account" className="block hover:text-foreground transition-colors">Booking Saya</Link>
-              <Link to="/portal/chat" className="block hover:text-foreground transition-colors">Hubungi Kami</Link>
+              <Link to="/portal" className="block hover:text-foreground transition-colors">{t("Beranda")}</Link>
+              <Link to="/portal/my-account" className="block hover:text-foreground transition-colors">{t("Booking Saya")}</Link>
+              <Link to="/portal/chat" className="block hover:text-foreground transition-colors">{t("Hubungi Kami")}</Link>
             </div>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground text-sm mb-3">Kontak</h4>
+            <h4 className="font-semibold text-foreground text-sm mb-3">{t("Kontak")}</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
               {(() => {
                 const phone = tenant?.phone ?? "+62 21 1234 5678";
@@ -196,16 +200,16 @@ export default function PortalLayout() {
             </div>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground text-sm mb-3">Kebijakan</h4>
+            <h4 className="font-semibold text-foreground text-sm mb-3">{t("Kebijakan")}</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p className="hover:text-foreground transition-colors cursor-pointer">Kebijakan Privasi</p>
-              <p className="hover:text-foreground transition-colors cursor-pointer">Syarat Layanan</p>
-              <p className="hover:text-foreground transition-colors cursor-pointer">Kebijakan Pembatalan</p>
+              <p className="hover:text-foreground transition-colors cursor-pointer">{t("Kebijakan Privasi")}</p>
+              <p className="hover:text-foreground transition-colors cursor-pointer">{t("Syarat Layanan")}</p>
+              <p className="hover:text-foreground transition-colors cursor-pointer">{t("Kebijakan Pembatalan")}</p>
             </div>
           </div>
         </div>
         <div className="max-w-6xl mx-auto mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
-          &copy; 2026 {hotelName}. Semua hak dilindungi.
+          &copy; 2026 {hotelName}. {t("Semua hak dilindungi.")}
         </div>
       </footer>
 

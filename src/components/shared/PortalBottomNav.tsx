@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Search, Calendar, MessageSquare, User, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const nav = [
   { icon: Search, label: "Beranda", path: "/portal" },
@@ -12,6 +13,7 @@ const nav = [
 
 export default function PortalBottomNav() {
   const { pathname } = useLocation();
+  const t = useT();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border z-40 md:hidden safe-area-bottom">
@@ -28,7 +30,7 @@ export default function PortalBottomNav() {
               )}
             >
               <item.icon className="w-5 h-5" />
-              {item.label}
+              {t(item.label)}
             </Link>
           );
         })}

@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import PageTransition from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
+import { useT } from "@/lib/i18n";
 import {
   getOrCreateThread,
   getMessages,
@@ -25,6 +26,7 @@ function formatTime(iso: string) {
 export default function PortalChat() {
   const { user, signIn } = useAuth();
   const { name: hotelName, initial: hotelInitial } = useTenant();
+  const t = useT();
 
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -158,19 +160,19 @@ export default function PortalChat() {
       <PageTransition>
         <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-4">
           <Link to="/portal/my-account" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Kembali
+            <ArrowLeft className="w-4 h-4" /> {t("Kembali")}
           </Link>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Pesan</h1>
-            <p className="text-sm text-muted-foreground mt-1">Chat dengan tim hotel kami</p>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Pesan")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("Chat dengan tim hotel kami")}</p>
           </div>
           <div className="bg-card rounded-xl border border-border p-6 md:p-8 space-y-4 text-center">
-            <p className="text-sm text-muted-foreground">Masuk dulu untuk mulai chat dengan front desk.</p>
+            <p className="text-sm text-muted-foreground">{t("Masuk dulu untuk mulai chat dengan front desk.")}</p>
             <button
               onClick={() => signIn("/portal/chat")}
               className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
             >
-              Masuk
+              {t("Masuk")}
             </button>
           </div>
         </div>
@@ -182,11 +184,11 @@ export default function PortalChat() {
     <PageTransition>
       <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-4">
         <Link to="/portal/my-account" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Kembali
+          <ArrowLeft className="w-4 h-4" /> {t("Kembali")}
         </Link>
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">Pesan</h1>
-          <p className="text-sm text-muted-foreground mt-1">Chat dengan tim hotel kami</p>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Pesan")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("Chat dengan tim hotel kami")}</p>
         </div>
         <div className="bg-card rounded-xl border border-border overflow-hidden" style={{ height: "60vh" }}>
           {/* Header */}
@@ -217,7 +219,7 @@ export default function PortalChat() {
             )}
             {!loading && !error && messages.length === 0 && (
               <div className="flex items-center justify-center h-full">
-                <p className="text-sm text-muted-foreground">Kirim pesan untuk memulai percakapan.</p>
+                <p className="text-sm text-muted-foreground">{t("Kirim pesan untuk memulai percakapan.")}</p>
               </div>
             )}
             {!loading && !error && messages.map((msg, i) => {
@@ -276,7 +278,7 @@ export default function PortalChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ketik pesan..."
+                placeholder={t("Ketik pesan...")}
                 disabled={!thread || sending}
                 className="flex-1 px-3 md:px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
               />

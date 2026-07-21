@@ -6,6 +6,7 @@ import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
+import { useT } from "@/lib/i18n";
 import { useMyBookings } from "@/hooks/useBookings";
 import { usePortalMenu, useMyRoomServiceOrders, usePlaceRoomServiceOrder } from "@/hooks/usePortalOrder";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +32,7 @@ const statusLabels: Record<string, { label: string; cls: string }> = {
 export default function PortalOrder() {
   const { user, signIn } = useAuth();
   const { name: hotelName } = useTenant();
+  const t = useT();
   const { toast } = useToast();
 
   const { data: bookings = [], isLoading: loadingBookings } = useMyBookings();
@@ -99,8 +101,8 @@ export default function PortalOrder() {
         <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-4">
           <Header />
           <div className="bg-card rounded-xl border border-border p-6 md:p-8 space-y-4 text-center">
-            <p className="text-sm text-muted-foreground">Masuk dulu untuk memesan room service.</p>
-            <button onClick={() => signIn("/portal/order")} className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">Masuk</button>
+            <p className="text-sm text-muted-foreground">{t("Masuk dulu untuk memesan room service.")}</p>
+            <button onClick={() => signIn("/portal/order")} className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">{t("Masuk")}</button>
           </div>
         </div>
       </PageTransition>
@@ -119,9 +121,9 @@ export default function PortalOrder() {
         ) : !inhouse ? (
           <div className="bg-card rounded-xl border border-border p-6 md:p-8 text-center space-y-2">
             <UtensilsCrossed className="w-8 h-8 text-muted-foreground mx-auto" />
-            <p className="text-sm font-medium text-foreground">Room service tersedia saat kamu menginap</p>
+            <p className="text-sm font-medium text-foreground">{t("Room service tersedia saat kamu menginap")}</p>
             <p className="text-sm text-muted-foreground">Pesanan menu bisa dilakukan setelah check-in. Lihat status booking-mu di{" "}
-              <Link to="/portal/my-account" className="text-primary hover:underline">Booking Saya</Link>.
+              <Link to="/portal/my-account" className="text-primary hover:underline">{t("Booking Saya")}</Link>.
             </p>
           </div>
         ) : (
@@ -134,7 +136,7 @@ export default function PortalOrder() {
             <div className="space-y-6">
               {Object.entries(grouped).map(([cat, items]) => (
                 <div key={cat} className="space-y-2">
-                  <h2 className="text-sm font-semibold text-foreground">{categoryLabels[cat] ?? cat}</h2>
+                  <h2 className="text-sm font-semibold text-foreground">{t(categoryLabels[cat] ?? cat)}</h2>
                   <div className="grid sm:grid-cols-2 gap-2">
                     {items.map((p) => (
                       <div key={p.id} className="flex items-center justify-between gap-3 bg-card rounded-xl border border-border p-3">
@@ -150,7 +152,7 @@ export default function PortalOrder() {
                           </div>
                         ) : (
                           <button onClick={() => setQty(p.id, 1)} className="shrink-0 flex items-center gap-1.5 text-sm font-medium border border-primary/40 text-primary bg-primary/5 px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-colors">
-                            <Plus className="w-4 h-4" /> Tambah
+                            <Plus className="w-4 h-4" /> {t("Tambah")}
                           </button>
                         )}
                       </div>
@@ -158,13 +160,13 @@ export default function PortalOrder() {
                   </div>
                 </div>
               ))}
-              {menu.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Menu belum tersedia.</p>}
+              {menu.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">{t("Menu belum tersedia.")}</p>}
             </div>
 
             {/* My recent orders */}
             {myOrders.length > 0 && (
               <div className="space-y-2 pt-2">
-                <h2 className="text-sm font-semibold text-foreground">Pesanan &amp; permintaan kamu</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t("Pesanan & permintaan kamu")}</h2>
                 <div className="space-y-2">
                   {myOrders.slice(0, 5).map((o) => {
                     const st = statusLabels[o.status] ?? statusLabels.open;
@@ -172,7 +174,7 @@ export default function PortalOrder() {
                       <div key={o.id} className="bg-card rounded-xl border border-border p-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-foreground">{o.title}</p>
-                          <span className={cn("text-xs px-2 py-0.5 rounded-full whitespace-nowrap", st.cls)}>{st.label}</span>
+                          <span className={cn("text-xs px-2 py-0.5 rounded-full whitespace-nowrap", st.cls)}>{t(st.label)}</span>
                         </div>
                         {o.description && <p className="text-xs text-muted-foreground whitespace-pre-line mt-1">{o.description}</p>}
                       </div>
@@ -205,7 +207,7 @@ export default function PortalOrder() {
               className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {placeOrder.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              Pesan &amp; tagih ke kamar
+              {t("Pesan & tagih ke kamar")}
             </button>
           </div>
         </motion.div>
@@ -215,13 +217,14 @@ export default function PortalOrder() {
 }
 
 function Header() {
+  const t = useT();
   return (
     <div className="space-y-1">
       <Link to="/portal/my-account" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Kembali
+        <ArrowLeft className="w-4 h-4" /> {t("Kembali")}
       </Link>
-      <h1 className="text-xl md:text-2xl font-bold text-foreground">Room Service</h1>
-      <p className="text-sm text-muted-foreground">Pesan menu ke kamarmu — ditagihkan ke folio.</p>
+      <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Room Service")}</h1>
+      <p className="text-sm text-muted-foreground">{t("Pesan menu ke kamarmu — ditagihkan ke folio.")}</p>
     </div>
   );
 }
