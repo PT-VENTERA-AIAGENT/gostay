@@ -3,12 +3,14 @@ import {
   listProducts,
   createProduct,
   setProductActive,
+  updateProduct,
+  deleteProduct,
   createWalkInOrder,
   listRecentOrders,
   listOrdersBetween,
   listFolioTargets,
 } from "@/services/posService";
-import type { CreateProductInput, CreateWalkInOrderInput } from "@/services/posService";
+import type { CreateProductInput, UpdateProductInput, CreateWalkInOrderInput } from "@/services/posService";
 import { addCharge } from "@/services/frontDeskService";
 import type { AddChargeInput } from "@/services/frontDeskService";
 import { frontDeskKeys } from "@/hooks/useFrontDesk";
@@ -16,6 +18,7 @@ import { bookingKeys } from "@/hooks/useBookings";
 
 export const posKeys = {
   products: ["pos", "products"] as const,
+  allProducts: ["pos", "products", "all"] as const,
   orders: ["pos", "orders"] as const,
   folioTargets: ["pos", "folio-targets"] as const,
   today: (day: string) => ["pos", "today", day] as const,
@@ -23,6 +26,11 @@ export const posKeys = {
 
 export function useProducts() {
   return useQuery({ queryKey: posKeys.products, queryFn: () => listProducts(true) });
+}
+
+/** Every product, active or not — for the "Kelola produk" management view. */
+export function useAllProducts() {
+  return useQuery({ queryKey: posKeys.allProducts, queryFn: () => listProducts(false) });
 }
 
 export function useRecentOrders() {
@@ -53,6 +61,24 @@ export function useCreateProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateProductInput) => createProduct(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: posKeys.products }),
+  });
+}
+
+export function useUpdateProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateProductInput }) =>
+      updateProduct(id, input),
+    // posKeys.products is a prefix of posKeys.allProducts, so this refreshes both.
+    onSuccess: () => qc.invalidateQueries({ queryKey: posKeys.products }),
+  });
+}
+
+export function useDeleteProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteProduct(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: posKeys.products }),
   });
 }

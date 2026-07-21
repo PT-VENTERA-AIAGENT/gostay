@@ -29,6 +29,7 @@ import AddHotel from "./pages/admin/AddHotel";
 import CRM from "./pages/CRM";
 import Reviews from "./pages/Reviews";
 import WhatsApp from "./pages/settings/WhatsApp";
+import HotelProfile from "./pages/settings/HotelProfile";
 
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
@@ -42,6 +43,7 @@ import MyAccount from "./pages/portal/MyAccount";
 import PortalBookingDetail from "./pages/portal/PortalBookingDetail";
 import PortalProfile from "./pages/portal/PortalProfile";
 import PortalChat from "./pages/portal/PortalChat";
+import PortalOrder from "./pages/portal/PortalOrder";
 
 import NotFound from "./pages/NotFound";
 
@@ -148,6 +150,14 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/settings/hotel"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <HotelProfile />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
 
             {/* Customer Portal — public (no auth required to browse) */}
@@ -182,6 +192,7 @@ const App = () => (
                 }
               />
               <Route path="chat" element={<PortalChat />} />
+              <Route path="order" element={<PortalOrder />} />
             </Route>
 
             {/* Catch-all */}

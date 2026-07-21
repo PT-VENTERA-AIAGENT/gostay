@@ -1,10 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { Search, Calendar, MessageSquare, User } from "lucide-react";
+import { Search, Calendar, MessageSquare, User, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { icon: Search, label: "Home", path: "/portal" },
   { icon: Calendar, label: "Bookings", path: "/portal/my-account" },
+  { icon: UtensilsCrossed, label: "Order", path: "/portal/order" },
   { icon: MessageSquare, label: "Chat", path: "/portal/chat" },
   { icon: User, label: "Account", path: "/portal/profile" },
 ];

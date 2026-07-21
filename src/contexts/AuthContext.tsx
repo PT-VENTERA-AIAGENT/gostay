@@ -6,7 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { getSession, logout, startLogin, type SsoClaims, type SsoSession } from "@/lib/sso";
+import { getSession, logout, sessionExpiryMs, startLogin, type SsoClaims, type SsoSession } from "@/lib/sso";
 import type { UserRole } from "@/types/database.types";
 
 /**
@@ -90,6 +90,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refreshSession();
   }, [refreshSession]);
+
+  // When the session ends, sign the user out instead of leaving a dead token in
+  // place. A stale token doesn't error loudly — RLS just returns empty, so the
+  // app looked "logged in" while every page silently went blank ("sesi habis
+  // malah kosongin data"). Fire a timer at the exact expiry, and re-check when
+  // the tab regains focus (the common case: left open past the token's life).
+  useEffect(() => {
+    if (!session) return;
+    const expiresAt = sessionExpiryMs(session);
+    const recheck = () => {
+      // getSession() clears and returns null once expired; if it's gone, so is
+      // the session — bounce to a clean logged-out state.
+      if (!getSession()) logout();
+    };
+    const msLeft = Math.max(0, Math.min(expiresAt - Date.now(), 2_147_483_647));
+    const timer = window.setTimeout(logout, msLeft);
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
+    };
+  }, [session]);
 
   const signIn = (returnTo = "/") => startLogin(returnTo);
   const signOut = () => logout();

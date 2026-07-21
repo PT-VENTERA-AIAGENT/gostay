@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { User, Calendar, MessageSquare, Search, Menu, X, LogOut } from "lucide-react";
+import { User, Calendar, MessageSquare, Search, Menu, X, LogOut, UtensilsCrossed } from "lucide-react";
 import ChatWidget from "@/components/portal/ChatWidget";
 import PortalBottomNav from "@/components/shared/PortalBottomNav";
 import ThemeToggle from "@/components/shared/ThemeToggle";
@@ -12,6 +12,7 @@ import { useTenant } from "@/hooks/useTenant";
 const portalNav = [
   { label: "Home", path: "/portal", icon: Search },
   { label: "My Bookings", path: "/portal/my-account", icon: Calendar },
+  { label: "Room Service", path: "/portal/order", icon: UtensilsCrossed },
   { label: "Messages", path: "/portal/chat", icon: MessageSquare },
   { label: "Account", path: "/portal/profile", icon: User },
 ];
@@ -20,7 +21,7 @@ export default function PortalLayout() {
   const { pathname } = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
   const { session, user, signOut } = useAuth();
-  const { name: hotelName, initial: hotelInitial } = useTenant();
+  const { name: hotelName, initial: hotelInitial, tenant } = useTenant();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -163,9 +164,9 @@ export default function PortalLayout() {
           <div>
             <h4 className="font-semibold text-foreground text-sm mb-3">Contact</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p>+62 21 1234 5678</p>
-              <p>info@gostay.id</p>
-              <p>Jl. Hotel No. 1, Jakarta</p>
+              <p>{tenant?.phone ?? "+62 21 1234 5678"}</p>
+              <p>{tenant?.email ?? "info@gostay.id"}</p>
+              <p>{tenant?.address ?? "Jl. Hotel No. 1, Jakarta"}</p>
             </div>
           </div>
           <div>
