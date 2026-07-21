@@ -21,6 +21,9 @@ export interface GuestRequest {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Joined for the staff queue so the front desk knows who + which room.
+  customers?: { full_name: string | null } | null;
+  rooms?: { number: string | null } | null;
 }
 
 export interface GuestRequestFilters {
@@ -44,7 +47,7 @@ export async function listRequests(
 ): Promise<GuestRequest[]> {
   let query = db
     .from("guest_requests")
-    .select("*")
+    .select("*, customers ( full_name ), rooms ( number )")
     .order("created_at", { ascending: false });
 
   if (filter.status) query = query.eq("status", filter.status);
