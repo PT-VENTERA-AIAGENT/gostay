@@ -131,11 +131,34 @@ export async function handleCallback(
   return { claims, returnTo: tx.returnTo };
 }
 
+/** Epoch ms at which a JWT expires, or null if it carries no parseable exp. */
+function jwtExpiryMs(token?: string | null): number | null {
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    const { exp } = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof exp === "number" ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * When the session effectively dies. The Supabase token can expire before the
+ * SSO session's own expires_at, and once it does every RLS-gated query silently
+ * returns empty — the "sesi habis tapi malah kosongin data" symptom. So the
+ * session is only good until the EARLIER of the two clocks.
+ */
+export function sessionExpiryMs(session: SsoSession): number {
+  const tokenExp = jwtExpiryMs(session.supabase_token);
+  return tokenExp ? Math.min(session.expires_at, tokenExp) : session.expires_at;
+}
+
 export function getSession(): SsoSession | null {
   const raw = sessionStorage.getItem(SESSION_KEY);
   if (!raw) return null;
   const session = JSON.parse(raw) as SsoSession;
-  if (Date.now() > session.expires_at) {
+  if (Date.now() >= sessionExpiryMs(session)) {
     sessionStorage.removeItem(SESSION_KEY);
     return null;
   }
