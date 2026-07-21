@@ -8,6 +8,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useChatThreads } from "@/hooks/useChat";
+import { useTenant } from "@/hooks/useTenant";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -36,6 +37,9 @@ export default function AppSidebar() {
   // per-thread unread counts; realtime keeps it live across the app.
   const { data: threads = [] } = useChatThreads();
   const unreadTotal = threads.reduce((n, t) => n + (t.unread_count ?? 0), 0);
+
+  // Brand the shell with the caller's actual hotel, not a hardcoded name.
+  const { name: hotelName, initial: hotelInitial } = useTenant();
   const badgeFor = (path: string) => (path === "/chat" ? unreadTotal : 0);
 
   const toggleCollapsed = () => {
@@ -70,7 +74,7 @@ export default function AppSidebar() {
     >
       <div className={cn("flex items-center gap-2 px-2 mb-8", collapsed && "justify-center")}>
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">B</span>
+          <span className="text-primary-foreground font-bold text-sm">{hotelInitial}</span>
         </div>
         <AnimatePresence>
           {!collapsed && (
@@ -78,9 +82,10 @@ export default function AppSidebar() {
               initial={{ opacity: 0, width: 0 }}
               animate={{ opacity: 1, width: "auto" }}
               exit={{ opacity: 0, width: 0 }}
+              title={hotelName}
               className="text-lg font-bold text-foreground tracking-tight overflow-hidden whitespace-nowrap"
             >
-              GoStay
+              {hotelName}
             </motion.span>
           )}
         </AnimatePresence>

@@ -7,6 +7,7 @@ import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/hooks/useTenant";
 
 const portalNav = [
   { label: "Home", path: "/portal", icon: Search },
@@ -19,6 +20,7 @@ export default function PortalLayout() {
   const { pathname } = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
   const { session, user, signOut } = useAuth();
+  const { name: hotelName, initial: hotelInitial } = useTenant();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -26,9 +28,9 @@ export default function PortalLayout() {
       <header className="bg-card border-b border-border px-4 md:px-8 py-3 md:py-4 flex items-center justify-between sticky top-0 z-30 backdrop-blur-sm bg-card/95">
         <Link to="/portal" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">B</span>
+            <span className="text-primary-foreground font-bold text-sm">{hotelInitial}</span>
           </div>
-          <span className="text-lg font-bold text-foreground tracking-tight">GoStay</span>
+          <span className="text-lg font-bold text-foreground tracking-tight">{hotelName}</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
@@ -144,9 +146,9 @@ export default function PortalLayout() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xs">B</span>
+                <span className="text-primary-foreground font-bold text-xs">{hotelInitial}</span>
               </div>
-              <span className="font-bold text-foreground">GoStay</span>
+              <span className="font-bold text-foreground">{hotelName}</span>
             </div>
             <p className="text-sm text-muted-foreground">Your perfect stay awaits. Book directly for the best rates and exclusive perks.</p>
           </div>
@@ -176,7 +178,7 @@ export default function PortalLayout() {
           </div>
         </div>
         <div className="max-w-6xl mx-auto mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
-          &copy; 2026 GoStay Hotel. All rights reserved.
+          &copy; 2026 {hotelName}. All rights reserved.
         </div>
       </footer>
 
