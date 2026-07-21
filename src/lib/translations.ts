@@ -169,4 +169,16 @@ export const ID: Record<string, string> = {
   "No rooms configured yet.": "Belum ada kamar.",
   "No bookings in this period.": "Tidak ada booking di periode ini.",
   "All Status": "Semua Status",
+  "Reservations": "Reservasi",
+  "Booking ID": "ID Booking",
+  "Guest Name": "Nama Tamu",
+  "Room Type": "Tipe Kamar",
+  "Room Number": "Nomor Kamar",
+  "Duration": "Durasi",
+  "Check-In & Check-Out": "Check-In & Check-Out",
+  "Status": "Status",
+  "Search guest, ref, room": "Cari tamu, ref, kamar",
+  "Room": "Kamar",
+  "nights": "malam",
+
 };
