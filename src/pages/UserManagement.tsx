@@ -101,7 +101,7 @@ export default function UserManagement() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("User Management")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Kelola tim (admin &amp; staff) · {isLoading ? "Loading…" : `${team.length} anggota`}
+            {t("Kelola tim (admin & staff)")} · {isLoading ? "Loading…" : `${team.length} {t("anggota")}`}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("Tamu ada di CRM Tamu.")}</p>
         </div>
@@ -223,7 +223,7 @@ export default function UserManagement() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
                             <span className={cn("w-2 h-2 rounded-full", u.is_active ? "bg-success" : "bg-muted-foreground")} />
-                            <span className="text-sm text-muted-foreground">{u.is_active ? "Active" : "Inactive"}</span>
+                            <span className="text-sm text-muted-foreground">{u.is_active ? t("Active") : t("Inactive")}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{formatLastSeen(u.last_seen_at)}</td>
@@ -234,7 +234,7 @@ export default function UserManagement() {
                               disabled={setActive.isPending}
                               className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                             >
-                              {u.is_active ? "Deactivate" : "Reactivate"}
+                              {u.is_active ? t("Deactivate") : t("Reactivate")}
                             </button>
                           )}
                         </td>
@@ -269,7 +269,7 @@ export default function UserManagement() {
                     <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
                       <span className="flex items-center gap-1">
                         <span className={cn("w-2 h-2 rounded-full", u.is_active ? "bg-success" : "bg-muted-foreground")} />
-                        {u.is_active ? "Active" : "Inactive"}
+                        {u.is_active ? t("Active") : t("Inactive")}
                       </span>
                       <span>{formatLastSeen(u.last_seen_at)}</span>
                     </div>
@@ -291,7 +291,7 @@ export default function UserManagement() {
                           disabled={setActive.isPending}
                           className="text-xs font-medium px-3 py-2 rounded-lg border border-border text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                         >
-                          {u.is_active ? "Deactivate" : "Reactivate"}
+                          {u.is_active ? t("Deactivate") : t("Reactivate")}
                         </button>
                       </div>
                     )}

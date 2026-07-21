@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, Loader2, ConciergeBell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
@@ -51,6 +52,7 @@ const guestRequestKeys = {
 };
 
 export default function GuestRequests() {
+  const t = useT();
   const [activeStatus, setActiveStatus] = useState<"all" | GuestRequestStatus>("all");
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -146,17 +148,17 @@ export default function GuestRequests() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-              <ConciergeBell className="w-6 h-6 text-primary" /> Permintaan Tamu
+              <ConciergeBell className="w-6 h-6 text-primary" /> {t("Permintaan Tamu")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {isLoading ? "Memuat…" : `${requests.length} permintaan`}
+              {isLoading ? t("Memuat…") : `${requests.length} ${t("permintaan")}`}
             </p>
           </div>
           <button
             onClick={() => setShowForm((v) => !v)}
             className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 self-start"
           >
-            <Plus className="w-4 h-4" /> Permintaan Baru
+            <Plus className="w-4 h-4" /> {t("Permintaan Baru")}
           </button>
         </div>
 
@@ -168,35 +170,35 @@ export default function GuestRequests() {
             className="bg-card rounded-xl border border-border p-4 md:p-5 space-y-4"
           >
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Judul</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("Judul")}</label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Contoh: Minta handuk tambahan"
+                placeholder={t("Contoh: Minta handuk tambahan")}
                 className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Deskripsi</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("Deskripsi")}</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                placeholder="Detail permintaan…"
+                placeholder={t("Detail permintaan…")}
                 className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary resize-none"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Prioritas</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("Prioritas")}</label>
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value as GuestRequestPriority)}
                   className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
                 >
-                  <option value="low">Rendah</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">Tinggi</option>
+                  <option value="low">{t("Rendah")}</option>
+                  <option value="normal">{t("Normal")}</option>
+                  <option value="high">{t("Tinggi")}</option>
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -206,7 +208,7 @@ export default function GuestRequests() {
                 <input
                   value={roomNumber}
                   onChange={(e) => setRoomNumber(e.target.value)}
-                  placeholder="Contoh: 101"
+                  placeholder={t("Contoh: 101")}
                   className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
@@ -243,7 +245,7 @@ export default function GuestRequests() {
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           ))}
         </div>
@@ -262,7 +264,7 @@ export default function GuestRequests() {
           </div>
         ) : requests.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-sm text-muted-foreground">Belum ada permintaan.</p>
+            <p className="text-sm text-muted-foreground">{t("Belum ada permintaan.")}</p>
           </div>
         ) : (
           <motion.div
@@ -287,7 +289,7 @@ export default function GuestRequests() {
                           priorityConfig[req.priority].cls
                         )}
                       >
-                        {priorityConfig[req.priority].label}
+                        {t(priorityConfig[req.priority].label)}
                       </span>
                       <span
                         className={cn(
@@ -295,7 +297,7 @@ export default function GuestRequests() {
                           statusConfig[req.status].cls
                         )}
                       >
-                        {statusConfig[req.status].label}
+                        {t(statusConfig[req.status].label)}
                       </span>
                     </div>
                     {(req.customers?.full_name || req.rooms?.number) && (
@@ -328,7 +330,7 @@ export default function GuestRequests() {
                             : "border-primary/40 text-primary hover:bg-primary/10"
                         )}
                       >
-                        {action.label}
+                        {t(action.label)}
                       </button>
                     ))}
                   </div>

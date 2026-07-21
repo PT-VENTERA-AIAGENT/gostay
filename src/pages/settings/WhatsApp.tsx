@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MessageCircle, QrCode, CheckCircle2, AlertTriangle, Smartphone } from "lucide-react";
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,7 @@ interface ConnectResponse {
 }
 
 export default function WhatsApp() {
+  const t = useT();
   const { session } = useAuth();
   const { toast } = useToast();
   const token = session?.supabase_token ?? null;
@@ -172,7 +174,7 @@ export default function WhatsApp() {
             <MessageCircle className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Sambungkan WhatsApp</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Sambungkan WhatsApp")}</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               Tautkan nomor WhatsApp hotel agar tamu bisa memesan lewat chat.
             </p>
@@ -218,7 +220,7 @@ function EmptyState({ onConnect, busy }: { onConnect: () => void; busy: boolean 
       <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
         <Smartphone className="w-8 h-8 text-primary" />
       </div>
-      <h2 className="text-lg font-semibold text-foreground">Sambungkan WhatsApp</h2>
+      <h2 className="text-lg font-semibold text-foreground">{t("Sambungkan WhatsApp")}</h2>
       <p className="text-sm text-muted-foreground mt-2 max-w-sm leading-relaxed">
         Tautkan nomor WhatsApp hotel Anda agar tamu bisa mengecek kamar dan melakukan pemesanan langsung
         lewat percakapan WhatsApp.
@@ -254,7 +256,7 @@ function QrState({ qr }: { qr?: string }) {
       <p className="text-sm text-muted-foreground mt-5 max-w-sm leading-relaxed">
         Buka WhatsApp di HP → Setelan → Perangkat Tertaut → Tautkan Perangkat, lalu scan QR ini.
       </p>
-      <p className="text-xs text-muted-foreground mt-2">QR berganti otomatis.</p>
+      <p className="text-xs text-muted-foreground mt-2">{t("QR berganti otomatis.")}</p>
     </div>
   );
 }

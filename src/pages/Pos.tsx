@@ -4,6 +4,7 @@ import {
   Store, Package, X, Check, Receipt, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { motion, AnimatePresence } from "framer-motion";
 import PageTransition, { staggerItem } from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,6 +34,7 @@ interface CartLine extends PosOrderItem {
 type Mode = "walkin" | "folio";
 
 export default function Pos() {
+  const t = useT();
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -104,7 +106,7 @@ export default function Pos() {
         { items, subtotal, payment_method: method, guest_name: guestName.trim() || null, created_by: user?.id ?? null },
         {
           onSuccess: () => {
-            toast({ title: `Terjual — ${formatIDR(subtotal)} (${METHOD_LABELS[method]})` });
+            toast({ title: `Terjual — ${formatIDR(subtotal)} (${t(METHOD_LABELS[method])})` });
             resetAfterSale();
           },
           onError: (e) => toast({ title: "Gagal menyimpan penjualan", description: (e as Error).message, variant: "destructive" }),
@@ -125,8 +127,8 @@ export default function Pos() {
         },
         {
           onSuccess: () => {
-            const t = folioTargets.find((x) => x.id === targetBooking);
-            toast({ title: `Ditagihkan ke folio ${t?.reference ?? ""} — ${formatIDR(subtotal)}` });
+            const target = folioTargets.find((x) => x.id === targetBooking);
+            toast({ title: `Ditagihkan ke folio ${target?.reference ?? ""} — ${formatIDR(subtotal)}` });
             resetAfterSale();
           },
           onError: (e) => toast({ title: "Gagal menagih ke folio", description: (e as Error).message, variant: "destructive" }),
@@ -141,10 +143,10 @@ export default function Pos() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-              <Store className="w-6 h-6 text-primary" /> Kasir (POS)
+              <Store className="w-6 h-6 text-primary" /> {t("Kasir (POS)")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Jual item outlet — bayar langsung atau tagihkan ke folio kamar.
+              {t("Jual item outlet — bayar langsung atau tagihkan ke folio kamar.")}
             </p>
           </div>
           <div className="flex items-center gap-2 self-start">
@@ -152,13 +154,13 @@ export default function Pos() {
               onClick={() => setShowRecap(true)}
               className="flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
             >
-              <Receipt className="w-4 h-4" /> Rekap hari ini
+              <Receipt className="w-4 h-4" /> {t("Rekap hari ini")}
             </button>
             <button
               onClick={() => setShowProductForm(true)}
               className="flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
             >
-              <Package className="w-4 h-4" /> Kelola produk
+              <Package className="w-4 h-4" /> {t("Kelola produk")}
             </button>
           </div>
         </div>
@@ -176,7 +178,7 @@ export default function Pos() {
                     activeCat === c ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {c === "all" ? "Semua" : CATEGORY_LABELS[c]}
+                  {c === "all" ? t("Semua") : t(CATEGORY_LABELS[c])}
                 </button>
               ))}
             </div>
@@ -187,7 +189,7 @@ export default function Pos() {
               </div>
             ) : shownProducts.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-sm text-muted-foreground">Belum ada produk. Klik “Kelola produk” untuk menambah.</p>
+                <p className="text-sm text-muted-foreground">{t("Belum ada produk. Klik Kelola produk untuk menambah.")}</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -209,14 +211,14 @@ export default function Pos() {
           {/* ─── Cart / checkout ───────────────────────────────────── */}
           <div className="bg-card rounded-xl border border-border p-4 h-fit lg:sticky lg:top-4">
             <h2 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-              <ShoppingCart className="w-4 h-4" /> Keranjang
+              <ShoppingCart className="w-4 h-4" /> {t("Keranjang")}
               {cart.length > 0 && (
                 <span className="text-xs font-medium text-muted-foreground">({cart.length})</span>
               )}
             </h2>
 
             {cart.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">Ketuk produk untuk menambah.</p>
+              <p className="text-sm text-muted-foreground py-6 text-center">{t("Ketuk produk untuk menambah.")}</p>
             ) : (
               <div className="space-y-2 max-h-72 overflow-y-auto">
                 {cart.map((l) => (
@@ -243,7 +245,7 @@ export default function Pos() {
             )}
 
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-border">
-              <span className="text-sm text-muted-foreground">Subtotal</span>
+              <span className="text-sm text-muted-foreground">{t("Subtotal")}</span>
               <span className="text-lg font-bold text-foreground">{formatIDR(subtotal)}</span>
             </div>
 
@@ -256,7 +258,7 @@ export default function Pos() {
                   mode === "walkin" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >
-                <CreditCard className="w-4 h-4" /> Bayar langsung
+                <CreditCard className="w-4 h-4" /> {t("Bayar langsung")}
               </button>
               <button
                 onClick={() => setMode("folio")}
@@ -265,7 +267,7 @@ export default function Pos() {
                   mode === "folio" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >
-                <BedDouble className="w-4 h-4" /> Ke folio
+                <BedDouble className="w-4 h-4" /> {t("Ke folio")}
               </button>
             </div>
 
@@ -283,7 +285,7 @@ export default function Pos() {
                 <input
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="Nama tamu (opsional)"
+                  placeholder={t("Nama tamu (opsional)")}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
@@ -294,7 +296,7 @@ export default function Pos() {
                   onChange={(e) => setTargetBooking(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
-                  <option value="">Pilih booking / kamar…</option>
+                  <option value="">{t("Pilih booking / kamar…")}</option>
                   {folioTargets.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.roomNumber ? `Kamar ${t.roomNumber} · ` : ""}{t.guestName} · {t.reference}
@@ -302,7 +304,7 @@ export default function Pos() {
                   ))}
                 </select>
                 {folioTargets.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1.5">Tidak ada tamu yang sedang menginap.</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">{t("Tidak ada tamu yang sedang menginap.")}</p>
                 )}
               </div>
             )}
@@ -332,6 +334,7 @@ export default function Pos() {
 // ─── Daily recap / cashier close ────────────────────────────────────────────────
 
 function DailyRecap({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const { data: orders = [], isLoading } = useTodayOrders();
 
   const total = orders.reduce((s, o) => s + Number(o.subtotal), 0);
@@ -368,15 +371,15 @@ function DailyRecap({ onClose }: { onClose: () => void }) {
         ) : (
           <div className="p-4 space-y-4 overflow-y-auto">
             <div className="rounded-xl border border-border bg-muted/40 p-4 text-center">
-              <p className="text-xs text-muted-foreground">Total penjualan langsung hari ini</p>
+              <p className="text-xs text-muted-foreground">{t("Total penjualan langsung hari ini")}</p>
               <p className="text-2xl font-bold text-foreground mt-1">{formatIDR(total)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{orders.length} transaksi</p>
             </div>
 
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Per metode bayar</p>
+              <p className="text-xs font-medium text-muted-foreground mb-2">{t("Per metode bayar")}</p>
               {Object.keys(byMethod).length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-3">Belum ada penjualan hari ini.</p>
+                <p className="text-sm text-muted-foreground text-center py-3">{t("Belum ada penjualan hari ini.")}</p>
               ) : (
                 <div className="space-y-1.5">
                   {(Object.keys(byMethod) as PaymentMethod[]).map((m) => (
@@ -402,6 +405,7 @@ function DailyRecap({ onClose }: { onClose: () => void }) {
 // ─── Product manager (full CRUD: add, edit, activate/deactivate, delete) ────────
 
 function ProductManager({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const { toast } = useToast();
   // The manager lists ALL products, including deactivated ones, so staff can
   // re-activate or delete them — the cashier grid still shows only active items.
@@ -476,50 +480,50 @@ function ProductManager({ onClose }: { onClose: () => void }) {
         className="bg-card rounded-xl border border-border w-full max-w-lg max-h-[85vh] flex flex-col"
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="font-semibold text-foreground flex items-center gap-2"><Package className="w-4 h-4" /> Kelola produk</h2>
+          <h2 className="font-semibold text-foreground flex items-center gap-2"><Package className="w-4 h-4" /> {t("Kelola produk")}</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Tutup"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-4 space-y-2 border-b border-border">
-          <input className={inputCls} placeholder="Nama produk (mis. Cappuccino)" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className={inputCls} placeholder={t("Nama produk (mis. Cappuccino)")} value={name} onChange={(e) => setName(e.target.value)} />
           <div className="grid grid-cols-2 gap-2">
             <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value as PosCategory)}>
               {(Object.keys(CATEGORY_LABELS) as PosCategory[]).map((k) => (
                 <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
               ))}
             </select>
-            <input className={inputCls} type="number" min="0" step="1000" placeholder="Harga (Rp)" value={price} onChange={(e) => setPrice(e.target.value)} />
+            <input className={inputCls} type="number" min="0" step="1000" placeholder={t("Harga (Rp)")} value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
           <button
             onClick={handleCreate}
             disabled={createProduct.isPending}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
           >
-            {createProduct.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Tambah produk
+            {createProduct.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} {t("Tambah produk")}
           </button>
         </div>
 
         <div className="p-4 overflow-y-auto space-y-1.5">
           {products.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Belum ada produk.</p>
+            <p className="text-sm text-muted-foreground text-center py-4">{t("Belum ada produk.")}</p>
           ) : (
             products.map((p) =>
               editId === p.id ? (
                 <div key={p.id} className="space-y-2 p-2 rounded-lg bg-muted/50 border border-border">
-                  <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nama produk" />
+                  <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t("Nama produk")} />
                   <div className="grid grid-cols-2 gap-2">
                     <select className={inputCls} value={editCategory} onChange={(e) => setEditCategory(e.target.value as PosCategory)}>
                       {(Object.keys(CATEGORY_LABELS) as PosCategory[]).map((k) => (
                         <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
                       ))}
                     </select>
-                    <input className={inputCls} type="number" min="0" step="1000" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} placeholder="Harga (Rp)" />
+                    <input className={inputCls} type="number" min="0" step="1000" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} placeholder={t("Harga (Rp)")} />
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => saveEdit(p.id)} disabled={updateProduct.isPending} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-60">
                       {updateProduct.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Simpan
                     </button>
-                    <button onClick={() => setEditId(null)} className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted">Batal</button>
+                    <button onClick={() => setEditId(null)} className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted">{t("Batal")}</button>
                   </div>
                 </div>
               ) : (
