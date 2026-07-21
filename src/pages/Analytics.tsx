@@ -1,6 +1,7 @@
 import { TrendingUp, TrendingDown, BedDouble, DollarSign, Download, LogIn, LogOut, MessageSquare, Phone, Flag, FileText, CalendarRange, Loader2 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart } from "recharts";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { exportCSV, exportPDF } from "@/components/analytics/ExportUtils";
@@ -63,10 +64,11 @@ function AnimatedKPI({ value, format }: { value: number; format: (n: number) => 
 }
 
 function KpiCard({ kpi }: { kpi: KPI }) {
+  const t = useT();
   return (
     <motion.div variants={staggerItem} whileHover={{ scale: 1.02, y: -2 }} className="bg-card rounded-xl border border-border p-3 md:p-4 card-hover">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-muted-foreground">{kpi.label}</span>
+        <span className="text-xs text-muted-foreground">{t(kpi.label)}</span>
         <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
           <kpi.icon className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
@@ -119,6 +121,7 @@ function MovementList({ rows, empty }: { rows: MovementRow[]; empty: string }) {
 }
 
 export default function Analytics() {
+  const t = useT();
   const [rangeKey, setRangeKey] = useState("30d");
   const rangeDays = RANGES[rangeKey].days;
   const { data, isLoading, error } = useAnalytics(rangeDays);
@@ -207,7 +210,7 @@ export default function Analytics() {
                 className="bg-transparent font-medium text-foreground focus:outline-none cursor-pointer"
               >
                 {Object.entries(RANGES).map(([key, r]) => (
-                  <option key={key} value={key}>{r.label}</option>
+                  <option key={key} value={key}>{t(r.label)}</option>
                 ))}
               </select>
             </div>
@@ -221,12 +224,12 @@ export default function Analytics() {
         </div>
 
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
-          {kpis.map((kpi) => <KpiCard key={kpi.label} kpi={kpi} />)}
+          {kpis.map((kpi) => <KpiCard key={t(kpi.label)} kpi={kpi} />)}
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <motion.div variants={staggerItem} initial="hidden" animate="show" className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">Occupancy Trend</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("Occupancy Trend")}</h2>
             <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={occupancyChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(45, 15%, 88%)" />
@@ -239,9 +242,9 @@ export default function Analytics() {
           </motion.div>
 
           <motion.div variants={staggerItem} initial="hidden" animate="show" className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">Revenue by Room Type</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("Revenue by Room Type")}</h2>
             {roomTypeChart.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-20 text-center">No revenue in this range.</p>
+              <p className="text-xs text-muted-foreground py-20 text-center">{t("No revenue in this range.")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
@@ -258,25 +261,25 @@ export default function Analytics() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 print:break-before-page">
           <div className="lg:col-span-2 bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">Monthly Revenue &amp; Bookings</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("Monthly Revenue & Bookings")}</h2>
             <ResponsiveContainer width="100%" height={250}>
               <ComposedChart data={data.monthlyRevenue}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(45, 15%, 88%)" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(220, 10%, 46%)" />
                 <YAxis yAxisId="left" tick={{ fontSize: 12 }} stroke="hsl(220, 10%, 46%)" tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}M`} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} stroke="hsl(220, 10%, 46%)" allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name) => (name === "Revenue" ? formatIDR(v) : v)} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name) => ((name === "Revenue" || name === t("Revenue")) ? formatIDR(v) : v)} />
                 <Legend />
-                <Bar yAxisId="left" dataKey="revenue" fill="hsl(72, 45%, 45%)" radius={[4, 4, 0, 0]} name="Revenue" animationDuration={1000} />
-                <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="hsl(210, 60%, 50%)" strokeWidth={2} name="Bookings" dot={{ r: 3 }} />
+                <Bar yAxisId="left" dataKey="revenue" fill="hsl(72, 45%, 45%)" radius={[4, 4, 0, 0]} name={t("Revenue")} animationDuration={1000} />
+                <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="hsl(210, 60%, 50%)" strokeWidth={2} name={t("Bookings")} dot={{ r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">Booking Source</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("Booking Source")}</h2>
             {sourceChart.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-20 text-center">No bookings in this range.</p>
+              <p className="text-xs text-muted-foreground py-20 text-center">{t("No bookings in this range.")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
@@ -293,9 +296,9 @@ export default function Analytics() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">Guest Demographics</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("Guest Demographics")}</h2>
             {data.demographics.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-16 text-center">No guests in this range.</p>
+              <p className="text-xs text-muted-foreground py-16 text-center">{t("No guests in this range.")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={data.demographics} layout="vertical">
@@ -303,29 +306,29 @@ export default function Analytics() {
                   <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" allowDecimals={false} />
                   <YAxis dataKey="country" type="category" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" width={80} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="guests" fill="hsl(72, 45%, 45%)" radius={[0, 4, 4, 0]} name="Bookings" animationDuration={1000} />
+                  <Bar dataKey="guests" fill="hsl(72, 45%, 45%)" radius={[0, 4, 4, 0]} name={t("Bookings")} animationDuration={1000} />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">ADR Trend (Weekly)</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("ADR Trend (Weekly)")}</h2>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={data.adrTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(45, 15%, 88%)" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" minTickGap={16} />
                 <YAxis tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" tickFormatter={(v) => `${(v / 1_000_000).toFixed(1)}M`} />
                 <Tooltip formatter={(v: number) => formatIDR(v)} contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="adr" stroke="hsl(210, 60%, 50%)" strokeWidth={2} dot={{ r: 3 }} name="ADR" animationDuration={1000} />
+                <Line type="monotone" dataKey="adr" stroke="hsl(210, 60%, 50%)" strokeWidth={2} dot={{ r: 3 }} name={t("ADR")} animationDuration={1000} />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">Channel Performance</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("Channel Performance")}</h2>
             {sourceChart.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-16 text-center">No bookings in this range.</p>
+              <p className="text-xs text-muted-foreground py-16 text-center">{t("No bookings in this range.")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={sourceChart}>
@@ -333,10 +336,10 @@ export default function Analytics() {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" />
                   <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}M`} />
                   <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name) => (name === "Revenue" ? formatIDR(v) : v)} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name) => ((name === "Revenue" || name === t("Revenue")) ? formatIDR(v) : v)} />
                   <Legend />
-                  <Bar yAxisId="left" dataKey="revenue" fill="hsl(72, 45%, 45%)" radius={[4, 4, 0, 0]} name="Revenue" animationDuration={1000} />
-                  <Bar yAxisId="right" dataKey="count" fill="hsl(210, 60%, 50%)" radius={[4, 4, 0, 0]} name="Bookings" animationDuration={1000} />
+                  <Bar yAxisId="left" dataKey="revenue" fill="hsl(72, 45%, 45%)" radius={[4, 4, 0, 0]} name={t("Revenue")} animationDuration={1000} />
+                  <Bar yAxisId="right" dataKey="count" fill="hsl(210, 60%, 50%)" radius={[4, 4, 0, 0]} name={t("Bookings")} animationDuration={1000} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -345,7 +348,7 @@ export default function Analytics() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">Weekly Pattern</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("Weekly Pattern")}</h2>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={data.weekdayTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(45, 15%, 88%)" />
@@ -353,22 +356,22 @@ export default function Analytics() {
                 <YAxis tick={{ fontSize: 12 }} stroke="hsl(220, 10%, 46%)" allowDecimals={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend />
-                <Line type="monotone" dataKey="arrivals" stroke="hsl(145, 63%, 42%)" strokeWidth={2} name="Arrivals" animationDuration={1000} />
-                <Line type="monotone" dataKey="departures" stroke="hsl(0, 72%, 51%)" strokeWidth={2} name="Departures" animationDuration={1000} />
+                <Line type="monotone" dataKey="arrivals" stroke="hsl(145, 63%, 42%)" strokeWidth={2} name={t("Arrivals")} animationDuration={1000} />
+                <Line type="monotone" dataKey="departures" stroke="hsl(0, 72%, 51%)" strokeWidth={2} name={t("Departures")} animationDuration={1000} />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
             <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><LogIn className="w-4 h-4" /> Today's Arrivals</h2>
-            <MovementList rows={data.arrivalsToday} empty="No arrivals today." />
+            <MovementList rows={data.arrivalsToday} empty={t("No arrivals today.")} />
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
             <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><LogOut className="w-4 h-4" /> Today's Departures</h2>
-            <MovementList rows={data.departuresToday} empty="No departures today." />
+            <MovementList rows={data.departuresToday} empty={t("No departures today.")} />
             <div className="mt-4 pt-4 border-t border-border space-y-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Quick Stats</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("Quick Stats")}</h3>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Unread Chats</span>
                 <span className="font-semibold text-foreground tabular-nums">{quickStats.unreadChats}</span>

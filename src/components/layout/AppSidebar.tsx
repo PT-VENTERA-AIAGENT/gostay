@@ -28,7 +28,7 @@ const navItems = [
 const bottomItems = [
   { icon: Contact, label: "CRM Tamu", path: "/crm" },
   { icon: Building2, label: "Profil Hotel", path: "/settings/hotel" },
-  { icon: MessageCircle, label: "Sambungkan WhatsApp", path: "/settings/whatsapp" },
+  { icon: MessageCircle, label: "WhatsApp", path: "/settings/whatsapp" },
   { icon: Users, label: "Manajemen Pengguna", path: "/users" },
   { icon: Star, label: "Ulasan", path: "/reviews" },
 ];

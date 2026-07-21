@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { Link } from "react-router-dom";
 import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
@@ -50,6 +51,7 @@ const housekeepingConfig: Record<HousekeepingStatus, { label: string; badgeClass
 };
 
 function HousekeepingBadge({ room }: { room: Room }) {
+  const t = useT();
   const qc = useQueryClient();
   const { toast } = useToast();
   // `housekeeping_status` is migrated but not yet in the Room type — read it via cast.
@@ -78,17 +80,17 @@ function HousekeepingBadge({ room }: { room: Room }) {
           )}
         >
           <span className={cn("w-1.5 h-1.5 rounded-full", config.dotClass)} />
-          {config.label}
+          {t(config.label)}
           <ChevronDown className="w-3 h-3 opacity-70" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuLabel>Housekeeping</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("Housekeeping")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={current} onValueChange={(v) => mutation.mutate(v as HousekeepingStatus)}>
           {HOUSEKEEPING_ORDER.map((status) => (
             <DropdownMenuRadioItem key={status} value={status}>
               <span className={cn("w-2 h-2 rounded-full mr-2", housekeepingConfig[status].dotClass)} />
-              {housekeepingConfig[status].label}
+              {t(housekeepingConfig[status].label)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -103,6 +105,7 @@ function AnimatedCount({ value }: { value: number }) {
 }
 
 export default function Rooms() {
+  const t = useT();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState("All");
@@ -165,7 +168,7 @@ export default function Rooms() {
   if (error) {
     return (
       <PageTransition>
-        <div className="p-6 text-center text-sm text-destructive">Failed to load rooms. Please try again.</div>
+        <div className="p-6 text-center text-sm text-destructive">{t("Failed to load rooms. Please try again.")}</div>
       </PageTransition>
     );
   }
@@ -175,17 +178,17 @@ export default function Rooms() {
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Room Status Board</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Room Status Board")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {rooms.length} total rooms · {rooms.filter((r) => statusOf(r) === "available").length} available {isToday ? "hari ini" : `pada ${new Date(date + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`}
             </p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <Link to="/rooms/types" className="px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2 btn-press">
-              <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Room Types</span>
+              <Settings className="w-4 h-4" /> <span className="hidden sm:inline">{t("Room Types")}</span>
             </Link>
             <button onClick={openAdd} className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Room</span>
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t("Add Room")}</span>
             </button>
           </div>
         </div>
@@ -198,7 +201,7 @@ export default function Rooms() {
             <DatePicker value={date} onChange={(v) => setDate(v || todayISO())} placeholder="Pilih tanggal" />
           </div>
           {!isToday && (
-            <button onClick={() => setDate(todayISO())} className="text-sm text-primary font-medium hover:underline">Hari ini</button>
+            <button onClick={() => setDate(todayISO())} className="text-sm text-primary font-medium hover:underline">{t("Hari ini")}</button>
           )}
         </div>
 
@@ -217,7 +220,7 @@ export default function Rooms() {
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className={cn("w-2.5 h-2.5 rounded-full", config.dotClass)} />
-                  <span className="text-xs font-medium text-muted-foreground">{config.label}</span>
+                  <span className="text-xs font-medium text-muted-foreground">{t(config.label)}</span>
                 </div>
                 <p className="text-xl md:text-2xl font-bold text-foreground tabular-nums"><AnimatedCount value={count} /></p>
               </motion.button>
@@ -232,7 +235,7 @@ export default function Rooms() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 w-full sm:w-64 md:w-72 shrink-0 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background transition-shadow">
             <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search room number..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full min-w-0" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search room number...")} className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full min-w-0" />
           </div>
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1 flex-1 min-w-0 overflow-x-auto">
             {roomTypeFilters.map((t) => (
@@ -265,7 +268,7 @@ export default function Rooms() {
                     </div>
                     <p className="text-xs text-muted-foreground mb-1">{room.room_types?.name}</p>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full", config.colorClass)}>{config.label}</span>
+                      <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full", config.colorClass)}>{t(config.label)}</span>
                       <HousekeepingBadge room={room} />
                     </div>
                   </motion.div>
@@ -278,9 +281,9 @@ export default function Rooms() {
         {floors.length === 0 && (
           <div className="text-center py-16">
             <DoorOpen className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm font-medium text-foreground mb-1">No rooms match your filters</p>
-            <p className="text-xs text-muted-foreground mb-4">Try adjusting your search or filter criteria</p>
-            <button onClick={() => { setSearch(""); setStatusFilter("all"); setTypeFilter("All"); }} className="text-sm text-primary font-medium hover:underline">Clear filters</button>
+            <p className="text-sm font-medium text-foreground mb-1">{t("No rooms match your filters")}</p>
+            <p className="text-xs text-muted-foreground mb-4">{t("Try adjusting your search or filter criteria")}</p>
+            <button onClick={() => { setSearch(""); setStatusFilter("all"); setTypeFilter("All"); }} className="text-sm text-primary font-medium hover:underline">{t("Clear filters")}</button>
           </div>
         )}
 

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -67,6 +68,7 @@ function parseDateOnly(s: string): Date {
 }
 
 export default function BookingCalendar() {
+  const t = useT();
   // Opens on the current week rather than a pinned date: this was `new Date(2026, 3, 1)`
   // with a matching `const today = new Date(2026, 3, 5) // Mock today`, so the
   // grid always showed April 2026 no matter when it was opened.
@@ -122,8 +124,8 @@ export default function BookingCalendar() {
   if (sortedRooms.length === 0) {
     return (
       <div className="bg-card rounded-xl border border-border p-12 text-center">
-        <p className="text-sm font-medium text-foreground mb-1">No rooms yet</p>
-        <p className="text-xs text-muted-foreground">Add rooms before the calendar can show anything.</p>
+        <p className="text-sm font-medium text-foreground mb-1">{t("No rooms yet")}</p>
+        <p className="text-xs text-muted-foreground">{t("Add rooms before the calendar can show anything.")}</p>
       </div>
     );
   }
@@ -164,7 +166,7 @@ export default function BookingCalendar() {
         <div className="min-w-max">
           <div className="flex border-b border-border">
             <div className="w-[120px] shrink-0 px-3 py-2 bg-muted/50 border-r border-border">
-              <span className="text-xs font-medium text-muted-foreground">Room</span>
+              <span className="text-xs font-medium text-muted-foreground">{t("Room")}</span>
             </div>
             {dates.map((d) => {
               const isToday = formatDate(d) === formatDate(today);

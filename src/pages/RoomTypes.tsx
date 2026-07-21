@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { Link } from "react-router-dom";
 import { Plus, Search, Filter, Wifi, Wind, Tv, Coffee, Bath, Mountain, Loader2, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
@@ -17,6 +18,7 @@ function formatIDR(n: number) {
 }
 
 export default function RoomTypes() {
+  const t = useT();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RoomType | null>(null);
@@ -46,7 +48,7 @@ export default function RoomTypes() {
   if (error) {
     return (
       <PageTransition>
-        <div className="p-6 text-center text-sm text-destructive">Failed to load room types.</div>
+        <div className="p-6 text-center text-sm text-destructive">{t("Failed to load room types.")}</div>
       </PageTransition>
     );
   }
@@ -56,7 +58,7 @@ export default function RoomTypes() {
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Room Types</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Room Types")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{roomTypes.length} room types configured</p>
           </div>
           <button onClick={openAdd} className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press self-start">
@@ -67,7 +69,7 @@ export default function RoomTypes() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 w-full sm:max-w-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background transition-shadow">
             <Search className="w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search room types..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search room types...")} className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
           </div>
           <button className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors btn-press">
             <Filter className="w-4 h-4" /> Filter
@@ -89,13 +91,13 @@ export default function RoomTypes() {
                   {type.photos[0] ? (
                     <img src={type.photos[0]} alt={type.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">No photo</div>
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">{t("No photo")}</div>
                   )}
                 </div>
                 <div className="flex items-start justify-between mb-2 gap-2">
                   <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{type.name}</h3>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {!type.is_active && <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Nonaktif</span>}
+                    {!type.is_active && <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{t("Nonaktif")}</span>}
                     <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Max {type.max_occupancy}</span>
                     <button
                       onClick={(e) => openEdit(e, type)}
@@ -126,7 +128,7 @@ export default function RoomTypes() {
             </motion.div>
           ))}
           {filtered.length === 0 && (
-            <div className="col-span-full text-center py-12 text-sm text-muted-foreground">No room types found.</div>
+            <div className="col-span-full text-center py-12 text-sm text-muted-foreground">{t("No room types found.")}</div>
           )}
         </motion.div>
 

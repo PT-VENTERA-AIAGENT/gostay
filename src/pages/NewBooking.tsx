@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, User, Calendar, MapPin, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 import { useMemo, useState } from "react";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import DatePicker from "@/components/shared/DatePicker";
@@ -21,6 +22,7 @@ function nightsBetween(a: string, b: string) {
 }
 
 export default function NewBooking() {
+  const t = useT();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -134,8 +136,8 @@ export default function NewBooking() {
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">New Booking</h1>
-            <p className="text-sm text-muted-foreground">Create a reservation for a walk-in or phone guest</p>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("New Booking")}</h1>
+            <p className="text-sm text-muted-foreground">{t("Create a reservation for a walk-in or phone guest")}</p>
           </div>
         </div>
 
@@ -186,22 +188,22 @@ export default function NewBooking() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Full Name</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Full Name")}</label>
                   <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={Boolean(linkedCustomer)}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/50 disabled:text-muted-foreground" placeholder="Guest name" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Email</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Email")}</label>
                   <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={Boolean(linkedCustomer)}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/50 disabled:text-muted-foreground" placeholder="guest@email.com" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Phone</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Phone")}</label>
                   <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" placeholder="+62..." />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Nationality</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Nationality")}</label>
                   <input type="text" value={nationality} onChange={(e) => setNationality(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Indonesia" />
                 </div>
@@ -212,26 +214,26 @@ export default function NewBooking() {
               <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><Calendar className="w-4 h-4" /> Stay Details</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Check-in Date</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Check-in Date")}</label>
                   <DatePicker value={checkIn} onChange={setCheckIn} placeholder="Pilih check-in" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Check-out Date</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Check-out Date")}</label>
                   <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder="Pilih check-out" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Adults</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Adults")}</label>
                   <input type="number" value={adults} min={1} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Children</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Children")}</label>
                   <input type="number" value={children} min={0} onChange={(e) => setChildren(Math.max(0, Number(e.target.value)))}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
                 </div>
               </div>
               {checkIn && checkOut && nights === 0 && (
-                <p className="text-xs text-destructive mt-2">Check-out must be after check-in.</p>
+                <p className="text-xs text-destructive mt-2">{t("Check-out must be after check-in.")}</p>
               )}
             </motion.div>
 
@@ -252,7 +254,7 @@ export default function NewBooking() {
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Specific Room</label>
                   <select value={roomId} onChange={(e) => setRoomId(e.target.value)} disabled={!datesValid || !roomTypeId}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/50 disabled:text-muted-foreground">
-                    <option value="">Auto-assign</option>
+                    <option value="">{t("Auto-assign")}</option>
                     {roomsForType.map((r) => (
                       <option key={r.id} value={r.id}>Room {r.number} (floor {r.floor})</option>
                     ))}
@@ -264,14 +266,14 @@ export default function NewBooking() {
                         : `${roomsForType.length} room${roomsForType.length !== 1 ? "s" : ""} free`}
                     </p>
                   )}
-                  {!datesValid && <p className="text-xs text-muted-foreground mt-1.5">Pick dates to see what is free.</p>}
+                  {!datesValid && <p className="text-xs text-muted-foreground mt-1.5">{t("Pick dates to see what is free.")}</p>}
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">Source</label>
                   <select value={source} onChange={(e) => setSource(e.target.value as BookingSource)}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="walk_in">Walk-in</option>
-                    <option value="phone">Phone</option>
+                    <option value="phone">{t("Phone")}</option>
                     <option value="staff">Staff</option>
                   </select>
                 </div>
@@ -284,7 +286,7 @@ export default function NewBooking() {
             </motion.div>
 
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4">Internal Notes</h2>
+              <h2 className="font-semibold text-foreground mb-4">{t("Internal Notes")}</h2>
               <textarea rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder="Staff-only notes..." />
             </motion.div>
@@ -292,12 +294,12 @@ export default function NewBooking() {
 
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.35 }}>
             <div className="bg-card rounded-xl border border-border p-4 md:p-5 sticky top-6">
-              <h2 className="font-semibold text-foreground mb-4">Price Summary</h2>
+              <h2 className="font-semibold text-foreground mb-4">{t("Price Summary")}</h2>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between text-muted-foreground"><span>Room type</span><span className="text-foreground">{selectedType?.name ?? "—"}</span></div>
-                <div className="flex justify-between text-muted-foreground"><span>Dates</span><span className="text-foreground">{datesValid ? `${checkIn} → ${checkOut}` : "—"}</span></div>
-                <div className="flex justify-between text-muted-foreground"><span>Nights</span><span className="text-foreground">{nights || "—"}</span></div>
-                <div className="flex justify-between text-muted-foreground"><span>Rate / night</span><span className="text-foreground">{rate ? formatIDR(rate) : "—"}</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>{t("Dates")}</span><span className="text-foreground">{datesValid ? `${checkIn} → ${checkOut}` : "—"}</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>{t("Nights")}</span><span className="text-foreground">{nights || "—"}</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>{t("Rate / night")}</span><span className="text-foreground">{rate ? formatIDR(rate) : "—"}</span></div>
                 <div className="border-t border-border pt-3 flex justify-between font-semibold text-foreground">
                   <span>Total</span><span className="tabular-nums">{total ? formatIDR(total) : "—"}</span>
                 </div>

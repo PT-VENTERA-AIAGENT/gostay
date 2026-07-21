@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { Search, Send, Paperclip, CheckCheck, MoreVertical, Phone, User, ArrowLeft, Loader2, CheckCircle, RotateCcw, Paperclip as PaperclipIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerItem } from "@/components/shared/PageTransition";
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function Chat() {
+  const t = useT();
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [messageText, setMessageText] = useState("");
@@ -104,10 +106,10 @@ export default function Chat() {
         {/* Thread list */}
         <div className={cn("w-full md:w-80 border-r border-border bg-card flex flex-col shrink-0", showChat ? "hidden md:flex" : "flex")}>
           <div className="p-4 border-b border-border">
-            <h2 className="font-semibold text-foreground mb-3">Messages</h2>
+            <h2 className="font-semibold text-foreground mb-3">{t("Messages")}</h2>
             <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
               <Search className="w-4 h-4 text-muted-foreground" />
-              <input value={threadSearch} onChange={(e) => setThreadSearch(e.target.value)} placeholder="Search conversations..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
+              <input value={threadSearch} onChange={(e) => setThreadSearch(e.target.value)} placeholder={t("Search conversations...")} className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -116,7 +118,7 @@ export default function Chat() {
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
             ) : visibleThreads.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-8">{threadSearch ? "Tidak ada yang cocok" : "No conversations yet"}</p>
+              <p className="text-center text-sm text-muted-foreground py-8">{threadSearch ? "Tidak ada yang cocok" : t("No conversations yet")}</p>
             ) : (
               visibleThreads.map((thread, i) => (
                 <motion.button
@@ -134,7 +136,7 @@ export default function Chat() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground truncate pr-4">{thread.last_message?.content ?? "No messages yet"}</p>
+                    <p className="text-xs text-muted-foreground truncate pr-4">{thread.last_message?.content ?? t("No messages yet")}</p>
                     {(thread.unread_count ?? 0) > 0 && (
                       <span className="bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold shrink-0">{thread.unread_count}</span>
                     )}
@@ -241,7 +243,7 @@ export default function Chat() {
                   <input
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
-                    placeholder="Type a message..."
+                    placeholder={t("Type a message...")}
                     className="flex-1 px-3 md:px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                   <button type="submit" disabled={!messageText.trim() || sendMessage.isPending} className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50">
@@ -262,10 +264,10 @@ export default function Chat() {
               <p className="text-xs text-muted-foreground">{selectedThread.customers?.email}</p>
             </div>
             <div className="space-y-3 text-sm">
-              <div><span className="text-muted-foreground text-xs">Status</span><p className="font-medium text-foreground capitalize">{selectedThread.status}</p></div>
+              <div><span className="text-muted-foreground text-xs">{t("Status")}</span><p className="font-medium text-foreground capitalize">{selectedThread.status}</p></div>
             </div>
             <button onClick={toggleThreadStatus} className="w-full mt-4 px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
-              {selectedThread.status === "resolved" ? "Reopen Thread" : "Resolve Thread"}
+              {selectedThread.status === "resolved" ? t("Reopen Thread") : t("Resolve Thread")}
             </button>
           </div>
         )}

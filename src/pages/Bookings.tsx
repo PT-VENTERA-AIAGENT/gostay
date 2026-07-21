@@ -1,6 +1,7 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Search, Filter, Download, Calendar, List, Eye, CalendarPlus, Loader2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
@@ -40,6 +41,7 @@ export default function Bookings() {
   // opened the list and the nav item did nothing.
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const t = useT();
   const view: "list" | "calendar" = searchParams.get("view") === "calendar" ? "calendar" : "list";
   const setView = (v: "list" | "calendar") => {
     const next = new URLSearchParams(searchParams);
@@ -94,7 +96,7 @@ export default function Bookings() {
   if (error) {
     return (
       <PageTransition>
-        <div className="p-6 text-center text-sm text-destructive">Failed to load bookings. Please try again.</div>
+        <div className="p-6 text-center text-sm text-destructive">{t("Failed to load bookings. Please try again.")}</div>
       </PageTransition>
     );
   }
@@ -104,18 +106,18 @@ export default function Bookings() {
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Reservations</h1>
-            <p className="text-sm text-muted-foreground mt-1">{totalCount} total bookings</p>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Reservations")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{totalCount} {t("total bookings")}</p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <button onClick={handleExport} disabled={bookings.length === 0} className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted transition-colors btn-press disabled:opacity-50 disabled:cursor-not-allowed">
-              <Download className="w-4 h-4" /> <span className="hidden md:inline">Export CSV</span>
+              <Download className="w-4 h-4" /> <span className="hidden md:inline">{t("Export CSV")}</span>
             </button>
             <button onClick={() => setShowWalkIn(true)} className="border border-primary/40 text-primary bg-primary/5 px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/10 transition-colors flex items-center gap-2 btn-press">
-              <Zap className="w-4 h-4" /> <span className="hidden sm:inline">Walk-in</span>
+              <Zap className="w-4 h-4" /> <span className="hidden sm:inline">{t("Walk-in")}</span>
             </button>
             <Link to="/bookings/new" className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Booking</span>
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t("New Booking")}</span>
             </Link>
           </div>
         </div>
@@ -124,18 +126,18 @@ export default function Bookings() {
           <div className="flex items-center gap-2 md:gap-3 flex-1">
             <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 sm:max-w-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background transition-shadow">
               <Search className="w-4 h-4 text-muted-foreground" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search guest, ref, room..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search guest, ref, room...")} className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
             </div>
             <button onClick={() => setShowFilter((v) => !v)} className={cn("hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border text-sm font-medium transition-colors btn-press", showFilter || dateFrom || dateTo ? "border-primary text-primary bg-primary/5" : "border-border bg-card text-muted-foreground hover:bg-muted")}>
-              <Filter className="w-4 h-4" /> Filter
+              <Filter className="w-4 h-4" /> {t("Filter")}
             </button>
           </div>
           <div className="flex items-center bg-muted rounded-lg p-1 self-start">
             <button onClick={() => setView("list")} className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 btn-press", view === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
-              <List className="w-4 h-4" /> List
+              <List className="w-4 h-4" /> {t("List")}
             </button>
             <button onClick={() => setView("calendar")} className={cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 btn-press", view === "calendar" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}>
-              <Calendar className="w-4 h-4" /> Calendar
+              <Calendar className="w-4 h-4" /> {t("Calendar")}
             </button>
           </div>
         </div>
@@ -161,7 +163,7 @@ export default function Bookings() {
             <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
               {statusTabs.map((tab) => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-3 md:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap touch-target", activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-                  {tab.label}
+                  {t(tab.label)}
                 </button>
               ))}
             </div>
@@ -171,14 +173,14 @@ export default function Bookings() {
               <table className="w-full min-w-[980px]">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Reference</th>
-                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Guest</th>
-                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Room</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Reference")}</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Guest")}</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Room")}</th>
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Check-in</th>
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Check-out</th>
-                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Status</th>
-                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Total</th>
-                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Source</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Status")}</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Total")}</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Source")}</th>
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap"></th>
                   </tr>
                 </thead>
@@ -206,11 +208,11 @@ export default function Bookings() {
                         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.rooms?.number} · {b.rooms?.room_types?.name}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.check_in}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.check_out}</td>
-                        <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap inline-block", sc.cls)}>{sc.label}</span></td>
+                        <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap inline-block", sc.cls)}>{t(sc.label)}</span></td>
                         <td className="px-4 py-3 text-sm font-medium text-foreground tabular-nums">{formatIDR(b.total_amount)}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground capitalize whitespace-nowrap">{b.source.replace("_", " ")}</td>
                         <td className="px-4 py-3">
-                          <Link to={`/bookings/${b.id}`} onClick={(e) => e.stopPropagation()} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
+                          <Link to={`/bookings/${b.id}`} onClick={(e) => e.stopPropagation()} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title={t("View details")}>
                             <Eye className="w-4 h-4" />
                           </Link>
                         </td>
@@ -221,9 +223,9 @@ export default function Bookings() {
                     <tr>
                       <td colSpan={9} className="px-4 py-16 text-center">
                         <CalendarPlus className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-                        <p className="text-sm font-medium text-foreground mb-1">No bookings found</p>
-                        <p className="text-xs text-muted-foreground mb-4">Try adjusting your search or filter criteria</p>
-                        <button onClick={() => { setSearch(""); setActiveTab("all"); }} className="text-sm text-primary font-medium hover:underline">Clear filters</button>
+                        <p className="text-sm font-medium text-foreground mb-1">{t("No bookings found")}</p>
+                        <p className="text-xs text-muted-foreground mb-4">{t("Try adjusting your search or filter criteria")}</p>
+                        <button onClick={() => { setSearch(""); setActiveTab("all"); }} className="text-sm text-primary font-medium hover:underline">{t("Clear filters")}</button>
                       </td>
                     </tr>
                   )}
@@ -243,7 +245,7 @@ export default function Bookings() {
                           <p className="text-sm font-semibold text-foreground">{b.customers?.full_name}</p>
                           <p className="text-xs font-mono text-primary">{b.reference}</p>
                         </div>
-                        <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap inline-block", sc.cls)}>{sc.label}</span>
+                        <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap inline-block", sc.cls)}>{t(sc.label)}</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>{b.rooms?.number} · {b.rooms?.room_types?.name}</span>
@@ -257,9 +259,9 @@ export default function Bookings() {
               {bookings.length === 0 && (
                 <div className="text-center py-12">
                   <CalendarPlus className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground mb-1">No bookings found</p>
-                  <p className="text-xs text-muted-foreground mb-4">Try adjusting your search or filter</p>
-                  <button onClick={() => { setSearch(""); setActiveTab("all"); }} className="text-sm text-primary font-medium hover:underline">Clear filters</button>
+                  <p className="text-sm font-medium text-foreground mb-1">{t("No bookings found")}</p>
+                  <p className="text-xs text-muted-foreground mb-4">{t("Try adjusting your search or filter")}</p>
+                  <button onClick={() => { setSearch(""); setActiveTab("all"); }} className="text-sm text-primary font-medium hover:underline">{t("Clear filters")}</button>
                 </div>
               )}
             </motion.div>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Search, PhoneIncoming, PhoneOutgoing, Flag, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useCallLogs } from "@/hooks/useCallLogs";
@@ -21,6 +22,7 @@ const tabs = [
 ];
 
 export default function CallLogs() {
+  const t = useT();
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -52,7 +54,7 @@ export default function CallLogs() {
   if (error) {
     return (
       <PageTransition>
-        <div className="p-6 text-center text-sm text-destructive">Failed to load call logs.</div>
+        <div className="p-6 text-center text-sm text-destructive">{t("Failed to load call logs.")}</div>
       </PageTransition>
     );
   }
@@ -62,7 +64,7 @@ export default function CallLogs() {
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Call Logs</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Call Logs")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{callLogs.length} logged · {followUpCount} follow-ups</p>
           </div>
           <Link to="/calls/new" className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 self-start">
@@ -77,8 +79,8 @@ export default function CallLogs() {
             { label: "Outbound",   value: String(outboundCount) },
             { label: "Follow-ups", value: String(followUpCount), warn: true },
           ].map((s) => (
-            <motion.div key={s.label} variants={staggerItem} className="bg-card rounded-xl border border-border p-3 md:p-4">
-              <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+            <motion.div key={t(s.label)} variants={staggerItem} className="bg-card rounded-xl border border-border p-3 md:p-4">
+              <p className="text-xs text-muted-foreground mb-1">{t(s.label)}</p>
               <p className={cn("text-xl md:text-2xl font-bold", s.warn ? "text-warning" : "text-foreground")}>{s.value}</p>
             </motion.div>
           ))}
@@ -87,14 +89,14 @@ export default function CallLogs() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 w-full sm:max-w-sm">
             <Search className="w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search phone, customer..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search phone, customer...")} className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
           </div>
         </div>
 
         <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
           {tabs.map((tab) => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-3 md:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap", activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-              {tab.label}
+              {t(tab.label)}
             </button>
           ))}
         </div>
@@ -104,14 +106,14 @@ export default function CallLogs() {
           <table className="w-full min-w-[860px]">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                <th className="text-left px-4 py-3 font-medium">Direction</th>
-                <th className="text-left px-4 py-3 font-medium">Phone</th>
-                <th className="text-left px-4 py-3 font-medium">Customer</th>
-                <th className="text-left px-4 py-3 font-medium">Date/Time</th>
-                <th className="text-left px-4 py-3 font-medium">Duration</th>
-                <th className="text-left px-4 py-3 font-medium">Summary</th>
-                <th className="text-left px-4 py-3 font-medium">Agent</th>
-                <th className="text-left px-4 py-3 font-medium">Follow-up</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Direction")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Phone")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Customer")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Date/Time")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Duration")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Summary")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Agent")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("Follow-up")}</th>
               </tr>
             </thead>
             <motion.tbody variants={staggerContainer} initial="hidden" animate="show">
@@ -125,7 +127,7 @@ export default function CallLogs() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm font-mono text-foreground">{call.caller_phone}</td>
-                  <td className="px-4 py-3 text-sm">{call.customers ? <span className="text-foreground font-medium">{call.customers.full_name}</span> : <span className="text-muted-foreground italic">Unknown</span>}</td>
+                  <td className="px-4 py-3 text-sm">{call.customers ? <span className="text-foreground font-medium">{call.customers.full_name}</span> : <span className="text-muted-foreground italic">{t("Unknown")}</span>}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(call.created_at).toLocaleString()}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">{formatDuration(call.duration_seconds)}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">{call.summary ?? "—"}</td>
@@ -134,7 +136,7 @@ export default function CallLogs() {
                 </motion.tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">No call logs found</td></tr>
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">{t("No call logs found")}</td></tr>
               )}
             </motion.tbody>
           </table>
