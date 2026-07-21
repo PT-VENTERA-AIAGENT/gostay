@@ -1,5 +1,6 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 import { staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
 import type { MonthlyPoint } from "@/services/analyticsService";
@@ -16,6 +17,7 @@ function AnimatedRevenue({ total }: { total: number }) {
 }
 
 export default function RevenueChart({ monthly }: { monthly: MonthlyPoint[] }) {
+  const t = useT();
   const total = monthly.reduce((sum, m) => sum + m.revenue, 0);
 
   return (
@@ -26,12 +28,12 @@ export default function RevenueChart({ monthly }: { monthly: MonthlyPoint[] }) {
       className="bg-card rounded-xl p-5 border border-border card-hover"
     >
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h3 className="font-semibold text-foreground">Revenue</h3>
-        <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">Last 6 months</span>
+        <h3 className="font-semibold text-foreground">{t("Revenue")}</h3>
+        <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">{t("Last 6 months")}</span>
       </div>
 
       <div className="mb-2">
-        <span className="text-xs text-muted-foreground">Total Revenue</span>
+        <span className="text-xs text-muted-foreground">{t("Total Revenue")}</span>
         <p className="text-2xl font-bold text-foreground tabular-nums"><AnimatedRevenue total={total} /></p>
       </div>
 
@@ -52,7 +54,7 @@ export default function RevenueChart({ monthly }: { monthly: MonthlyPoint[] }) {
             tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}jt`}
           />
           <Tooltip
-            formatter={(v: number) => [formatIDR(v), "Revenue"]}
+            formatter={(v: number) => [formatIDR(v), t("Revenue")]}
             contentStyle={{ borderRadius: "0.5rem", border: "1px solid hsl(45, 15%, 88%)", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}
           />
           <Area type="monotone" dataKey="revenue" stroke="hsl(72, 45%, 45%)" strokeWidth={2.5} fill="url(#revGrad)" animationDuration={1200} />

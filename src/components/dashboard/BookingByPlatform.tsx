@@ -1,5 +1,6 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 import { staggerItem } from "@/components/shared/PageTransition";
 import type { SourcePoint } from "@/services/analyticsService";
 
@@ -21,6 +22,7 @@ const COLORS = [
 ];
 
 export default function BookingByPlatform({ bySource }: { bySource: SourcePoint[] }) {
+  const t = useT();
   const total = bySource.reduce((sum, s) => sum + s.count, 0);
   const data = bySource.map((s, i) => ({
     name: SOURCE_LABELS[s.source] ?? s.source,
@@ -37,12 +39,12 @@ export default function BookingByPlatform({ bySource }: { bySource: SourcePoint[
       className="bg-card rounded-xl p-5 border border-border card-hover"
     >
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h3 className="font-semibold text-foreground min-w-0 truncate">Booking by Source</h3>
+        <h3 className="font-semibold text-foreground min-w-0 truncate">{t("Booking by Source")}</h3>
         <span className="text-xs text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">{total} bookings</span>
       </div>
 
       {total === 0 ? (
-        <p className="text-xs text-muted-foreground py-12 text-center">No bookings in this period.</p>
+        <p className="text-xs text-muted-foreground py-12 text-center">{t("No bookings in this period.")}</p>
       ) : (
         <div className="flex flex-wrap items-center gap-4">
           <ResponsiveContainer width={140} height={140}>
@@ -61,7 +63,7 @@ export default function BookingByPlatform({ bySource }: { bySource: SourcePoint[
               <div key={d.name} className="flex items-center gap-2 text-xs group cursor-default">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0 group-hover:scale-125 transition-transform" style={{ backgroundColor: d.color }} />
                 <span className="text-muted-foreground tabular-nums">{d.pct}%</span>
-                <span className="text-foreground font-medium group-hover:text-primary transition-colors">{d.name}</span>
+                <span className="text-foreground font-medium group-hover:text-primary transition-colors">{t(d.name)}</span>
               </div>
             ))}
           </div>

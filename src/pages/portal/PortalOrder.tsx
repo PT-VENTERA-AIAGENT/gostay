@@ -129,7 +129,7 @@ export default function PortalOrder() {
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              Memesan untuk <span className="font-medium text-foreground">Kamar {inhouse.rooms?.number ?? "-"}</span> · {hotelName}. Pesanan ditagihkan ke folio kamar dan diantar oleh front desk.
+              {t("Memesan untuk")} <span className="font-medium text-foreground">Kamar {inhouse.rooms?.number ?? "-"}</span> · {hotelName}. {t("Pesanan ditagihkan ke folio kamar dan diantar oleh front desk.")}
             </p>
 
             {/* Menu by category */}

@@ -3,6 +3,7 @@ import { Search, Eye, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 import { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import CopyButton from "@/components/shared/CopyButton";
 import { useBookings } from "@/hooks/useBookings";
@@ -40,6 +41,7 @@ function fmtDate(iso: string) {
 }
 
 export default function BookingList() {
+  const t = useT();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<BookingStatus | "all">("all");
   const { data, isLoading, error } = useBookings({
@@ -70,9 +72,9 @@ export default function BookingList() {
             aria-label="Filter by status"
             className="text-sm bg-muted rounded-lg px-3 py-2 text-foreground border-none outline-none cursor-pointer shrink-0"
           >
-            <option value="all">All Status</option>
+            <option value="all">{t("All Status")}</option>
             {Object.entries(statusLabels).map(([key, s]) => (
-              <option key={key} value={key}>{s.label}</option>
+              <option key={key} value={key}>{t(s.label)}</option>
             ))}
           </select>
         </div>

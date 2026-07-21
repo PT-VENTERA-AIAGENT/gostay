@@ -1,5 +1,6 @@
 import { CalendarPlus, LogIn, LogOut, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 import { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
 import type { AnalyticsData } from "@/services/analyticsService";
@@ -26,6 +27,7 @@ function AnimatedStat({ value, format }: { value: number; format: (n: number) =>
 }
 
 export default function StatCards({ data }: { data: AnalyticsData }) {
+  const t = useT();
   const stats: Stat[] = [
     {
       label: "New Bookings",
@@ -49,14 +51,14 @@ export default function StatCards({ data }: { data: AnalyticsData }) {
     <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
       {stats.map((stat) => (
         <motion.div
-          key={stat.label}
+          key={t(stat.label)}
           variants={staggerItem}
           whileHover={{ scale: 1.02, y: -2 }}
           whileTap={{ scale: 0.98 }}
           className="bg-secondary rounded-xl p-4 md:p-5 flex flex-col gap-2 md:gap-3 cursor-default card-hover"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="text-xs md:text-sm font-medium text-secondary-foreground/70 min-w-0 leading-snug">{stat.label}</span>
+            <span className="text-xs md:text-sm font-medium text-secondary-foreground/70 min-w-0 leading-snug">{t(stat.label)}</span>
             <div className="w-8 h-8 shrink-0 rounded-lg bg-secondary-foreground/5 flex items-center justify-center">
               <stat.icon className="w-4 h-4 md:w-5 md:h-5 text-secondary-foreground/50" />
             </div>
