@@ -57,6 +57,16 @@ export async function listRequests(
   return (data ?? []) as GuestRequest[];
 }
 
+/** How many requests are still open — drives the sidebar badge. RLS-scoped. */
+export async function countOpenRequests(): Promise<number> {
+  const { count, error } = await db
+    .from("guest_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "open");
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function createRequest(
   input: CreateGuestRequestInput
 ): Promise<GuestRequest> {

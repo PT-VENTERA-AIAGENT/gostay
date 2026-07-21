@@ -2,10 +2,12 @@ import { Outlet } from "react-router-dom";
 import AppSidebar from "./AppSidebar";
 import TopBar from "./TopBar";
 import MobileBottomNav from "@/components/shared/MobileBottomNav";
+import RealtimeSync from "@/components/shared/RealtimeSync";
 
 export default function StaffLayout() {
   return (
     <div className="flex min-h-screen bg-background">
+      <RealtimeSync scope="staff" />
       <AppSidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />

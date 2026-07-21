@@ -8,6 +8,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
+import RealtimeSync from "@/components/shared/RealtimeSync";
 
 const portalNav = [
   { label: "Home", path: "/portal", icon: Search },
@@ -25,11 +26,16 @@ export default function PortalLayout() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {session && <RealtimeSync scope="guest" />}
       {/* Header */}
       <header className="bg-card border-b border-border px-4 md:px-8 py-3 md:py-4 flex items-center justify-between sticky top-0 z-30 backdrop-blur-sm bg-card/95">
         <Link to="/portal" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">{hotelInitial}</span>
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center overflow-hidden">
+            {tenant?.logo_url ? (
+              <img src={tenant.logo_url} alt={hotelName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-primary-foreground font-bold text-sm">{hotelInitial}</span>
+            )}
           </div>
           <span className="text-lg font-bold text-foreground tracking-tight">{hotelName}</span>
         </Link>
@@ -146,8 +152,12 @@ export default function PortalLayout() {
         <div className="max-w-6xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xs">{hotelInitial}</span>
+              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center overflow-hidden">
+                {tenant?.logo_url ? (
+                  <img src={tenant.logo_url} alt={hotelName} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-primary-foreground font-bold text-xs">{hotelInitial}</span>
+                )}
               </div>
               <span className="font-bold text-foreground">{hotelName}</span>
             </div>
@@ -164,9 +174,25 @@ export default function PortalLayout() {
           <div>
             <h4 className="font-semibold text-foreground text-sm mb-3">Contact</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p>{tenant?.phone ?? "+62 21 1234 5678"}</p>
-              <p>{tenant?.email ?? "info@gostay.id"}</p>
-              <p>{tenant?.address ?? "Jl. Hotel No. 1, Jakarta"}</p>
+              {(() => {
+                const phone = tenant?.phone ?? "+62 21 1234 5678";
+                const email = tenant?.email ?? "info@gostay.id";
+                const address = tenant?.address ?? "Jl. Hotel No. 1, Jakarta";
+                return (
+                  <>
+                    <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="block hover:text-foreground transition-colors">{phone}</a>
+                    <a href={`mailto:${email}`} className="block hover:text-foreground transition-colors">{email}</a>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block hover:text-foreground transition-colors"
+                    >
+                      {address}
+                    </a>
+                  </>
+                );
+              })()}
             </div>
           </div>
           <div>
