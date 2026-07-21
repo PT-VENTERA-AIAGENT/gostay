@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { Building2, Loader2, Save } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Building2, Loader2, Save, Upload, Trash2, ImageIcon } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
-import { useTenant, useUpdateHotelProfile, type HotelProfileInput } from "@/hooks/useTenant";
+import { useTenant, useUpdateHotelProfile, uploadHotelLogo, type HotelProfileInput } from "@/hooks/useTenant";
 import { useToast } from "@/hooks/use-toast";
 
 const empty = { name: "", address: "", phone: "", email: "", description: "", logo_url: "" };
@@ -12,6 +12,8 @@ export default function HotelProfile() {
   const { toast } = useToast();
 
   const [form, setForm] = useState(empty);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Hydrate once the tenant loads; nulls become empty strings for the inputs.
   useEffect(() => {
@@ -29,6 +31,30 @@ export default function HotelProfile() {
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function onLogoPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file || !tenant) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "File harus berupa gambar", variant: "destructive" });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "Ukuran logo maksimal 2 MB", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const url = await uploadHotelLogo(tenant.id, file);
+      setForm((f) => ({ ...f, logo_url: url }));
+      toast({ title: "Logo terunggah", description: "Klik Simpan untuk menyimpan perubahan." });
+    } catch (err) {
+      toast({ title: "Gagal mengunggah logo", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const save = () => {
     if (!tenant) return;
@@ -59,7 +85,7 @@ export default function HotelProfile() {
 
   return (
     <PageTransition>
-      <div className="p-4 md:p-6 max-w-2xl">
+      <div className="p-4 md:p-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-2 mb-1">
           <Building2 className="w-6 h-6 text-primary" />
           <h1 className="text-xl md:text-2xl font-bold text-foreground">Profil Hotel</h1>
@@ -89,9 +115,40 @@ export default function HotelProfile() {
             <Field label="Alamat">
               <input className={inputCls} value={form.address} onChange={set("address")} placeholder="Jl. …, Kota" />
             </Field>
-            <Field label="URL logo (opsional)">
-              <input className={inputCls} value={form.logo_url} onChange={set("logo_url")} placeholder="https://…/logo.png" />
-            </Field>
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium text-foreground">Logo hotel (opsional)</span>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-xl border border-border bg-muted/40 flex items-center justify-center overflow-hidden shrink-0">
+                  {form.logo_url ? (
+                    <img src={form.logo_url} alt="Logo hotel" className="w-full h-full object-contain" />
+                  ) : (
+                    <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onLogoPick} />
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="flex items-center gap-2 text-sm font-medium border border-input px-3 py-2 rounded-lg text-foreground hover:bg-muted transition-colors disabled:opacity-60"
+                  >
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {form.logo_url ? "Ganti logo" : "Unggah logo"}
+                  </button>
+                  {form.logo_url && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, logo_url: "" }))}
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive px-2 py-2 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" /> Hapus
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">PNG atau JPG, maks 2 MB.</p>
+            </div>
 
             <div className="pt-2 flex items-center gap-3">
               <button

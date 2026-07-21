@@ -31,6 +31,22 @@ const FALLBACK_NAME = "GoStay";
 const TENANT_COLUMNS = "id, name, slug, address, phone, email, description, logo_url";
 
 /**
+ * Upload a hotel logo to the public `hotel-logos` bucket and return its URL.
+ * Storage RLS (023) only lets a hotel's own staff write into a folder named
+ * after their tenant id, so the path leads with tenantId. Returns a public URL
+ * ready to store in tenants.logo_url.
+ */
+export async function uploadHotelLogo(tenantId: string, file: File): Promise<string> {
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${tenantId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("hotel-logos")
+    .upload(path, file, { upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from("hotel-logos").getPublicUrl(path).data.publicUrl;
+}
+
+/**
  * The hotel (tenant) the signed-in user belongs to. RLS restricts `tenants` to
  * the caller's own row (`id = get_my_tenant()`), so a bare select returns just
  * that hotel. Used to brand the shell and drive the Hotel Profile editor.

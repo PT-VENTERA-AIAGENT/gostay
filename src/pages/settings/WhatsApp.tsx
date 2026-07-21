@@ -166,7 +166,7 @@ export default function WhatsApp() {
 
   return (
     <PageTransition>
-      <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-2xl">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
             <MessageCircle className="w-5 h-5 text-primary" />
