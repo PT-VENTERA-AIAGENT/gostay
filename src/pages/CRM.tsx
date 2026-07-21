@@ -257,7 +257,7 @@ export default function CRM() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("CRM")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {isLoading ? "Loading..." : `${customers.length} guests`}
+              {isLoading ? "Loading..." : `${customers.length} {t("guests")}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -299,7 +299,7 @@ export default function CRM() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, email, phone..."
+            placeholder={t("Search by name, email, phone...")}
             className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full"
           />
         </div>

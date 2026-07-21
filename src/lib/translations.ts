@@ -134,6 +134,7 @@ export const EN: Record<string, string> = {
   "Gagal memuat ulasan.": "Failed to load reviews.",
   "Ulasan tamu akan muncul di sini setelah mereka menilai menginap.": "Guest reviews appear here after they rate their stay.",
   "Tamu ada di CRM Tamu.": "Guests are in Guest CRM.",
+  "Total Pendapatan": "Total Revenue",
 };
 
 // English → Indonesian, for the staff pages (which are authored in English).
@@ -318,4 +319,11 @@ export const ID: Record<string, string> = {
   "No rooms yet": "Belum ada kamar",
   "Add rooms before the calendar can show anything.": "Tambah kamar dulu agar kalender bisa menampilkan sesuatu.",
   "Monthly Revenue & Bookings": "Pendapatan & Booking Bulanan",
+  "Total Guests": "Total Tamu",
+  "VIP Guests": "Tamu VIP",
+  "New (30d)": "Baru (30h)",
+  "guests": "tamu",
+  "Search by name, email, phone...": "Cari nama, email, telepon...",
+  "Regular": "Reguler",
+  "Today": "Hari ini",
 };

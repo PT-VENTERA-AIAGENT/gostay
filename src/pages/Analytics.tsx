@@ -1,7 +1,7 @@
 import { TrendingUp, TrendingDown, BedDouble, DollarSign, Download, LogIn, LogOut, MessageSquare, Phone, Flag, FileText, CalendarRange, Loader2 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart } from "recharts";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, compactIDR } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { exportCSV, exportPDF } from "@/components/analytics/ExportUtils";
@@ -27,10 +27,7 @@ const RANGES: Record<string, { label: string; days: number }> = {
 };
 
 function formatIDR(n: number) {
-  if (n >= 1_000_000_000) return `IDR ${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `IDR ${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `IDR ${(n / 1_000).toFixed(0)}K`;
-  return `IDR ${Math.round(n)}`;
+  return compactIDR(n);
 }
 
 function shortDate(iso: string) {

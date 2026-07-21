@@ -13,6 +13,21 @@ interface LangContextValue {
 const LangContext = createContext<LangContextValue | undefined>(undefined);
 const STORAGE_KEY = "gostay_lang";
 
+// Module-level mirror of the active language so non-hook formatters (compact
+// currency in charts/stat cards) can read it. Kept in sync by setLang; the
+// components that call these already subscribe via useT and re-render on change.
+let _lang: Lang =
+  typeof localStorage !== "undefined" && localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "id";
+
+/** "Rp 4.6jt" in Indonesian, "Rp 4.6M" in English — abbreviations follow lang. */
+export function compactIDR(n: number): string {
+  const en = _lang === "en";
+  if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}${en ? "B" : "M"}`;
+  if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}${en ? "M" : "jt"}`;
+  if (n >= 1_000) return `Rp ${(n / 1_000).toFixed(0)}${en ? "K" : "rb"}`;
+  return `Rp ${Math.round(n)}`;
+}
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
     const saved = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
@@ -21,6 +36,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
+    _lang = l;
     try {
       localStorage.setItem(STORAGE_KEY, l);
     } catch {

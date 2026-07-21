@@ -1,14 +1,12 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { motion } from "framer-motion";
-import { useT } from "@/lib/i18n";
+import { useT, compactIDR } from "@/lib/i18n";
 import { staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
 import type { MonthlyPoint } from "@/services/analyticsService";
 
 function formatIDR(n: number) {
-  if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(2)} M`;
-  if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)} jt`;
-  return `Rp ${n.toLocaleString("id-ID")}`;
+  return compactIDR(n);
 }
 
 function AnimatedRevenue({ total }: { total: number }) {
