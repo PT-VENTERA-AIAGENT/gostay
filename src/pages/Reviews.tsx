@@ -58,7 +58,11 @@ export default function Reviews() {
                   <button
                     onClick={() => setPublished.mutate({ id: r.id, isPublished: !r.is_published })}
                     disabled={setPublished.isPending}
-                    className="text-xs flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                    className={`text-xs font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 shrink-0 ${
+                      r.is_published
+                        ? "border-input text-foreground bg-card hover:bg-muted"
+                        : "border-primary/40 text-primary bg-primary/10 hover:bg-primary/20"
+                    }`}
                     title={r.is_published ? "Sembunyikan dari portal" : "Tampilkan di portal"}
                   >
                     {r.is_published ? <><EyeOff className="w-3.5 h-3.5" /> Sembunyikan</> : <><Eye className="w-3.5 h-3.5" /> Tampilkan</>}
