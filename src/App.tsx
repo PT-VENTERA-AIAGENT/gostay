@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { AuthProvider } from "@/contexts/AuthContext";
+import { LanguageProvider } from "@/lib/i18n";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 
 import StaffLayout from "./components/layout/StaffLayout";
@@ -65,6 +66,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <LanguageProvider>
         <AuthProvider>
           <Routes>
             {/* Public landing page */}
@@ -201,6 +203,7 @@ const App = () => (
           <PromoPopup />
           <ExitIntentPopup />
         </AuthProvider>
+        </LanguageProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

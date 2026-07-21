@@ -7,6 +7,7 @@ import DatePicker from "@/components/shared/DatePicker";
 import { useRoomTypes, useAvailableRooms, useRooms } from "@/hooks/useRooms";
 import { usePublishedReviews, useReviewStats } from "@/hooks/useReviews";
 import { useTenant } from "@/hooks/useTenant";
+import { useT } from "@/lib/i18n";
 
 const amenityIcons: Record<string, React.ElementType> = { WiFi: Wifi, AC: Wind, TV: Tv, "Mini Bar": Coffee, Bathtub: Bath, "Sea View": Mountain };
 
@@ -45,6 +46,7 @@ const todayISO = new Date().toISOString().slice(0, 10);
 export default function PortalHome() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { name: hotelName } = useTenant();
+  const t = useT();
 
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") ?? "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") ?? "");
@@ -94,11 +96,11 @@ export default function PortalHome() {
               <span>
                 {reviewStats && reviewStats.count > 0
                   ? `Dinilai ${reviewStats.average.toFixed(1)}/5 oleh ${reviewStats.count} tamu`
-                  : "Booking langsung, harga terbaik"}
+                  : t("Booking langsung, harga terbaik")}
               </span>
             </motion.div>
-            <motion.h1 variants={staggerItem} className="text-3xl md:text-5xl font-bold text-foreground mb-3 md:mb-4 leading-tight">Penginapan Sempurnamu<br />di {hotelName}</motion.h1>
-            <motion.p variants={staggerItem} className="text-base md:text-lg text-muted-foreground mb-6 md:mb-10 max-w-2xl mx-auto">Nikmati kenyamanan dan kemewahan di jantung kota. Booking langsung untuk harga terbaik dan keuntungan eksklusif.</motion.p>
+            <motion.h1 variants={staggerItem} className="text-3xl md:text-5xl font-bold text-foreground mb-3 md:mb-4 leading-tight">{t("Penginapan Sempurnamu")}<br />{t("Menginap di")} {hotelName}</motion.h1>
+            <motion.p variants={staggerItem} className="text-base md:text-lg text-muted-foreground mb-6 md:mb-10 max-w-2xl mx-auto">{t("Nikmati kenyamanan dan kemewahan di jantung kota. Booking langsung untuk harga terbaik dan keuntungan eksklusif.")}</motion.p>
 
             <motion.div variants={staggerItem} className="bg-card rounded-2xl border border-border p-4 md:p-6 shadow-sm max-w-3xl mx-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
@@ -126,17 +128,17 @@ export default function PortalHome() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Tamu</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">{t("Tamu")}</label>
                   <select
                     value={guests}
                     onChange={(e) => setGuests(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="1">1 Tamu</option>
-                    <option value="2">2 Tamu</option>
-                    <option value="3">3 Tamu</option>
-                    <option value="4">4 Tamu</option>
-                    <option value="5">5+ Tamu</option>
+                    <option value="1">{t("1 Tamu")}</option>
+                    <option value="2">{t("2 Tamu")}</option>
+                    <option value="3">{t("3 Tamu")}</option>
+                    <option value="4">{t("4 Tamu")}</option>
+                    <option value="5">{t("5+ Tamu")}</option>
                   </select>
                 </div>
                 <div className="flex items-end">
@@ -144,7 +146,7 @@ export default function PortalHome() {
                     onClick={handleSearch}
                     className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                   >
-                    <Search className="w-4 h-4" /> Cari
+                    <Search className="w-4 h-4" /> {t("Cari")}
                   </button>
                 </div>
               </div>
@@ -163,8 +165,8 @@ export default function PortalHome() {
             ].map((item) => (
               <motion.div key={item.title} variants={staggerItem} whileHover={{ y: -4, transition: { duration: 0.2 } }} className="text-center p-4 rounded-xl hover:bg-card hover:shadow-sm transition-all cursor-default">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3"><item.icon className="w-6 h-6 text-primary" /></div>
-                <h3 className="font-semibold text-foreground text-sm mb-1">{item.title}</h3>
-                <p className="text-xs text-muted-foreground">{item.desc}</p>
+                <h3 className="font-semibold text-foreground text-sm mb-1">{t(item.title)}</h3>
+                <p className="text-xs text-muted-foreground">{t(item.desc)}</p>
               </motion.div>
             ))}
           </motion.div>
@@ -175,12 +177,12 @@ export default function PortalHome() {
           <div className="flex items-center justify-between mb-6 md:mb-8">
             <div>
               <h2 className="text-xl md:text-2xl font-bold text-foreground">
-                {searched ? "Kamar Tersedia" : "Kamar Kami"}
+                {searched ? t("Kamar Tersedia") : t("Kamar Kami")}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {searched
-                  ? `Kamar tersedia untuk tanggal pilihanmu`
-                  : "Pilih dari tipe kamar yang kami rancang khusus"}
+                  ? t("Kamar tersedia untuk tanggal pilihanmu")
+                  : t("Pilih dari tipe kamar yang kami rancang khusus")}
               </p>
             </div>
           </div>
@@ -211,7 +213,7 @@ export default function PortalHome() {
                       {room.photos?.[0] ? (
                         <img src={room.photos[0]} alt={room.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : (
-                        "Tanpa foto"
+                        t("Tanpa foto")
                       )}
                     </div>
                     <div className="p-4 md:p-5 flex flex-col flex-1">
@@ -220,7 +222,7 @@ export default function PortalHome() {
                       </div>
                       <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{room.description}</p>
                       <div className="flex items-center gap-2 md:gap-3 text-xs text-muted-foreground mb-3 flex-wrap">
-                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Maks {room.max_occupancy}</span>
+                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {t("Maks")} {room.max_occupancy}</span>
                       </div>
                       <div className="flex flex-wrap gap-1 mb-3">
                         {(room.amenities ?? []).slice(0, 3).map((a) => {
@@ -237,9 +239,9 @@ export default function PortalHome() {
                       </div>
                       <div className="flex items-center justify-between pt-3 mt-auto border-t border-border">
                         <p className="text-base md:text-lg font-bold text-primary">
-                          {formatIDR(room.base_rate)} <span className="text-xs font-normal text-muted-foreground">/ malam</span>
+                          {formatIDR(room.base_rate)} <span className="text-xs font-normal text-muted-foreground">{t("/ malam")}</span>
                         </p>
-                        <span className="text-sm text-primary font-medium flex items-center gap-1">Pesan Sekarang <ArrowRight className="w-4 h-4" /></span>
+                        <span className="text-sm text-primary font-medium flex items-center gap-1">{t("Pesan Sekarang")} <ArrowRight className="w-4 h-4" /></span>
                       </div>
                     </div>
                   </Link>
@@ -252,9 +254,9 @@ export default function PortalHome() {
         {/* Reviews */}
         <section className="px-4 md:px-8 py-8 md:py-12 bg-muted/30">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-6 md:mb-8"><h2 className="text-xl md:text-2xl font-bold text-foreground">Kata Tamu Kami</h2><p className="text-sm text-muted-foreground mt-1">Ulasan asli dari tamu asli</p></div>
+            <div className="text-center mb-6 md:mb-8"><h2 className="text-xl md:text-2xl font-bold text-foreground">{t("Kata Tamu Kami")}</h2><p className="text-sm text-muted-foreground mt-1">{t("Ulasan asli dari tamu asli")}</p></div>
             {reviews.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground">Belum ada ulasan. Jadilah yang pertama setelah menginap!</p>
+              <p className="text-center text-sm text-muted-foreground">{t("Belum ada ulasan. Jadilah yang pertama setelah menginap!")}</p>
             ) : (
               <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                 {reviews.map((r) => (
@@ -272,7 +274,7 @@ export default function PortalHome() {
         {/* Hotel Info */}
         <section className="px-4 md:px-8 py-12 md:py-16 bg-card border-t border-border">
           <motion.div variants={fadeInUp} initial="hidden" animate="show" className="max-w-4xl mx-auto text-center">
-            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3">Tentang {hotelName}</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3">{t("Tentang")} {hotelName}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto mb-8 text-sm md:text-base">Berlokasi di jantung kota, {hotelName} menghadirkan keramahan kelas dunia dengan fasilitas modern.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-2xl mx-auto">
               {[
@@ -281,7 +283,7 @@ export default function PortalHome() {
                 { value: String(reviewStats?.count ?? 0), label: "Ulasan" },
                 { value: String(roomTypes?.length ?? 0), label: "Tipe Kamar" },
               ].map((s) => (
-                <div key={s.label}><p className="text-2xl md:text-3xl font-bold text-primary">{s.value}</p><p className="text-sm text-muted-foreground">{s.label}</p></div>
+                <div key={s.label}><p className="text-2xl md:text-3xl font-bold text-primary">{s.value}</p><p className="text-sm text-muted-foreground">{t(s.label)}</p></div>
               ))}
             </div>
           </motion.div>

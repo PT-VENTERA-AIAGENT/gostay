@@ -2,6 +2,8 @@ import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LogOut } from "lucide-react";
 import ThemeToggle from "@/components/shared/ThemeToggle";
+import LanguageToggle from "@/components/shared/LanguageToggle";
+import { useT } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import GlobalSearch from "@/components/layout/GlobalSearch";
 import NotificationsMenu from "@/components/layout/NotificationsMenu";
@@ -55,6 +57,7 @@ const roleLabels: Record<string, string> = {
 
 export default function TopBar() {
   const { pathname } = useLocation();
+  const t = useT();
   const title = titleFor(pathname);
   const { user, role, signOut } = useAuth();
 
@@ -70,11 +73,13 @@ export default function TopBar() {
         transition={{ duration: 0.25 }}
         className="text-lg md:text-2xl font-bold text-foreground"
       >
-        {title}
+        {t(title)}
       </motion.h1>
 
       <div className="flex items-center gap-2 md:gap-3">
         <GlobalSearch />
+
+        <LanguageToggle />
 
         <ThemeToggle />
 
