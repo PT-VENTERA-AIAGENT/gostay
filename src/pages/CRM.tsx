@@ -20,7 +20,9 @@ import type { Customer, Booking, BookingStatus } from "@/types/database.types";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BookingRow extends Booking {
-  room_type: { name: string } | null;
+  // The room type name comes through the room (bookings → rooms → room_types);
+  // there is no direct bookings→room_types foreign key to embed.
+  rooms: { room_types: { name: string } | null } | null;
 }
 
 interface CustomerWithBookings extends Customer {
@@ -93,7 +95,7 @@ async function fetchCustomers(): Promise<CustomerWithBookings[]> {
   const { data, error } = await supabase
     .from("customers")
     .select(
-      `*, bookings(id, status, check_in, check_out, total_amount, created_at, room_id, customer_id, reference, reference, num_adults, num_children, amount_paid, payment_status, source, special_requests, internal_notes, created_by, updated_at, room_type:room_types(name))`
+      `*, bookings(*, rooms(room_types(name)))`
     )
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -185,7 +187,7 @@ function GuestPanel({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">
-                          {booking.room_type?.name ?? "Room"}
+                          {booking.rooms?.room_types?.name ?? "Room"}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {formatDate(booking.check_in)} — {formatDate(booking.check_out)}
@@ -308,8 +310,8 @@ export default function CRM() {
         )}
 
         {/* Desktop table */}
-        <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
-          <table className="w-full">
+        <div className="hidden md:block bg-card rounded-xl border border-border overflow-x-auto">
+          <table className="w-full min-w-[820px]">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
                 <th className="text-left px-4 py-3 font-medium">Guest</th>

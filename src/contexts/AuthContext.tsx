@@ -9,24 +9,73 @@ import {
 import { getSession, logout, startLogin, type SsoClaims, type SsoSession } from "@/lib/sso";
 import type { UserRole } from "@/types/database.types";
 
+/**
+ * Callers throughout the app expect `user.id`, and what they invariably mean by
+ * it is `profiles.id` — every foreign key that records who did something
+ * (chat_messages.sender_id, call_logs.agent_id, booking_audit_log.performed_by)
+ * points at that table.
+ *
+ * So `id` is the profile uuid the server derived, **not** the raw SSO subject.
+ * They are different values: profiles.id = uuid_v5(namespace, sub). Using `sub`
+ * here would send an id no row has, and every such write would be rejected as a
+ * foreign key violation.
+ */
+export interface AuthUser extends SsoClaims {
+  id: string;
+}
+
+function toAuthUser(session: SsoSession): AuthUser {
+  return {
+    ...session.claims,
+    // The fallback only bites when Supabase is unconfigured, in which case
+    // there is no profiles row to point at and no write will succeed anyway.
+    id: session.profile_id ?? session.claims.sub,
+  };
+}
+
 interface AuthContextValue {
   session: SsoSession | null;
-  user: SsoClaims | null;
+  user: AuthUser | null;
   role: UserRole | null;
   isLoading: boolean;
   signIn: (returnTo?: string) => void;
   signOut: () => void;
   refreshSession: () => void;
-  // Legacy compat stubs (pages that call these will degrade gracefully)
-  signUp: () => Promise<{ error: Error | null }>;
-  resetPassword: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function realmToRole(realm?: string): UserRole {
-  if (realm === "ventera-employees") return "admin";
-  return "staff";
+/**
+ * The role comes from `profiles.role` in the database, read back by
+ * /api/sso/token and carried on the session. Nothing in the SSO token — realm
+ * included — grants a role: the database is the only source of truth, which is
+ * also what get_my_role() reads inside every RLS policy.
+ *
+ * Null when Supabase is not configured, or before a profile exists. Null denies
+ * every gated route, which is the correct answer in both cases.
+ *
+ * This value is not a security boundary: it only decides what the browser
+ * renders, and the session it comes from is editable. Enforcement lives in the
+ * RLS policies keyed on auth.uid().
+ */
+function resolveRole(session: SsoSession): UserRole | null {
+  return session.role ?? null;
+}
+
+/**
+ * Where a signed-in user belongs after login.
+ *
+ * Staff and admin run the back office at /dashboard; everyone else — customers,
+ * and users whose role has not resolved yet — get the guest portal, which is
+ * public and never bounces them. Sending a null-role user to /dashboard would
+ * only get them denied by ProtectedRoute and dumped back here.
+ *
+ * The landing page at "/" is marketing, not an app home: routing a logged-in
+ * user there leaves them staring at a "Masuk" button, which is exactly the
+ * "kok cuma refresh" symptom.
+ */
+export function roleHome(role: UserRole | null): string {
+  return role === "admin" || role === "staff" ? "/dashboard" : "/portal";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -49,14 +98,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         session,
-        user: session?.claims ?? null,
-        role: session ? realmToRole(session.claims.realm) : null,
+        user: session ? toAuthUser(session) : null,
+        role: session ? resolveRole(session) : null,
         isLoading,
         signIn,
         signOut,
         refreshSession,
-        signUp: async () => ({ error: new Error("Use SSO login") }),
-        resetPassword: async () => ({ error: new Error("Use SSO login") }),
       }}
     >
       {children}

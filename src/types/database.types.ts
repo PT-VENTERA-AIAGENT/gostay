@@ -6,7 +6,7 @@ export type BookingStatus =
   | "checked_out"
   | "cancelled"
   | "no_show";
-export type BookingSource = "portal" | "phone" | "walk_in" | "staff";
+export type BookingSource = "portal" | "phone" | "walk_in" | "staff" | "whatsapp";
 export type PaymentStatus = "pending" | "partial" | "paid" | "refunded";
 export type CallDirection = "inbound" | "outbound";
 export type RoomStatus =
@@ -79,6 +79,11 @@ export interface Database {
         Insert: AnalyticsCacheInsert;
         Update: AnalyticsCacheUpdate;
       };
+      reviews: {
+        Row: Review;
+        Insert: ReviewInsert;
+        Update: ReviewUpdate;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -101,6 +106,12 @@ export interface Profile {
   phone: string | null;
   role: UserRole;
   avatar_url: string | null;
+  /** Ventera SSO subject. id = uuid_v5(namespace, sso_sub). Added in 003. */
+  sso_sub: string | null;
+  /** Last SSO sign-in; null means never. Added in 004. */
+  last_seen_at: string | null;
+  /** False revokes access — get_my_role() ignores inactive users. Added in 004. */
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -143,10 +154,17 @@ export type RoomUpdate = Partial<RoomInsert>;
 // ─── Room with type (joined) ──────────────────────────────────────────────────
 export interface RoomWithType extends Room {
   room_types: Pick<RoomType, "id" | "name" | "slug" | "base_rate">;
+  /**
+   * An array, not an object: bookings has a foreign key to rooms, so the
+   * `current_booking:bookings(...)` embed in roomService.getRooms() is
+   * one-to-many and PostgREST returns a list. Typing it as a single object made
+   * `current_booking.status` read undefined on an array — which silently
+   * reported every room as available.
+   */
   current_booking?: Pick<
     Booking,
     "id" | "status" | "check_out" | "customer_id"
-  > | null;
+  >[] | null;
 }
 
 // ─── Seasonal Pricing ─────────────────────────────────────────────────────────
@@ -255,7 +273,7 @@ export type ChatThreadInsert = Omit<
 export type ChatThreadUpdate = Partial<ChatThreadInsert>;
 
 export interface ChatThreadWithRelations extends ChatThread {
-  customers: Pick<Customer, "id" | "full_name" | "email">;
+  customers: Pick<Customer, "id" | "full_name" | "email" | "phone" | "profile_id">;
   last_message?: Pick<ChatMessage, "content" | "created_at"> | null;
   unread_count?: number;
 }
@@ -303,4 +321,23 @@ export interface AnalyticsCache {
   updated_at: string;
 }
 export type AnalyticsCacheInsert = Omit<AnalyticsCache, "id">;
+
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+export interface Review {
+  id: string;
+  customer_id: string;
+  booking_id: string | null;
+  rating: number;
+  comment: string | null;
+  is_published: boolean;
+  created_at: string;
+}
+export type ReviewInsert = Omit<Review, "id" | "created_at" | "is_published"> & {
+  is_published?: boolean;
+};
+export type ReviewUpdate = Partial<Omit<Review, "id" | "created_at">>;
+
+export interface ReviewWithCustomer extends Review {
+  customers: Pick<Customer, "id" | "full_name"> | null;
+}
 export type AnalyticsCacheUpdate = Partial<AnalyticsCacheInsert>;

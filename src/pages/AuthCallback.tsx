@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { handleCallback } from "@/lib/sso";
-import { useSsoAuth } from "@/contexts/AuthContext";
+import { handleCallback, getSession } from "@/lib/sso";
+import { useSsoAuth, roleHome } from "@/contexts/AuthContext";
 
 export default function AuthCallback() {
   const [params] = useSearchParams();
@@ -28,7 +28,14 @@ export default function AuthCallback() {
         return;
       }
       refreshSession();
-      navigate(result.returnTo || "/", { replace: true });
+      // handleCallback has just stored the session, role included, so read it
+      // back for the routing decision. A returnTo that points at a real page
+      // (a deep link the user was sent to /login from) wins; the default "/"
+      // is marketing, so fall through to the role's home instead.
+      const role = getSession()?.role ?? null;
+      const dest =
+        result.returnTo && result.returnTo !== "/" ? result.returnTo : roleHome(role);
+      navigate(dest, { replace: true });
     });
   }, []);
 

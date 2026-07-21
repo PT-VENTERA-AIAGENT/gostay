@@ -1,34 +1,52 @@
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
-  Package, CalendarDays, DollarSign, Star, ConciergeBell, ChevronDown,
-  Phone, Users, ChevronLeft, ChevronRight, Contact
+  CalendarDays, DollarSign, Star,
+  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { useChatThreads } from "@/hooks/useChat";
+import { usePendingBookingsCount } from "@/hooks/useBookings";
+import { useTenant } from "@/hooks/useTenant";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: CalendarCheck, label: "Reservations", path: "/bookings" },
   { icon: DoorOpen, label: "Rooms", path: "/rooms" },
-  { icon: MessageSquare, label: "Messages", path: "/chat", badge: 7 },
+  { icon: MessageSquare, label: "Messages", path: "/chat" },
   { icon: Phone, label: "Call Logs", path: "/calls" },
-  { icon: Package, label: "Inventory", path: "/inventory" },
+  { icon: ConciergeBell, label: "Permintaan Tamu", path: "/requests" },
+  { icon: Store, label: "Kasir (POS)", path: "/pos" },
   { icon: CalendarDays, label: "Calendar", path: "/bookings?view=calendar" },
-  { icon: DollarSign, label: "Financials", path: "/analytics", hasSubmenu: true },
+  { icon: DollarSign, label: "Financials", path: "/analytics" },
 ];
 
 const bottomItems = [
   { icon: Contact, label: "CRM Tamu", path: "/crm" },
+  { icon: MessageCircle, label: "Sambungkan WhatsApp", path: "/settings/whatsapp" },
   { icon: Users, label: "User Management", path: "/users" },
   { icon: Star, label: "Reviews", path: "/reviews" },
-  { icon: ConciergeBell, label: "Concierge", path: "/concierge" },
 ];
 
 export default function AppSidebar() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "true");
+
+  // Real unread total for the Messages badge (was hardcoded to 7). Sums the
+  // per-thread unread counts; realtime keeps it live across the app.
+  const { data: threads = [] } = useChatThreads();
+  const unreadTotal = threads.reduce((n, t) => n + (t.unread_count ?? 0), 0);
+
+  // Pending reservations waiting on the front desk — same badge treatment as
+  // unread Messages, so new bookings are visible from any page.
+  const { data: pendingBookings = 0 } = usePendingBookingsCount();
+
+  // Brand the shell with the caller's actual hotel, not a hardcoded name.
+  const { name: hotelName, initial: hotelInitial } = useTenant();
+  const badgeFor = (path: string) =>
+    path === "/chat" ? unreadTotal : path === "/bookings" ? pendingBookings : 0;
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -36,9 +54,22 @@ export default function AppSidebar() {
     localStorage.setItem("sidebar-collapsed", String(next));
   };
 
+  /**
+   * Exactly one item highlights at a time.
+   *
+   * Reservations (/bookings) and Calendar (/bookings?view=calendar) share a
+   * pathname, so comparing pathname alone lit both up. The query string is what
+   * separates them, so it is part of the comparison: an item with ?view=... is
+   * active only when that param matches, and a bare path is active only when no
+   * competing view param is set.
+   */
   const isActive = (path: string) => {
-    if (path === "/") return pathname === "/";
-    return pathname.startsWith(path.split("?")[0]);
+    const [base, query] = path.split("?");
+    if (base === "/dashboard") return pathname === "/dashboard";
+    if (!pathname.startsWith(base)) return false;
+    const wantView = query ? new URLSearchParams(query).get("view") : null;
+    const currentView = new URLSearchParams(search).get("view");
+    return wantView ? currentView === wantView : !currentView;
   };
 
   return (
@@ -49,7 +80,7 @@ export default function AppSidebar() {
     >
       <div className={cn("flex items-center gap-2 px-2 mb-8", collapsed && "justify-center")}>
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">B</span>
+          <span className="text-primary-foreground font-bold text-sm">{hotelInitial}</span>
         </div>
         <AnimatePresence>
           {!collapsed && (
@@ -57,9 +88,10 @@ export default function AppSidebar() {
               initial={{ opacity: 0, width: 0 }}
               animate={{ opacity: 1, width: "auto" }}
               exit={{ opacity: 0, width: 0 }}
+              title={hotelName}
               className="text-lg font-bold text-foreground tracking-tight overflow-hidden whitespace-nowrap"
             >
-              GoStay
+              {hotelName}
             </motion.span>
           )}
         </AnimatePresence>
@@ -92,17 +124,16 @@ export default function AppSidebar() {
                   </motion.span>
                 )}
               </AnimatePresence>
-              {!collapsed && item.badge && (
+              {!collapsed && badgeFor(item.path) > 0 && (
                 <motion.span
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold"
+                  className="bg-destructive text-destructive-foreground text-xs rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center font-semibold"
                 >
-                  {item.badge}
+                  {badgeFor(item.path) > 9 ? "9+" : badgeFor(item.path)}
                 </motion.span>
               )}
-              {!collapsed && item.hasSubmenu && <ChevronDown className="w-4 h-4" />}
-              {collapsed && item.badge && (
+              {collapsed && badgeFor(item.path) > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
               )}
             </Link>

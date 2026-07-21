@@ -8,7 +8,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // api/ holds the serverless code; those files opt into the node environment
+    // per-file with a @vitest-environment pragma.
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "api/**/*.{test,spec}.ts"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

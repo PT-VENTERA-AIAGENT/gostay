@@ -3,9 +3,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
-import { createBooking } from "@/services/bookingService";
-import { getOrCreateCustomer } from "@/services/bookingService";
+import { createBooking, getOrCreateOwnCustomer } from "@/services/bookingService";
 import { getAvailableRooms } from "@/services/roomService";
+import { useAuth } from "@/contexts/AuthContext";
 import type { RoomType } from "@/types/database.types";
 
 interface GuestInfo {
@@ -45,6 +45,7 @@ function formatDate(dateStr: string) {
 export default function BookingReview() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, signIn } = useAuth();
   const state = location.state as ReviewState | null;
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -65,16 +66,23 @@ export default function BookingReview() {
   const { roomType, checkIn, checkOut, guests, guestInfo, nights, total } = state;
 
   async function handleConfirm() {
+    // A booking has to belong to someone. Every "own bookings" RLS policy walks
+    // customers.profile_id back to auth.uid(), so an anonymous booking would be
+    // one the guest could never open again — and the insert is denied anyway.
+    if (!user) {
+      signIn(location.pathname);
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     try {
-      // 1. Get or create customer
-      const customer = await getOrCreateCustomer({
+      // 1. Get or create the customer record owned by this profile
+      const customer = await getOrCreateOwnCustomer(user.id, {
         full_name: `${guestInfo.firstName} ${guestInfo.lastName}`.trim(),
         email: guestInfo.email,
         phone: guestInfo.phone || null,
         nationality: null,
-        profile_id: null,
       });
 
       // 2. Find an available room for this room type
@@ -94,14 +102,17 @@ export default function BookingReview() {
         check_out: checkOut,
         num_adults: guests,
         num_children: 0,
-        status: "confirmed",
+        // Staff confirm; the guest does not confirm their own booking. A browser
+        // that could insert status='confirmed' with payment_status='pending' is
+        // a browser that books free stays — see PRD §"Booking creation".
+        status: "pending",
         total_amount: total,
         amount_paid: 0,
         payment_status: "pending",
         source: "portal",
         special_requests: guestInfo.specialRequests || null,
         internal_notes: null,
-        created_by: null,
+        created_by: user.id,
       });
 
       navigate("/portal/book/confirmation", {
@@ -209,9 +220,11 @@ export default function BookingReview() {
               className="bg-primary text-primary-foreground px-5 md:px-6 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 touch-target disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Confirming...</>
+                <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
+              ) : user ? (
+                <>Request Booking <Check className="w-4 h-4" /></>
               ) : (
-                <>Confirm Booking <Check className="w-4 h-4" /></>
+                <>Sign in to book <Check className="w-4 h-4" /></>
               )}
             </button>
           </motion.div>

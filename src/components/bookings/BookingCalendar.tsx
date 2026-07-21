@@ -1,42 +1,9 @@
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-
-const rooms = [
-  { id: "1", number: "101", type: "Standard" },
-  { id: "2", number: "102", type: "Standard" },
-  { id: "3", number: "103", type: "Standard" },
-  { id: "4", number: "104", type: "Deluxe" },
-  { id: "5", number: "105", type: "Deluxe" },
-  { id: "6", number: "201", type: "Standard" },
-  { id: "7", number: "202", type: "Standard" },
-  { id: "8", number: "203", type: "Deluxe" },
-  { id: "9", number: "204", type: "Suite" },
-  { id: "10", number: "205", type: "Suite" },
-  { id: "11", number: "301", type: "Family" },
-  { id: "12", number: "302", type: "Family" },
-  { id: "13", number: "303", type: "Suite" },
-  { id: "14", number: "304", type: "Presidential" },
-  { id: "15", number: "305", type: "Presidential" },
-];
-
-const bookings = [
-  { id: "1", roomId: "2", guest: "David Chen", checkIn: "2026-04-01", checkOut: "2026-04-04", status: "checked_in" },
-  { id: "2", roomId: "3", guest: "Sarah Kim", checkIn: "2026-04-02", checkOut: "2026-04-05", status: "confirmed" },
-  { id: "3", roomId: "7", guest: "Mike Johnson", checkIn: "2026-04-05", checkOut: "2026-04-07", status: "pending" },
-  { id: "4", roomId: "8", guest: "Emily Davis", checkIn: "2026-04-03", checkOut: "2026-04-06", status: "checked_in" },
-  { id: "5", roomId: "10", guest: "Robert Wilson", checkIn: "2026-04-01", checkOut: "2026-04-03", status: "checked_out" },
-  { id: "6", roomId: "12", guest: "Anna Lee", checkIn: "2026-03-30", checkOut: "2026-04-02", status: "checked_out" },
-  { id: "7", roomId: "15", guest: "James Brown", checkIn: "2026-04-07", checkOut: "2026-04-10", status: "confirmed" },
-  { id: "8", roomId: "5", guest: "Lisa Wang", checkIn: "2026-04-01", checkOut: "2026-04-04", status: "checked_in" },
-  { id: "9", roomId: "1", guest: "Tom Harris", checkIn: "2026-04-06", checkOut: "2026-04-09", status: "confirmed" },
-  { id: "10", roomId: "9", guest: "Grace Park", checkIn: "2026-04-04", checkOut: "2026-04-08", status: "confirmed" },
-  { id: "11", roomId: "11", guest: "Kevin Nguyen", checkIn: "2026-04-02", checkOut: "2026-04-06", status: "checked_in" },
-  { id: "12", roomId: "14", guest: "Sofia Martinez", checkIn: "2026-04-01", checkOut: "2026-04-05", status: "checked_in" },
-  { id: "13", roomId: "6", guest: "Alex Turner", checkIn: "2026-04-08", checkOut: "2026-04-11", status: "pending" },
-  { id: "14", roomId: "4", guest: "Rachel Adams", checkIn: "2026-04-05", checkOut: "2026-04-08", status: "confirmed" },
-];
+import { useRooms } from "@/hooks/useRooms";
+import { useBookingsInRange } from "@/hooks/useBookings";
 
 const statusColors: Record<string, string> = {
   pending: "bg-warning/80 border-warning",
@@ -44,6 +11,7 @@ const statusColors: Record<string, string> = {
   checked_in: "bg-primary/80 border-primary",
   checked_out: "bg-muted border-muted-foreground/30",
   cancelled: "bg-destructive/30 border-destructive",
+  no_show: "bg-destructive/30 border-destructive",
 };
 
 const statusTextColors: Record<string, string> = {
@@ -52,7 +20,12 @@ const statusTextColors: Record<string, string> = {
   checked_in: "text-primary-foreground",
   checked_out: "text-muted-foreground",
   cancelled: "text-destructive-foreground",
+  no_show: "text-destructive-foreground",
 };
+
+// A cancelled or no-show booking is not occupying the room, so drawing a bar
+// for it would misreport the night as taken.
+const OCCUPYING = new Set(["pending", "confirmed", "checked_in", "checked_out"]);
 
 function getDatesInRange(start: Date, numDays: number): Date[] {
   const dates: Date[] = [];
@@ -68,19 +41,53 @@ function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * Local calendar date, not UTC.
+ *
+ * toISOString() converts to UTC first, so east of Greenwich every date before
+ * ~07:00 local lands on the previous day — the "today" column would highlight
+ * yesterday for a hotel in WIB for most of the morning.
+ */
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0];
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Parses a date-only column ('2026-04-01') as local midnight, to match. */
+function parseDateOnly(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 export default function BookingCalendar() {
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date(2026, 3, 1); // April 1, 2026
-    return d;
-  });
+  // Opens on the current week rather than a pinned date: this was `new Date(2026, 3, 1)`
+  // with a matching `const today = new Date(2026, 3, 5) // Mock today`, so the
+  // grid always showed April 2026 no matter when it was opened.
+  const [startDate, setStartDate] = useState(startOfToday);
 
   const numDays = 14;
-  const dates = getDatesInRange(startDate, numDays);
+  const dates = useMemo(() => getDatesInRange(startDate, numDays), [startDate]);
   const cellWidth = 80;
+  const today = startOfToday();
+
+  // The window the grid draws. rangeEnd is exclusive — one day past the last
+  // visible column, so a stay starting on that column still counts.
+  const rangeStart = formatDate(dates[0]);
+  const rangeEnd = useMemo(() => {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + numDays);
+    return formatDate(d);
+  }, [startDate]);
+
+  const { data: rooms, isLoading: roomsLoading } = useRooms();
+  const { data: bookings, isLoading: bookingsLoading } = useBookingsInRange(rangeStart, rangeEnd);
 
   const navigate = (dir: number) => {
     const d = new Date(startDate);
@@ -88,24 +95,57 @@ export default function BookingCalendar() {
     setStartDate(d);
   };
 
-  const today = new Date(2026, 3, 5); // Mock today
+  const byRoom = useMemo(() => {
+    const map = new Map<string, typeof bookings>();
+    for (const b of bookings ?? []) {
+      if (!OCCUPYING.has(b.status)) continue;
+      const list = map.get(b.room_id) ?? [];
+      list.push(b);
+      map.set(b.room_id, list);
+    }
+    return map;
+  }, [bookings]);
+
+  const sortedRooms = useMemo(
+    () => [...(rooms ?? [])].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true })),
+    [rooms],
+  );
+
+  if (roomsLoading || bookingsLoading) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-12 flex items-center justify-center text-muted-foreground">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading calendar…
+      </div>
+    );
+  }
+
+  if (sortedRooms.length === 0) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-12 text-center">
+        <p className="text-sm font-medium text-foreground mb-1">No rooms yet</p>
+        <p className="text-xs text-muted-foreground">Add rooms before the calendar can show anything.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
-      {/* Header controls */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
+          <button onClick={() => navigate(-1)} aria-label="Previous week" className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-sm font-semibold text-foreground min-w-[180px] text-center">
             {dates[0].toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </span>
-          <button onClick={() => navigate(1)} className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
+          <button onClick={() => navigate(1)} aria-label="Next week" className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
             <ChevronRight className="w-4 h-4" />
           </button>
+          <button onClick={() => setStartDate(startOfToday())} className="text-xs text-primary font-medium hover:underline ml-1">
+            Today
+          </button>
         </div>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-3 text-xs flex-wrap">
           {[
             { label: "Pending", cls: "bg-warning/80" },
             { label: "Confirmed", cls: "bg-info/80" },
@@ -122,7 +162,6 @@ export default function BookingCalendar() {
 
       <div className="overflow-x-auto">
         <div className="min-w-max">
-          {/* Date header */}
           <div className="flex border-b border-border">
             <div className="w-[120px] shrink-0 px-3 py-2 bg-muted/50 border-r border-border">
               <span className="text-xs font-medium text-muted-foreground">Room</span>
@@ -137,57 +176,47 @@ export default function BookingCalendar() {
                   className={cn(
                     "shrink-0 px-1 py-2 text-center border-r border-border",
                     isToday && "bg-primary/10",
-                    isWeekend && !isToday && "bg-muted/30"
+                    isWeekend && !isToday && "bg-muted/30",
                   )}
                 >
                   <p className={cn("text-xs font-medium", isToday ? "text-primary" : "text-muted-foreground")}>
                     {d.toLocaleDateString("en-US", { weekday: "short" })}
                   </p>
-                  <p className={cn("text-sm font-semibold", isToday ? "text-primary" : "text-foreground")}>
-                    {d.getDate()}
-                  </p>
+                  <p className={cn("text-sm font-semibold", isToday ? "text-primary" : "text-foreground")}>{d.getDate()}</p>
                 </div>
               );
             })}
           </div>
 
-          {/* Room rows */}
-          {rooms.map((room) => {
-            const roomBookings = bookings.filter((b) => b.roomId === room.id);
+          {sortedRooms.map((room) => {
+            const roomBookings = byRoom.get(room.id) ?? [];
 
             return (
               <div key={room.id} className="flex border-b border-border last:border-0 relative" style={{ height: 44 }}>
                 <div className="w-[120px] shrink-0 px-3 flex items-center border-r border-border bg-muted/30">
-                  <div>
+                  <div className="truncate">
                     <span className="text-sm font-semibold text-foreground">{room.number}</span>
-                    <span className="text-xs text-muted-foreground ml-1.5">{room.type}</span>
+                    <span className="text-xs text-muted-foreground ml-1.5">{room.room_types?.name}</span>
                   </div>
                 </div>
                 <div className="relative flex-1" style={{ width: numDays * cellWidth }}>
-                  {/* Grid lines */}
-                  {dates.map((d) => {
+                  {dates.map((d, idx) => {
                     const isToday = formatDate(d) === formatDate(today);
-                    const idx = dates.indexOf(d);
                     return (
                       <div
                         key={formatDate(d)}
-                        className={cn(
-                          "absolute top-0 bottom-0 border-r border-border",
-                          isToday && "bg-primary/5"
-                        )}
+                        className={cn("absolute top-0 bottom-0 border-r border-border", isToday && "bg-primary/5")}
                         style={{ left: idx * cellWidth, width: cellWidth }}
                       />
                     );
                   })}
 
-                  {/* Booking bars */}
                   {roomBookings.map((booking) => {
-                    const bStart = new Date(booking.checkIn);
-                    const bEnd = new Date(booking.checkOut);
+                    const bStart = parseDateOnly(booking.check_in);
+                    const bEnd = parseDateOnly(booking.check_out);
                     const rangeStart = dates[0];
                     const rangeEnd = dates[dates.length - 1];
 
-                    // Skip bookings entirely outside range
                     if (bEnd <= rangeStart || bStart > rangeEnd) return null;
 
                     const startOffset = Math.max(0, daysBetween(rangeStart, bStart));
@@ -196,23 +225,20 @@ export default function BookingCalendar() {
 
                     if (barWidth <= 0) return null;
 
+                    const guest = booking.customers?.full_name ?? "Guest";
+
                     return (
                       <Link
                         key={booking.id}
                         to={`/bookings/${booking.id}`}
                         className={cn(
                           "absolute top-1 bottom-1 rounded-md border flex items-center px-2 cursor-pointer hover:opacity-90 transition-opacity z-10",
-                          statusColors[booking.status]
+                          statusColors[booking.status],
                         )}
-                        style={{
-                          left: startOffset * cellWidth + 2,
-                          width: barWidth - 4,
-                        }}
-                        title={`${booking.guest} — ${booking.checkIn} to ${booking.checkOut}`}
+                        style={{ left: startOffset * cellWidth + 2, width: barWidth - 4 }}
+                        title={`${guest} — ${booking.check_in} to ${booking.check_out} (${booking.reference})`}
                       >
-                        <span className={cn("text-xs font-medium truncate", statusTextColors[booking.status])}>
-                          {booking.guest}
-                        </span>
+                        <span className={cn("text-xs font-medium truncate", statusTextColors[booking.status])}>{guest}</span>
                       </Link>
                     );
                   })}

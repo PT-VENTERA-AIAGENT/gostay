@@ -1,11 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare, MoreHorizontal, Phone, Users, BarChart3, Package, CalendarDays, Star, ConciergeBell } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare, MoreHorizontal, Phone, Users, BarChart3, CalendarDays, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const mainNav = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: CalendarCheck, label: "Bookings", path: "/bookings" },
   { icon: DoorOpen, label: "Rooms", path: "/rooms" },
   { icon: MessageSquare, label: "Chat", path: "/chat" },
@@ -14,12 +14,10 @@ const mainNav = [
 
 const moreNav = [
   { icon: Phone, label: "Call Logs", path: "/calls" },
-  { icon: Package, label: "Inventory", path: "/inventory" },
   { icon: CalendarDays, label: "Calendar", path: "/bookings?view=calendar" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Users, label: "Users", path: "/users" },
   { icon: Star, label: "Reviews", path: "/reviews" },
-  { icon: ConciergeBell, label: "Concierge", path: "/concierge" },
 ];
 
 export default function MobileBottomNav() {

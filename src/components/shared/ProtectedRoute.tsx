@@ -23,8 +23,12 @@ export default function ProtectedRoute({ children, allowedRoles }: Props) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    return <Navigate to="/" replace />;
+  // Deny by default. The previous `role && !allowedRoles.includes(role)` let a
+  // session with no resolved role through every check, because a null role made
+  // the condition short-circuit to false.
+  if (allowedRoles && (!role || !allowedRoles.includes(role))) {
+    // Send guests somewhere useful rather than bouncing them to the landing page.
+    return <Navigate to={role === "customer" ? "/portal" : "/"} replace />;
   }
 
   return <>{children}</>;

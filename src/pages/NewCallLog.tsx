@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Phone, PhoneIncoming, PhoneOutgoing, Flag, User, CalendarPlus, Search, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
+import DatePicker from "@/components/shared/DatePicker";
 import { useCreateCallLog, useCallerLookup } from "@/hooks/useCallLogs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -117,7 +118,7 @@ export default function NewCallLog() {
                 {followUp && (
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1.5 block">Follow-up Date</label>
-                    <input type="date" value={followUpDue} onChange={(e) => setFollowUpDue(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                    <DatePicker value={followUpDue} onChange={setFollowUpDue} placeholder="Pilih tanggal follow-up" />
                   </div>
                 )}
               </motion.div>

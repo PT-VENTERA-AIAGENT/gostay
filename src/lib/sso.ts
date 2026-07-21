@@ -1,6 +1,11 @@
-const SSO_ISSUER = "https://sso.ventera.ai";
+// Issuer and client id are public by nature — they travel in the authorize URL.
+// The client secret is deliberately absent: every VITE_* value is inlined into
+// the browser bundle, so the secret lives only on the server and the token
+// exchange happens in api/sso/token.ts.
+const SSO_ISSUER =
+  (import.meta.env.VITE_SSO_ISSUER as string) ?? "https://sso.ventera.ai";
 const CLIENT_ID = (import.meta.env.VITE_SSO_CLIENT_ID as string) ?? "gostay";
-const CLIENT_SECRET = import.meta.env.VITE_SSO_CLIENT_SECRET as string | undefined;
+const TOKEN_ENDPOINT = "/api/sso/token";
 
 function getRedirectUri() {
   return `${window.location.origin}/auth/callback`;
@@ -45,10 +50,23 @@ export interface SsoClaims {
   exp?: number;
 }
 
+export type SsoRole = "admin" | "staff" | "customer";
+
 export interface SsoSession {
   claims: SsoClaims;
   access_token: string;
   expires_at: number;
+  /**
+   * Supabase-compatible JWT minted by /api/sso/token. supabase-js presents it
+   * via the `accessToken` hook, which is what makes auth.uid() resolve and RLS
+   * work. Null when SUPABASE_JWT_SECRET is not configured — the app then falls
+   * back to anon and reads only public data.
+   */
+  supabase_token?: string | null;
+  /** The role the database will enforce. Authoritative; decided server-side. */
+  role?: SsoRole | null;
+  /** profiles.id — a uuid derived from the SSO subject. */
+  profile_id?: string | null;
 }
 
 export async function startLogin(returnTo = "/") {
@@ -86,17 +104,12 @@ export async function handleCallback(
   sessionStorage.removeItem(TX_VERIFIER_KEY);
   sessionStorage.removeItem(TX_STATE_KEY);
 
-  const res = await fetch(`${SSO_ISSUER}/oidc/token`, {
+  // redirect_uri is not sent: the server derives it from the request origin so
+  // it cannot be pointed elsewhere by a caller.
+  const res = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: CLIENT_ID,
-      ...(CLIENT_SECRET ? { client_secret: CLIENT_SECRET } : {}),
-      redirect_uri: getRedirectUri(),
-      code,
-      code_verifier: verifier,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, code_verifier: verifier }),
   });
 
   if (!res.ok) return null;
@@ -108,6 +121,9 @@ export async function handleCallback(
     claims,
     access_token: tokens.access_token as string,
     expires_at: Date.now() + Number(tokens.expires_in ?? 3600) * 1000,
+    supabase_token: (tokens.supabase_token as string | null) ?? null,
+    role: (tokens.role as SsoRole | null) ?? null,
+    profile_id: (tokens.profile_id as string | null) ?? null,
   };
 
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -131,10 +147,18 @@ export function clearSession() {
 }
 
 export function logout() {
+  // Local sign-out: drop our session and return to the landing page.
+  //
+  // We deliberately do NOT bounce through the issuer's /oidc/session/end with a
+  // post_logout_redirect_uri — that URI must be registered on the client at
+  // Ventera, and while it is not, the end-session page answers
+  // "post_logout_redirect_uri not registered" and strands the user on an error.
+  // Clearing our own session is what actually logs them out of this app.
+  //
+  // Trade-off: the Ventera SSO session itself stays alive, so the next sign-in
+  // may not re-prompt for credentials. To get a full single-logout, register
+  // `${origin}/` as a post_logout_redirect_uri for the `gostay` client at
+  // Ventera, then this can call /oidc/session/end again.
   clearSession();
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    post_logout_redirect_uri: `${window.location.origin}/`,
-  });
-  window.location.assign(`${SSO_ISSUER}/oidc/session/end?${params}`);
+  window.location.assign("/");
 }

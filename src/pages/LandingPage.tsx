@@ -22,6 +22,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth, roleHome } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -72,6 +73,9 @@ function Section({ className = "", id, children }: { className?: string; id?: st
 // ─── Navbar ──────────────────────────────────────────────────────────────────
 
 function Navbar() {
+  const { session, role, signOut } = useAuth();
+  const home = roleHome(role);
+
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -87,8 +91,16 @@ function Navbar() {
           <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
         </nav>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" asChild><Link to="/login">Masuk</Link></Button>
-          <Button size="sm" asChild><Link to="/register">Coba Gratis 14 Hari</Link></Button>
+          {session ? (
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to={home}>{role === "admin" || role === "staff" ? "Dashboard" : "Portal Saya"}</Link>
+              </Button>
+              <Button variant="outline" size="sm" onClick={signOut}>Keluar</Button>
+            </>
+          ) : (
+            <Button size="sm" asChild><Link to="/login">Masuk</Link></Button>
+          )}
         </div>
       </div>
     </header>

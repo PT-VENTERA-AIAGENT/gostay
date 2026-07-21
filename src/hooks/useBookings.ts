@@ -3,6 +3,7 @@ import {
   getBookings,
   getBookingById,
   createBooking,
+  createWalkInCheckIn,
   updateBookingStatus,
   updateBooking,
   getAuditLog,
@@ -10,13 +11,19 @@ import {
   getTodayDepartures,
   searchCustomers,
   getCustomerBookings,
+  getMyBookings,
+  getBookingsInRange,
+  countPendingBookings,
 } from "@/services/bookingService";
+import { addPayment } from "@/services/frontDeskService";
+import type { PaymentMethod } from "@/services/frontDeskService";
 import type {
   BookingFilters,
   BookingInsert,
   BookingUpdate,
   BookingStatus,
 } from "@/services/bookingService";
+import type { WalkInInput } from "@/services/bookingService";
 import type { BookingUpdate as BookingUpdateType } from "@/types/database.types";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -29,7 +36,19 @@ export const bookingKeys = {
   departures: () => ["bookings", "departures"] as const,
   customerBookings: (customerId: string) =>
     ["bookings", "customer", customerId] as const,
+  mine: (profileId: string) => ["bookings", "mine", profileId] as const,
+  range: (start: string, end: string) => ["bookings", "range", start, end] as const,
+  pendingCount: () => ["bookings", "pending-count"] as const,
 };
+
+/** Count of pending bookings, for the sidebar's Reservations badge. */
+export function usePendingBookingsCount() {
+  return useQuery({
+    queryKey: bookingKeys.pendingCount(),
+    queryFn: countPendingBookings,
+    refetchInterval: 60_000,
+  });
+}
 
 export function useBookings(filters?: BookingFilters) {
   return useQuery({
@@ -78,6 +97,29 @@ export function useCustomerBookings(customerId: string) {
   });
 }
 
+/** Bookings overlapping a date window, for the calendar. */
+export function useBookingsInRange(rangeStart: string, rangeEnd: string) {
+  return useQuery({
+    queryKey: bookingKeys.range(rangeStart, rangeEnd),
+    queryFn: () => getBookingsInRange(rangeStart, rangeEnd),
+    enabled: Boolean(rangeStart && rangeEnd),
+  });
+}
+
+/**
+ * The signed-in user's own bookings. Takes no id: passing one would invite a
+ * caller to pass someone else's, and the answer comes from auth.uid() anyway.
+ */
+export function useMyBookings() {
+  const { user } = useAuth();
+  const profileId = user?.id ?? "";
+  return useQuery({
+    queryKey: bookingKeys.mine(profileId),
+    queryFn: () => getMyBookings(profileId),
+    enabled: Boolean(profileId),
+  });
+}
+
 export function useSearchCustomers(query: string) {
   return useQuery({
     queryKey: ["customers", "search", query],
@@ -90,6 +132,41 @@ export function useCreateBooking() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: BookingInsert) => createBooking(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: bookingKeys.all }),
+  });
+}
+
+/**
+ * Walk-in check-in: create the guest + a checked_in booking, then optionally
+ * record a first payment (its trigger recomputes the balance). Invalidates the
+ * whole booking tree so the list, arrivals and calendar all refresh.
+ */
+export function useWalkInCheckIn() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({
+      input,
+      payment,
+    }: {
+      input: Omit<WalkInInput, "createdBy">;
+      payment?: { amount: number; method: PaymentMethod } | null;
+    }) => {
+      const { booking, customer } = await createWalkInCheckIn({
+        ...input,
+        createdBy: user?.id ?? null,
+      });
+      if (payment && payment.amount > 0) {
+        await addPayment({
+          booking_id: booking.id,
+          amount: payment.amount,
+          method: payment.method,
+          note: "Pembayaran walk-in",
+          created_by: user?.id ?? null,
+        });
+      }
+      return { booking, customer };
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: bookingKeys.all }),
   });
 }
@@ -112,6 +189,8 @@ export function useUpdateBookingStatus() {
       qc.invalidateQueries({ queryKey: bookingKeys.list() });
       qc.invalidateQueries({ queryKey: bookingKeys.arrivals() });
       qc.invalidateQueries({ queryKey: bookingKeys.departures() });
+      // Confirming/cancelling a pending booking changes the sidebar badge.
+      qc.invalidateQueries({ queryKey: bookingKeys.pendingCount() });
     },
   });
 }

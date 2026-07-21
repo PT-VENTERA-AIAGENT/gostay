@@ -3,15 +3,16 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Search, Star, Wifi, Wind, Tv, Coffee, Bath, Mountain, Users, MapPin, ArrowRight, Shield, Clock, CreditCard, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem, fadeInUp } from "@/components/shared/PageTransition";
-import { useRoomTypes, useAvailableRooms } from "@/hooks/useRooms";
+import DatePicker from "@/components/shared/DatePicker";
+import { useRoomTypes, useAvailableRooms, useRooms } from "@/hooks/useRooms";
+import { usePublishedReviews, useReviewStats } from "@/hooks/useReviews";
+import { useTenant } from "@/hooks/useTenant";
 
 const amenityIcons: Record<string, React.ElementType> = { WiFi: Wifi, AC: Wind, TV: Tv, "Mini Bar": Coffee, Bathtub: Bath, "Sea View": Mountain };
 
-const reviews = [
-  { name: "Sarah K.", rating: 5, text: "Absolutely wonderful stay! The staff was incredibly attentive and the room was spotless.", date: "Mar 2026" },
-  { name: "Michael T.", rating: 5, text: "Best hotel in the city. The sea view from the suite was breathtaking.", date: "Feb 2026" },
-  { name: "Lisa W.", rating: 4, text: "Great location and amenities. Will definitely come back!", date: "Jan 2026" },
-];
+function formatReviewDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
 
 function formatIDR(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -39,8 +40,11 @@ function RoomCardSkeleton() {
   );
 }
 
+const todayISO = new Date().toISOString().slice(0, 10);
+
 export default function PortalHome() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { name: hotelName } = useTenant();
 
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") ?? "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") ?? "");
@@ -48,6 +52,9 @@ export default function PortalHome() {
   const [searched, setSearched] = useState(Boolean(searchParams.get("checkIn")));
 
   const { data: roomTypes, isLoading: loadingTypes, error: errorTypes } = useRoomTypes();
+  const { data: allRooms = [] } = useRooms();
+  const { data: reviews = [] } = usePublishedReviews(6);
+  const { data: reviewStats } = useReviewStats();
   const {
     data: availableRooms,
     isLoading: loadingAvail,
@@ -84,29 +91,38 @@ export default function PortalHome() {
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="max-w-4xl mx-auto text-center">
             <motion.div variants={staggerItem} className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-1.5 text-sm text-muted-foreground mb-4 md:mb-6">
               <Star className="w-4 h-4 text-warning fill-warning" />
-              <span>Rated 4.8/5 by 350+ guests</span>
+              <span>
+                {reviewStats && reviewStats.count > 0
+                  ? `Rated ${reviewStats.average.toFixed(1)}/5 by ${reviewStats.count} guest${reviewStats.count !== 1 ? "s" : ""}`
+                  : "Direct booking, best rates"}
+              </span>
             </motion.div>
-            <motion.h1 variants={staggerItem} className="text-3xl md:text-5xl font-bold text-foreground mb-3 md:mb-4 leading-tight">Find Your Perfect<br />Stay at GoStay Hotel</motion.h1>
+            <motion.h1 variants={staggerItem} className="text-3xl md:text-5xl font-bold text-foreground mb-3 md:mb-4 leading-tight">Find Your Perfect<br />Stay at {hotelName}</motion.h1>
             <motion.p variants={staggerItem} className="text-base md:text-lg text-muted-foreground mb-6 md:mb-10 max-w-2xl mx-auto">Discover comfort and luxury in the heart of the city. Book directly for the best rates and exclusive perks.</motion.p>
 
             <motion.div variants={staggerItem} className="bg-card rounded-2xl border border-border p-4 md:p-6 shadow-sm max-w-3xl mx-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Check-in</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    min={todayISO}
+                    placeholder="Pilih tanggal"
+                    onChange={(v) => {
+                      setCheckIn(v);
+                      // Keep the range coherent: if check-out is now on or before
+                      // the new check-in, clear it rather than leave an invalid span.
+                      if (checkOut && v && checkOut <= v) setCheckOut("");
+                    }}
                   />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Check-out</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    min={checkIn || todayISO}
+                    placeholder="Pilih tanggal"
+                    onChange={setCheckOut}
                   />
                 </div>
                 <div>
@@ -138,7 +154,7 @@ export default function PortalHome() {
 
         {/* Why Book Direct */}
         <section className="px-4 md:px-8 py-8 md:py-12 max-w-6xl mx-auto">
-          <motion.div variants={staggerContainer} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
               { icon: CreditCard, title: "Best Price Guarantee", desc: "Book direct and get the lowest rate guaranteed" },
               { icon: Shield, title: "Free Cancellation", desc: "Cancel up to 48 hours before check-in" },
@@ -182,17 +198,23 @@ export default function PortalHome() {
               <p className="text-muted-foreground text-sm">No rooms available for the selected dates. Try different dates.</p>
             </div>
           ) : (
-            <motion.div variants={staggerContainer} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {displayedRooms.map((room) => (
-                <motion.div key={room.slug} variants={staggerItem} whileHover={{ y: -6, transition: { duration: 0.2 } }}>
+                <motion.div key={room.slug} variants={staggerItem} whileHover={{ y: -6, transition: { duration: 0.2 } }} className="h-full">
+                  {/* h-full + flex column keeps every card in a row the same
+                      height regardless of description length or amenity count. */}
                   <Link
                     to={`/portal/rooms/${room.slug}${checkIn && checkOut ? `?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}` : ""}`}
-                    className="block bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-shadow group"
+                    className="flex flex-col h-full bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-shadow group"
                   >
-                    <div className="aspect-[16/9] bg-muted flex items-center justify-center text-muted-foreground text-sm relative">
-                      Room Photo
+                    <div className="aspect-[16/9] bg-muted flex items-center justify-center text-muted-foreground text-sm relative overflow-hidden shrink-0">
+                      {room.photos?.[0] ? (
+                        <img src={room.photos[0]} alt={room.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        "No photo"
+                      )}
                     </div>
-                    <div className="p-4 md:p-5">
+                    <div className="p-4 md:p-5 flex flex-col flex-1">
                       <div className="flex items-start justify-between mb-2">
                         <h3 className="text-base md:text-lg font-semibold text-foreground group-hover:text-primary transition-colors">{room.name}</h3>
                       </div>
@@ -213,7 +235,7 @@ export default function PortalHome() {
                           <span className="text-xs text-muted-foreground px-1">+{room.amenities.length - 3}</span>
                         )}
                       </div>
-                      <div className="flex items-center justify-between pt-3 border-t border-border">
+                      <div className="flex items-center justify-between pt-3 mt-auto border-t border-border">
                         <p className="text-base md:text-lg font-bold text-primary">
                           {formatIDR(room.base_rate)} <span className="text-xs font-normal text-muted-foreground">/ night</span>
                         </p>
@@ -231,25 +253,34 @@ export default function PortalHome() {
         <section className="px-4 md:px-8 py-8 md:py-12 bg-muted/30">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-6 md:mb-8"><h2 className="text-xl md:text-2xl font-bold text-foreground">What Our Guests Say</h2><p className="text-sm text-muted-foreground mt-1">Real reviews from real guests</p></div>
-            <motion.div variants={staggerContainer} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-              {reviews.map((r, i) => (
-                <motion.div key={i} variants={staggerItem} className="bg-card rounded-xl border border-border p-5">
-                  <div className="flex items-center gap-1 mb-3">{Array.from({ length: r.rating }).map((_, j) => <Star key={j} className="w-4 h-4 text-warning fill-warning" />)}</div>
-                  <p className="text-sm text-foreground mb-3 leading-relaxed">"{r.text}"</p>
-                  <div className="flex items-center justify-between"><span className="text-sm font-medium text-foreground">{r.name}</span><span className="text-xs text-muted-foreground">{r.date}</span></div>
-                </motion.div>
-              ))}
-            </motion.div>
+            {reviews.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground">Belum ada ulasan. Jadilah yang pertama setelah menginap!</p>
+            ) : (
+              <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                {reviews.map((r) => (
+                  <motion.div key={r.id} variants={staggerItem} className="bg-card rounded-xl border border-border p-5">
+                    <div className="flex items-center gap-1 mb-3">{Array.from({ length: r.rating }).map((_, j) => <Star key={j} className="w-4 h-4 text-warning fill-warning" />)}</div>
+                    {r.comment && <p className="text-sm text-foreground mb-3 leading-relaxed">"{r.comment}"</p>}
+                    <div className="flex items-center justify-between"><span className="text-sm font-medium text-foreground">{r.customers?.full_name ?? "Tamu"}</span><span className="text-xs text-muted-foreground">{formatReviewDate(r.created_at)}</span></div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
           </div>
         </section>
 
         {/* Hotel Info */}
         <section className="px-4 md:px-8 py-12 md:py-16 bg-card border-t border-border">
-          <motion.div variants={fadeInUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="max-w-4xl mx-auto text-center">
-            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3">About GoStay Hotel</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto mb-8 text-sm md:text-base">Located in the heart of the city, GoStay Hotel offers world-class hospitality with modern amenities.</p>
+          <motion.div variants={fadeInUp} initial="hidden" animate="show" className="max-w-4xl mx-auto text-center">
+            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3">About {hotelName}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto mb-8 text-sm md:text-base">Located in the heart of the city, {hotelName} offers world-class hospitality with modern amenities.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-2xl mx-auto">
-              {[{ value: "43", label: "Rooms" }, { value: "4.8", label: "Rating" }, { value: "350+", label: "Reviews" }, { value: "5+", label: "Room Types" }].map((s) => (
+              {[
+                { value: String(allRooms.length || 0), label: "Rooms" },
+                { value: reviewStats && reviewStats.count > 0 ? reviewStats.average.toFixed(1) : "—", label: "Rating" },
+                { value: String(reviewStats?.count ?? 0), label: "Reviews" },
+                { value: String(roomTypes?.length ?? 0), label: "Room Types" },
+              ].map((s) => (
                 <div key={s.label}><p className="text-2xl md:text-3xl font-bold text-primary">{s.value}</p><p className="text-sm text-muted-foreground">{s.label}</p></div>
               ))}
             </div>
