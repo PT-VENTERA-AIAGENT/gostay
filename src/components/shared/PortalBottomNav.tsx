@@ -3,11 +3,11 @@ import { Search, Calendar, MessageSquare, User, UtensilsCrossed } from "lucide-r
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { icon: Search, label: "Home", path: "/portal" },
-  { icon: Calendar, label: "Bookings", path: "/portal/my-account" },
-  { icon: UtensilsCrossed, label: "Order", path: "/portal/order" },
-  { icon: MessageSquare, label: "Chat", path: "/portal/chat" },
-  { icon: User, label: "Account", path: "/portal/profile" },
+  { icon: Search, label: "Beranda", path: "/portal" },
+  { icon: Calendar, label: "Booking", path: "/portal/my-account" },
+  { icon: UtensilsCrossed, label: "Layanan", path: "/portal/order" },
+  { icon: MessageSquare, label: "Pesan", path: "/portal/chat" },
+  { icon: User, label: "Akun", path: "/portal/profile" },
 ];
 
 export default function PortalBottomNav() {

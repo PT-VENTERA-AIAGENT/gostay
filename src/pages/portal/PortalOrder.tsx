@@ -121,7 +121,7 @@ export default function PortalOrder() {
             <UtensilsCrossed className="w-8 h-8 text-muted-foreground mx-auto" />
             <p className="text-sm font-medium text-foreground">Room service tersedia saat kamu menginap</p>
             <p className="text-sm text-muted-foreground">Pesanan menu bisa dilakukan setelah check-in. Lihat status booking-mu di{" "}
-              <Link to="/portal/my-account" className="text-primary hover:underline">My Bookings</Link>.
+              <Link to="/portal/my-account" className="text-primary hover:underline">Booking Saya</Link>.
             </p>
           </div>
         ) : (
@@ -218,7 +218,7 @@ function Header() {
   return (
     <div className="space-y-1">
       <Link to="/portal/my-account" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Back
+        <ArrowLeft className="w-4 h-4" /> Kembali
       </Link>
       <h1 className="text-xl md:text-2xl font-bold text-foreground">Room Service</h1>
       <p className="text-sm text-muted-foreground">Pesan menu ke kamarmu — ditagihkan ke folio.</p>
