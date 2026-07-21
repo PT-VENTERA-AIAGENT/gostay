@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useChatThreads } from "@/hooks/useChat";
 import { usePendingBookingsCount } from "@/hooks/useBookings";
+import { useOpenRequestsCount } from "@/hooks/useGuestRequests";
 import { useTenant } from "@/hooks/useTenant";
 
 const navItems = [
@@ -43,11 +44,15 @@ export default function AppSidebar() {
   // Pending reservations waiting on the front desk — same badge treatment as
   // unread Messages, so new bookings are visible from any page.
   const { data: pendingBookings = 0 } = usePendingBookingsCount();
+  const { data: openRequests = 0 } = useOpenRequestsCount();
 
   // Brand the shell with the caller's actual hotel, not a hardcoded name.
-  const { name: hotelName, initial: hotelInitial } = useTenant();
+  const { name: hotelName, initial: hotelInitial, tenant } = useTenant();
   const badgeFor = (path: string) =>
-    path === "/chat" ? unreadTotal : path === "/bookings" ? pendingBookings : 0;
+    path === "/chat" ? unreadTotal
+    : path === "/bookings" ? pendingBookings
+    : path === "/requests" ? openRequests
+    : 0;
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -80,8 +85,12 @@ export default function AppSidebar() {
       className="hidden md:flex flex-col min-h-screen bg-card border-r border-sidebar-border px-2 py-6 shrink-0 relative"
     >
       <div className={cn("flex items-center gap-2 px-2 mb-8", collapsed && "justify-center")}>
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">{hotelInitial}</span>
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden">
+          {tenant?.logo_url ? (
+            <img src={tenant.logo_url} alt={hotelName} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-primary-foreground font-bold text-sm">{hotelInitial}</span>
+          )}
         </div>
         <AnimatePresence>
           {!collapsed && (
