@@ -13,23 +13,23 @@ import { useOpenRequestsCount } from "@/hooks/useGuestRequests";
 import { useTenant } from "@/hooks/useTenant";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: CalendarCheck, label: "Reservations", path: "/bookings" },
-  { icon: DoorOpen, label: "Rooms", path: "/rooms" },
-  { icon: MessageSquare, label: "Messages", path: "/chat" },
-  { icon: Phone, label: "Call Logs", path: "/calls" },
+  { icon: LayoutDashboard, label: "Dasbor", path: "/dashboard" },
+  { icon: CalendarCheck, label: "Reservasi", path: "/bookings" },
+  { icon: DoorOpen, label: "Kamar", path: "/rooms" },
+  { icon: MessageSquare, label: "Pesan", path: "/chat" },
+  { icon: Phone, label: "Log Panggilan", path: "/calls" },
   { icon: ConciergeBell, label: "Permintaan Tamu", path: "/requests" },
   { icon: Store, label: "Kasir (POS)", path: "/pos" },
-  { icon: CalendarDays, label: "Calendar", path: "/bookings?view=calendar" },
-  { icon: DollarSign, label: "Financials", path: "/analytics" },
+  { icon: CalendarDays, label: "Kalender", path: "/bookings?view=calendar" },
+  { icon: DollarSign, label: "Keuangan", path: "/analytics" },
 ];
 
 const bottomItems = [
   { icon: Contact, label: "CRM Tamu", path: "/crm" },
   { icon: Building2, label: "Profil Hotel", path: "/settings/hotel" },
   { icon: MessageCircle, label: "Sambungkan WhatsApp", path: "/settings/whatsapp" },
-  { icon: Users, label: "User Management", path: "/users" },
-  { icon: Star, label: "Reviews", path: "/reviews" },
+  { icon: Users, label: "Manajemen Pengguna", path: "/users" },
+  { icon: Star, label: "Ulasan", path: "/reviews" },
 ];
 
 export default function AppSidebar() {

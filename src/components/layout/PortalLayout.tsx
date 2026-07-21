@@ -11,11 +11,11 @@ import { useTenant } from "@/hooks/useTenant";
 import RealtimeSync from "@/components/shared/RealtimeSync";
 
 const portalNav = [
-  { label: "Home", path: "/portal", icon: Search },
-  { label: "My Bookings", path: "/portal/my-account", icon: Calendar },
+  { label: "Beranda", path: "/portal", icon: Search },
+  { label: "Booking Saya", path: "/portal/my-account", icon: Calendar },
   { label: "Room Service", path: "/portal/order", icon: UtensilsCrossed },
-  { label: "Messages", path: "/portal/chat", icon: MessageSquare },
-  { label: "Account", path: "/portal/profile", icon: User },
+  { label: "Pesan", path: "/portal/chat", icon: MessageSquare },
+  { label: "Akun", path: "/portal/profile", icon: User },
 ];
 
 export default function PortalLayout() {
@@ -57,7 +57,7 @@ export default function PortalLayout() {
               >
                 <item.icon className="w-4 h-4 shrink-0" />
                 {/* Labels only from lg — at md the header (logo + 4 labelled
-                    links + name + Sign Out) ran past the viewport. */}
+                    links + name + Keluar) ran past the viewport. */}
                 <span className="hidden lg:inline">{item.label}</span>
               </Link>
             );
@@ -68,7 +68,7 @@ export default function PortalLayout() {
           <ThemeToggle />
           {/* There is no "Register": Ventera SSO owns the accounts, so signing
               in is the only door — the old button led to a form that always
-              failed with "Use SSO login". The header also used to offer Sign In
+              failed with "Use SSO login". The header also used to offer Masuk
               to people who were already signed in. */}
           {session ? (
             <>
@@ -82,12 +82,12 @@ export default function PortalLayout() {
                 onClick={signOut}
                 className="hidden sm:inline-flex items-center gap-2 text-sm font-medium border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors btn-press"
               >
-                <LogOut className="w-4 h-4" /> Sign Out
+                <LogOut className="w-4 h-4" /> Keluar
               </button>
             </>
           ) : (
             <Link to="/login" className="hidden sm:inline text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity btn-press">
-              Sign In
+              Masuk
             </Link>
           )}
           <button className="md:hidden w-9 h-9 flex items-center justify-center text-muted-foreground touch-target" onClick={() => setMobileMenu(!mobileMenu)}>
@@ -127,10 +127,10 @@ export default function PortalLayout() {
                     onClick={() => { setMobileMenu(false); signOut(); }}
                     className="flex-1 text-center text-sm font-medium border border-border py-2.5 rounded-lg hover:bg-muted touch-target"
                   >
-                    Sign Out
+                    Keluar
                   </button>
                 ) : (
-                  <Link to="/login" className="flex-1 text-center text-sm font-medium bg-primary text-primary-foreground py-2.5 rounded-lg touch-target" onClick={() => setMobileMenu(false)}>Sign In</Link>
+                  <Link to="/login" className="flex-1 text-center text-sm font-medium bg-primary text-primary-foreground py-2.5 rounded-lg touch-target" onClick={() => setMobileMenu(false)}>Masuk</Link>
                 )}
               </div>
             </div>
@@ -161,18 +161,18 @@ export default function PortalLayout() {
               </div>
               <span className="font-bold text-foreground">{hotelName}</span>
             </div>
-            <p className="text-sm text-muted-foreground">Your perfect stay awaits. Book directly for the best rates and exclusive perks.</p>
+            <p className="text-sm text-muted-foreground">Menginap sempurnamu menanti. Booking langsung untuk harga terbaik dan keuntungan eksklusif.</p>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground text-sm mb-3">Quick Links</h4>
+            <h4 className="font-semibold text-foreground text-sm mb-3">Tautan Cepat</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <Link to="/portal" className="block hover:text-foreground transition-colors">Home</Link>
-              <Link to="/portal/my-account" className="block hover:text-foreground transition-colors">My Bookings</Link>
-              <Link to="/portal/chat" className="block hover:text-foreground transition-colors">Contact Us</Link>
+              <Link to="/portal" className="block hover:text-foreground transition-colors">Beranda</Link>
+              <Link to="/portal/my-account" className="block hover:text-foreground transition-colors">Booking Saya</Link>
+              <Link to="/portal/chat" className="block hover:text-foreground transition-colors">Hubungi Kami</Link>
             </div>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground text-sm mb-3">Contact</h4>
+            <h4 className="font-semibold text-foreground text-sm mb-3">Kontak</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
               {(() => {
                 const phone = tenant?.phone ?? "+62 21 1234 5678";
@@ -196,16 +196,16 @@ export default function PortalLayout() {
             </div>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground text-sm mb-3">Policies</h4>
+            <h4 className="font-semibold text-foreground text-sm mb-3">Kebijakan</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p className="hover:text-foreground transition-colors cursor-pointer">Privacy Policy</p>
-              <p className="hover:text-foreground transition-colors cursor-pointer">Terms of Service</p>
-              <p className="hover:text-foreground transition-colors cursor-pointer">Cancellation Policy</p>
+              <p className="hover:text-foreground transition-colors cursor-pointer">Kebijakan Privasi</p>
+              <p className="hover:text-foreground transition-colors cursor-pointer">Syarat Layanan</p>
+              <p className="hover:text-foreground transition-colors cursor-pointer">Kebijakan Pembatalan</p>
             </div>
           </div>
         </div>
         <div className="max-w-6xl mx-auto mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
-          &copy; 2026 {hotelName}. All rights reserved.
+          &copy; 2026 {hotelName}. Semua hak dilindungi.
         </div>
       </footer>
 

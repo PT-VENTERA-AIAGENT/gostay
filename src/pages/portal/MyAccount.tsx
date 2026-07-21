@@ -8,12 +8,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { BookingWithRelations } from "@/services/bookingService";
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
-  pending: { label: "Awaiting Confirmation", cls: "bg-warning/10 text-warning" },
-  confirmed: { label: "Upcoming", cls: "bg-info/10 text-info" },
-  checked_in: { label: "In Stay", cls: "bg-primary/10 text-primary" },
-  checked_out: { label: "Completed", cls: "bg-muted text-muted-foreground" },
-  cancelled: { label: "Cancelled", cls: "bg-destructive/10 text-destructive" },
-  no_show: { label: "No Show", cls: "bg-destructive/10 text-destructive" },
+  pending: { label: "Menunggu Konfirmasi", cls: "bg-warning/10 text-warning" },
+  confirmed: { label: "Akan Datang", cls: "bg-info/10 text-info" },
+  checked_in: { label: "Sedang Menginap", cls: "bg-primary/10 text-primary" },
+  checked_out: { label: "Selesai", cls: "bg-muted text-muted-foreground" },
+  cancelled: { label: "Dibatalkan", cls: "bg-destructive/10 text-destructive" },
+  no_show: { label: "Tidak Hadir", cls: "bg-destructive/10 text-destructive" },
 };
 
 // 'pending' belongs here, not under Past: it is a live request the guest is
@@ -50,7 +50,7 @@ function BookingCard({ b, past }: { b: BookingWithRelations; past?: boolean }) {
         </div>
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-medium text-foreground">{b.rooms?.room_types?.name ?? "Room"}</p>
+            <p className="font-medium text-foreground">{b.rooms?.room_types?.name ?? "Kamar"}</p>
             <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", sc.cls)}>{sc.label}</span>
           </div>
           <p className="text-sm text-muted-foreground">{formatDate(b.check_in)} → {formatDate(b.check_out)}</p>
@@ -74,14 +74,14 @@ export default function MyAccount() {
   const upcoming = (bookings ?? []).filter((b) => UPCOMING.has(b.status));
   const past = (bookings ?? []).filter((b) => !UPCOMING.has(b.status));
 
-  const name = user?.name ?? user?.email ?? "Guest";
+  const name = user?.name ?? user?.email ?? "Tamu";
 
   return (
     <PageTransition>
       <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">My Account</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your bookings and profile</p>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Akun Saya</h1>
+          <p className="text-sm text-muted-foreground mt-1">Kelola booking dan profilmu</p>
         </div>
 
         <div className="bg-card rounded-xl border border-border p-4 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -96,36 +96,36 @@ export default function MyAccount() {
           </div>
           <div className="flex items-center gap-2">
             <Link to="/portal/chat" className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
-              <MessageSquare className="w-4 h-4" /> <span className="hidden sm:inline">Messages</span>
+              <MessageSquare className="w-4 h-4" /> <span className="hidden sm:inline">Pesan</span>
             </Link>
             <Link to="/portal/profile" className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
-              <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Edit Profile</span>
+              <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Edit Profil</span>
             </Link>
           </div>
         </div>
 
         {isLoading && (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading your bookings…
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Memuat booking-mu…
           </div>
         )}
 
         {error && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-sm text-destructive">
-            Could not load your bookings. Please refresh, or contact us if it keeps happening.
+            Gagal memuat booking. Coba refresh, atau hubungi kami jika terus terjadi.
           </div>
         )}
 
         {!isLoading && !error && (
           <>
             <div>
-              <h2 className="text-lg font-semibold text-foreground mb-4">Upcoming Stays</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">Menginap Mendatang</h2>
               {upcoming.length === 0 ? (
                 <div className="bg-card rounded-xl border border-border p-8 text-center">
                   <Calendar className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="font-medium text-foreground mb-1">No upcoming bookings</p>
+                  <p className="font-medium text-foreground mb-1">Belum ada booking mendatang</p>
                   <Link to="/portal" className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity mt-3">
-                    Browse Rooms
+                    Lihat Kamar
                   </Link>
                 </div>
               ) : (
@@ -136,9 +136,9 @@ export default function MyAccount() {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-foreground mb-4">Past Stays</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">Riwayat Menginap</h2>
               {past.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No past stays yet.</p>
+                <p className="text-sm text-muted-foreground">Belum ada riwayat menginap.</p>
               ) : (
                 <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-3">
                   {past.map((b) => <BookingCard key={b.id} b={b} past />)}

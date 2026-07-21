@@ -15,17 +15,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const pageTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/bookings/new": "New Booking",
-  "/bookings": "Reservations",
-  "/rooms/types": "Room Types",
-  "/rooms": "Rooms",
-  "/chat": "Messages",
-  "/calls/new": "New Call Log",
-  "/calls": "Call Logs",
-  "/analytics": "Analytics",
-  "/users": "User Management",
-  "/reviews": "Reviews",
+  "/dashboard": "Dasbor",
+  "/bookings/new": "Booking Baru",
+  "/bookings": "Reservasi",
+  "/rooms/types": "Tipe Kamar",
+  "/rooms": "Kamar",
+  "/chat": "Pesan",
+  "/calls/new": "Log Panggilan Baru",
+  "/calls": "Log Panggilan",
+  "/analytics": "Keuangan",
+  "/users": "Manajemen Pengguna",
+  "/reviews": "Ulasan",
   "/crm": "CRM",
   "/settings/hotel": "Profil Hotel",
 };
