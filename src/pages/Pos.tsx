@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   ShoppingCart, Plus, Minus, Trash2, Loader2, CreditCard, BedDouble,
-  Store, Package, X, Check, Receipt,
+  Store, Package, X, Check, Receipt, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,8 +9,8 @@ import PageTransition, { staggerItem } from "@/components/shared/PageTransition"
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
-  useProducts, useFolioTargets, useCreateProduct, useSetProductActive,
-  useCreateWalkInOrder, usePostToFolio, useTodayOrders,
+  useProducts, useAllProducts, useFolioTargets, useCreateProduct, useSetProductActive,
+  useUpdateProduct, useDeleteProduct, useCreateWalkInOrder, usePostToFolio, useTodayOrders,
 } from "@/hooks/usePos";
 import type { PosProduct, PosOrderItem } from "@/services/posService";
 import type { PosCategory, PaymentMethod } from "@/services/frontDeskService";
@@ -321,7 +321,7 @@ export default function Pos() {
 
       <AnimatePresence>
         {showProductForm && (
-          <ProductManager products={products} onClose={() => setShowProductForm(false)} />
+          <ProductManager onClose={() => setShowProductForm(false)} />
         )}
         {showRecap && <DailyRecap onClose={() => setShowRecap(false)} />}
       </AnimatePresence>
@@ -399,16 +399,55 @@ function DailyRecap({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Product manager (add + activate/deactivate) ────────────────────────────────
+// ─── Product manager (full CRUD: add, edit, activate/deactivate, delete) ────────
 
-function ProductManager({ products, onClose }: { products: PosProduct[]; onClose: () => void }) {
+function ProductManager({ onClose }: { onClose: () => void }) {
   const { toast } = useToast();
+  // The manager lists ALL products, including deactivated ones, so staff can
+  // re-activate or delete them — the cashier grid still shows only active items.
+  const { data: products = [] } = useAllProducts();
   const createProduct = useCreateProduct();
   const setActive = useSetProductActive();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
 
   const [name, setName] = useState("");
   const [category, setCategory] = useState<PosCategory>("fnb");
   const [price, setPrice] = useState("");
+
+  // Inline edit state — which product is open, and its draft fields.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCategory, setEditCategory] = useState<PosCategory>("fnb");
+  const [editPrice, setEditPrice] = useState("");
+
+  function startEdit(p: PosProduct) {
+    setEditId(p.id);
+    setEditName(p.name);
+    setEditCategory(p.category);
+    setEditPrice(String(p.price));
+  }
+
+  function saveEdit(id: string) {
+    const value = Number(editPrice);
+    if (!editName.trim()) { toast({ title: "Nama produk wajib diisi", variant: "destructive" }); return; }
+    if (!Number.isFinite(value) || value < 0) { toast({ title: "Harga tidak valid", variant: "destructive" }); return; }
+    updateProduct.mutate(
+      { id, input: { name: editName.trim(), category: editCategory, price: value } },
+      {
+        onSuccess: () => { toast({ title: "Produk diperbarui" }); setEditId(null); },
+        onError: (e) => toast({ title: "Gagal memperbarui", description: (e as Error).message, variant: "destructive" }),
+      },
+    );
+  }
+
+  function handleDelete(p: PosProduct) {
+    if (!window.confirm(`Hapus "${p.name}" dari menu? Riwayat penjualan tidak terpengaruh.`)) return;
+    deleteProduct.mutate(p.id, {
+      onSuccess: () => toast({ title: "Produk dihapus" }),
+      onError: (e) => toast({ title: "Gagal menghapus", description: (e as Error).message, variant: "destructive" }),
+    });
+  }
 
   function handleCreate() {
     const value = Number(price);
@@ -464,24 +503,53 @@ function ProductManager({ products, onClose }: { products: PosProduct[]; onClose
           {products.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Belum ada produk.</p>
           ) : (
-            products.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 text-sm p-2 rounded-lg hover:bg-muted">
-                <div className="min-w-0">
-                  <p className="font-medium text-foreground truncate">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[p.category]} · {formatIDR(p.price)}</p>
+            products.map((p) =>
+              editId === p.id ? (
+                <div key={p.id} className="space-y-2 p-2 rounded-lg bg-muted/50 border border-border">
+                  <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nama produk" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <select className={inputCls} value={editCategory} onChange={(e) => setEditCategory(e.target.value as PosCategory)}>
+                      {(Object.keys(CATEGORY_LABELS) as PosCategory[]).map((k) => (
+                        <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
+                      ))}
+                    </select>
+                    <input className={inputCls} type="number" min="0" step="1000" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} placeholder="Harga (Rp)" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => saveEdit(p.id)} disabled={updateProduct.isPending} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-60">
+                      {updateProduct.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Simpan
+                    </button>
+                    <button onClick={() => setEditId(null)} className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted">Batal</button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setActive.mutate({ id: p.id, is_active: !p.is_active })}
-                  disabled={setActive.isPending}
-                  className={cn(
-                    "text-xs font-medium px-2.5 py-1 rounded-full transition-colors disabled:opacity-50",
-                    p.is_active ? "bg-success/10 text-success" : "bg-secondary text-muted-foreground",
-                  )}
-                >
-                  {p.is_active ? "Aktif" : "Nonaktif"}
-                </button>
-              </div>
-            ))
+              ) : (
+                <div key={p.id} className={cn("flex items-center justify-between gap-2 text-sm p-2 rounded-lg hover:bg-muted", !p.is_active && "opacity-60")}>
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[p.category]} · {formatIDR(p.price)}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setActive.mutate({ id: p.id, is_active: !p.is_active })}
+                      disabled={setActive.isPending}
+                      title={p.is_active ? "Nonaktifkan (sembunyikan dari kasir)" : "Aktifkan"}
+                      className={cn(
+                        "text-xs font-medium px-2.5 py-1 rounded-full transition-colors disabled:opacity-50",
+                        p.is_active ? "bg-success/10 text-success" : "bg-secondary text-muted-foreground",
+                      )}
+                    >
+                      {p.is_active ? "Aktif" : "Nonaktif"}
+                    </button>
+                    <button onClick={() => startEdit(p)} title="Edit" className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => handleDelete(p)} disabled={deleteProduct.isPending} title="Hapus" className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )
+            )
           )}
         </div>
       </motion.div>

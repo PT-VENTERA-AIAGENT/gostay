@@ -94,6 +94,30 @@ export async function setProductActive(id: string, is_active: boolean): Promise<
   if (error) throw error;
 }
 
+export interface UpdateProductInput {
+  name?: string;
+  category?: PosCategory;
+  price?: number;
+}
+
+export async function updateProduct(id: string, input: UpdateProductInput): Promise<PosProduct> {
+  const { data, error } = await db
+    .from("pos_products")
+    .update(input)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PosProduct;
+}
+
+// Line items on past orders are a jsonb snapshot (not a foreign key), so removing
+// a product never orphans a sale — the history keeps the name/price it was sold at.
+export async function deleteProduct(id: string): Promise<void> {
+  const { error } = await db.from("pos_products").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ─── Orders ────────────────────────────────────────────────────────────────────
 
 export async function createWalkInOrder(input: CreateWalkInOrderInput): Promise<PosOrder> {
