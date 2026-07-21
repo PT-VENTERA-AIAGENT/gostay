@@ -55,14 +55,14 @@ export default function BookingList() {
   return (
     <div className="bg-card rounded-xl p-5 border border-border">
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between mb-4 gap-3">
-        <h3 className="font-semibold text-foreground shrink-0">Booking List</h3>
+        <h3 className="font-semibold text-foreground shrink-0">{t("Booking List")}</h3>
         <div className="flex items-center gap-3 w-full lg:w-auto">
           <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 flex-1 min-w-0 lg:w-56 lg:flex-none">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search guest, ref, room"
+              placeholder={t("Search guest, ref, room")}
               className="bg-transparent text-xs outline-none w-full text-foreground placeholder:text-muted-foreground"
             />
           </div>
@@ -100,13 +100,13 @@ export default function BookingList() {
             <table className="w-full min-w-[860px] text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="text-left py-3 font-medium whitespace-nowrap">Booking ID</th>
-                  <th className="text-left py-3 font-medium whitespace-nowrap">Guest Name</th>
-                  <th className="text-left py-3 font-medium whitespace-nowrap">Room Type</th>
-                  <th className="text-left py-3 font-medium whitespace-nowrap">Room Number</th>
-                  <th className="text-left py-3 font-medium whitespace-nowrap">Duration</th>
-                  <th className="text-left py-3 font-medium whitespace-nowrap">Check-In &amp; Check-Out</th>
-                  <th className="text-left py-3 font-medium whitespace-nowrap">Status</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">{t("Booking ID")}</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">{t("Guest Name")}</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">{t("Room Type")}</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">{t("Room Number")}</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">{t("Duration")}</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">{t("Check-In & Check-Out")}</th>
+                  <th className="text-left py-3 font-medium whitespace-nowrap">{t("Status")}</th>
                   <th className="text-left py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -128,8 +128,8 @@ export default function BookingList() {
                           {type}
                         </span>
                       </td>
-                      <td className="py-3 text-foreground whitespace-nowrap">{b.rooms?.number ? "Room " + b.rooms.number : "—"}</td>
-                      <td className="py-3 text-muted-foreground whitespace-nowrap">{nightsOf(b.check_in, b.check_out)} nights</td>
+                      <td className="py-3 text-foreground whitespace-nowrap">{b.rooms?.number ? t("Room") + " " + b.rooms.number : "—"}</td>
+                      <td className="py-3 text-muted-foreground whitespace-nowrap">{nightsOf(b.check_in, b.check_out)} {t("nights")}</td>
                       <td className="py-3 text-muted-foreground whitespace-nowrap">{fmtDate(b.check_in)} - {fmtDate(b.check_out)}</td>
                       <td className="py-3">
                         <span className={cn("inline-block text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap", s.cls)}>{s.label}</span>
@@ -161,8 +161,8 @@ export default function BookingList() {
                       <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", s.cls)}>{s.label}</span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{b.rooms?.number ? "Room " + b.rooms.number : "—"} · {b.rooms?.room_types?.name ?? "—"}</span>
-                      <span>{nightsOf(b.check_in, b.check_out)} nights</span>
+                      <span>{b.rooms?.number ? t("Room") + " " + b.rooms.number : "—"} · {b.rooms?.room_types?.name ?? "—"}</span>
+                      <span>{nightsOf(b.check_in, b.check_out)} {t("nights")}</span>
                     </div>
                   </Link>
                 </motion.div>
