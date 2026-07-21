@@ -13,6 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { tr } from "@/lib/i18n";
 
 function formatIDR(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -80,7 +81,7 @@ export default function PortalBookingDetail() {
     setCancelError(null);
     try {
       await cancelBooking.mutateAsync({ id: booking!.id, status: "cancelled", note: "Cancelled by guest from the portal" });
-      toast({ title: "Booking cancelled", description: `${booking!.reference} has been cancelled.` });
+      toast({ title: tr("Booking cancelled"), description: `${booking!.reference} has been cancelled.` });
     } catch (e) {
       setCancelError(e instanceof Error ? e.message : "Could not cancel the booking. Please contact the hotel.");
     }

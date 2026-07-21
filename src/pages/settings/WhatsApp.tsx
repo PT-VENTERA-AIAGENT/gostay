@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MessageCircle, QrCode, CheckCircle2, AlertTriangle, Smartphone } from "lucide-react";
 import { motion } from "framer-motion";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -136,7 +136,7 @@ export default function WhatsApp() {
       startPolling();
     } catch (e) {
       toast({
-        title: "Gagal menyambungkan",
+        title: tr("Gagal menyambungkan"),
         description: (e as Error).message || "Terjadi kesalahan. Coba lagi.",
         variant: "destructive",
       });
@@ -154,10 +154,10 @@ export default function WhatsApp() {
       await apiFetch<{ ok: boolean }>("/api/wa/connect", { method: "DELETE" });
       stopPolling();
       setState({ status: "none", connected: false });
-      toast({ title: "Tautan WhatsApp dilepas" });
+      toast({ title: tr("Tautan WhatsApp dilepas") });
     } catch (e) {
       toast({
-        title: "Gagal melepas tautan",
+        title: tr("Gagal melepas tautan"),
         description: (e as Error).message || "Terjadi kesalahan. Coba lagi.",
         variant: "destructive",
       });

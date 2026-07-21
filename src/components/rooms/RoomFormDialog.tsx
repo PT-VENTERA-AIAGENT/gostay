@@ -6,6 +6,7 @@ import {
 import { useCreateRoom, useUpdateRoom, useDeleteRoom, useRoomTypes } from "@/hooks/useRooms";
 import { useToast } from "@/hooks/use-toast";
 import type { Room } from "@/types/database.types";
+import { tr } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -57,10 +58,10 @@ export default function RoomFormDialog({ open, onOpenChange, room, defaultTypeId
     try {
       if (room) {
         await update.mutateAsync({ id: room.id, payload });
-        toast({ title: "Kamar diperbarui", description: `Kamar ${payload.number}` });
+        toast({ title: tr("Kamar diperbarui"), description: `Kamar ${payload.number}` });
       } else {
         await create.mutateAsync(payload);
-        toast({ title: "Kamar dibuat", description: `Kamar ${payload.number}` });
+        toast({ title: tr("Kamar dibuat"), description: `Kamar ${payload.number}` });
       }
       onOpenChange(false);
     } catch (e) {
@@ -75,7 +76,7 @@ export default function RoomFormDialog({ open, onOpenChange, room, defaultTypeId
       // deleteRoom in the service soft-deletes (is_active=false) so a room with
       // bookings keeps its history rather than cascading them away.
       await remove.mutateAsync(room!.id);
-      toast({ title: "Kamar dinonaktifkan", description: `Kamar ${room!.number}` });
+      toast({ title: tr("Kamar dinonaktifkan"), description: `Kamar ${room!.number}` });
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menghapus.");

@@ -8,6 +8,7 @@ import { useCreateCallLog, useCallerLookup } from "@/hooks/useCallLogs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { CallDirection } from "@/types/database.types";
+import { tr } from "@/lib/i18n";
 
 function parseDuration(mmss: string): number {
   const parts = mmss.split(":").map(Number);
@@ -47,10 +48,10 @@ export default function NewCallLog() {
       },
       {
         onSuccess: () => {
-          toast({ title: "Call logged successfully" });
+          toast({ title: tr("Call logged successfully") });
           navigate("/calls");
         },
-        onError: (e) => toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
+        onError: (e) => toast({ title: tr("Error"), description: (e as Error).message, variant: "destructive" }),
       }
     );
   }

@@ -6,7 +6,7 @@ import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { useMyBookings } from "@/hooks/useBookings";
 import { usePortalMenu, useMyRoomServiceOrders, usePlaceRoomServiceOrder } from "@/hooks/usePortalOrder";
 import { useToast } from "@/hooks/use-toast";
@@ -86,11 +86,11 @@ export default function PortalOrder() {
       });
       setCart({});
       toast({
-        title: "Pesanan terkirim",
-        description: "Front desk akan mengantar pesananmu dan menambahkannya ke tagihan kamar.",
+        title: tr("Pesanan terkirim"),
+        description: tr("Front desk akan mengantar pesananmu dan menambahkannya ke tagihan kamar."),
       });
     } catch {
-      toast({ title: "Gagal mengirim pesanan", description: "Coba lagi sebentar.", variant: "destructive" });
+      toast({ title: tr("Gagal mengirim pesanan"), description: tr("Coba lagi sebentar."), variant: "destructive" });
     }
   };
 

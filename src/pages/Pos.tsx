@@ -4,7 +4,7 @@ import {
   Store, Package, X, Check, Receipt, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { motion, AnimatePresence } from "framer-motion";
 import PageTransition, { staggerItem } from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
@@ -96,7 +96,7 @@ export default function Pos() {
 
   function checkout() {
     if (cart.length === 0) {
-      toast({ title: "Keranjang kosong", variant: "destructive" });
+      toast({ title: tr("Keranjang kosong"), variant: "destructive" });
       return;
     }
     const items: PosOrderItem[] = cart.map(({ key: _key, ...rest }) => rest);
@@ -109,12 +109,12 @@ export default function Pos() {
             toast({ title: `Terjual — ${formatIDR(subtotal)} (${t(METHOD_LABELS[method])})` });
             resetAfterSale();
           },
-          onError: (e) => toast({ title: "Gagal menyimpan penjualan", description: (e as Error).message, variant: "destructive" }),
+          onError: (e) => toast({ title: tr("Gagal menyimpan penjualan"), description: (e as Error).message, variant: "destructive" }),
         },
       );
     } else {
       if (!targetBooking) {
-        toast({ title: "Pilih booking tujuan", variant: "destructive" });
+        toast({ title: tr("Pilih booking tujuan"), variant: "destructive" });
         return;
       }
       postToFolio.mutate(
@@ -131,7 +131,7 @@ export default function Pos() {
             toast({ title: `Ditagihkan ke folio ${target?.reference ?? ""} — ${formatIDR(subtotal)}` });
             resetAfterSale();
           },
-          onError: (e) => toast({ title: "Gagal menagih ke folio", description: (e as Error).message, variant: "destructive" }),
+          onError: (e) => toast({ title: tr("Gagal menagih ke folio"), description: (e as Error).message, variant: "destructive" }),
         },
       );
     }
@@ -434,13 +434,13 @@ function ProductManager({ onClose }: { onClose: () => void }) {
 
   function saveEdit(id: string) {
     const value = Number(editPrice);
-    if (!editName.trim()) { toast({ title: "Nama produk wajib diisi", variant: "destructive" }); return; }
-    if (!Number.isFinite(value) || value < 0) { toast({ title: "Harga tidak valid", variant: "destructive" }); return; }
+    if (!editName.trim()) { toast({ title: tr("Nama produk wajib diisi"), variant: "destructive" }); return; }
+    if (!Number.isFinite(value) || value < 0) { toast({ title: tr("Harga tidak valid"), variant: "destructive" }); return; }
     updateProduct.mutate(
       { id, input: { name: editName.trim(), category: editCategory, price: value } },
       {
-        onSuccess: () => { toast({ title: "Produk diperbarui" }); setEditId(null); },
-        onError: (e) => toast({ title: "Gagal memperbarui", description: (e as Error).message, variant: "destructive" }),
+        onSuccess: () => { toast({ title: tr("Produk diperbarui") }); setEditId(null); },
+        onError: (e) => toast({ title: tr("Gagal memperbarui"), description: (e as Error).message, variant: "destructive" }),
       },
     );
   }
@@ -448,20 +448,20 @@ function ProductManager({ onClose }: { onClose: () => void }) {
   function handleDelete(p: PosProduct) {
     if (!window.confirm(`Hapus "${p.name}" dari menu? Riwayat penjualan tidak terpengaruh.`)) return;
     deleteProduct.mutate(p.id, {
-      onSuccess: () => toast({ title: "Produk dihapus" }),
-      onError: (e) => toast({ title: "Gagal menghapus", description: (e as Error).message, variant: "destructive" }),
+      onSuccess: () => toast({ title: tr("Produk dihapus") }),
+      onError: (e) => toast({ title: tr("Gagal menghapus"), description: (e as Error).message, variant: "destructive" }),
     });
   }
 
   function handleCreate() {
     const value = Number(price);
-    if (!name.trim()) { toast({ title: "Nama produk wajib diisi", variant: "destructive" }); return; }
-    if (!Number.isFinite(value) || value < 0) { toast({ title: "Harga tidak valid", variant: "destructive" }); return; }
+    if (!name.trim()) { toast({ title: tr("Nama produk wajib diisi"), variant: "destructive" }); return; }
+    if (!Number.isFinite(value) || value < 0) { toast({ title: tr("Harga tidak valid"), variant: "destructive" }); return; }
     createProduct.mutate(
       { name: name.trim(), category, price: value },
       {
-        onSuccess: () => { toast({ title: "Produk ditambahkan" }); setName(""); setPrice(""); },
-        onError: (e) => toast({ title: "Gagal menambah produk", description: (e as Error).message, variant: "destructive" }),
+        onSuccess: () => { toast({ title: tr("Produk ditambahkan") }); setName(""); setPrice(""); },
+        onError: (e) => toast({ title: tr("Gagal menambah produk"), description: (e as Error).message, variant: "destructive" }),
       },
     );
   }

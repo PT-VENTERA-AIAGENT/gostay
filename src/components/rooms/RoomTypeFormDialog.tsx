@@ -6,6 +6,7 @@ import {
 import { useCreateRoomType, useUpdateRoomType } from "@/hooks/useRooms";
 import { useToast } from "@/hooks/use-toast";
 import type { RoomType } from "@/types/database.types";
+import { tr } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -77,10 +78,10 @@ export default function RoomTypeFormDialog({ open, onOpenChange, roomType }: Pro
     try {
       if (roomType) {
         await update.mutateAsync({ id: roomType.id, payload });
-        toast({ title: "Tipe kamar diperbarui", description: payload.name });
+        toast({ title: tr("Tipe kamar diperbarui"), description: payload.name });
       } else {
         await create.mutateAsync(payload);
-        toast({ title: "Tipe kamar dibuat", description: payload.name });
+        toast({ title: tr("Tipe kamar dibuat"), description: payload.name });
       }
       onOpenChange(false);
     } catch (e) {

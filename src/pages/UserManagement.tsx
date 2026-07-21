@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Search, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useProfiles, useUpdateUserRole, useSetUserActive } from "@/hooks/useUsers";
@@ -78,7 +78,7 @@ export default function UserManagement() {
       {
         onSuccess: () => toast({ title: `${u.full_name || u.email} is now ${roleConfig[role].label}` }),
         onError: (e) =>
-          toast({ title: "Could not change role", description: (e as Error).message, variant: "destructive" }),
+          toast({ title: tr("Could not change role"), description: (e as Error).message, variant: "destructive" }),
       },
     );
   }
@@ -90,7 +90,7 @@ export default function UserManagement() {
       {
         onSuccess: () => toast({ title: u.is_active ? `${label} deactivated` : `${label} reactivated` }),
         onError: (e) =>
-          toast({ title: "Could not change status", description: (e as Error).message, variant: "destructive" }),
+          toast({ title: tr("Could not change status"), description: (e as Error).message, variant: "destructive" }),
       },
     );
   }

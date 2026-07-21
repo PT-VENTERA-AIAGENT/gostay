@@ -19,6 +19,15 @@ const STORAGE_KEY = "gostay_lang";
 let _lang: Lang =
   typeof localStorage !== "undefined" && localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "id";
 
+/**
+ * Non-hook translate, for use outside React render — toast messages fired from
+ * event handlers, etc. Reads the module-level language mirror. Same lookup as
+ * the hook's t(): a string lives in one map and falls through otherwise.
+ */
+export function tr(s: string): string {
+  return _lang === "en" ? EN[s] ?? s : ID[s] ?? s;
+}
+
 /** "Rp 4.6jt" in Indonesian, "Rp 4.6M" in English — abbreviations follow lang. */
 export function compactIDR(n: number): string {
   const en = _lang === "en";

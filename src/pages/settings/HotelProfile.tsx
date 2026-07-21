@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useT } from "@/lib/i18n";
+import { useT, tr } from "@/lib/i18n";
 import { Building2, Loader2, Save, Upload, Trash2, ImageIcon } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { useTenant, useUpdateHotelProfile, uploadHotelLogo, type HotelProfileInput } from "@/hooks/useTenant";
@@ -39,20 +39,20 @@ export default function HotelProfile() {
     e.target.value = ""; // allow re-picking the same file
     if (!file || !tenant) return;
     if (!file.type.startsWith("image/")) {
-      toast({ title: "File harus berupa gambar", variant: "destructive" });
+      toast({ title: tr("File harus berupa gambar"), variant: "destructive" });
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast({ title: "Ukuran logo maksimal 2 MB", variant: "destructive" });
+      toast({ title: tr("Ukuran logo maksimal 2 MB"), variant: "destructive" });
       return;
     }
     setUploading(true);
     try {
       const url = await uploadHotelLogo(tenant.id, file);
       setForm((f) => ({ ...f, logo_url: url }));
-      toast({ title: "Logo terunggah", description: "Klik Simpan untuk menyimpan perubahan." });
+      toast({ title: tr("Logo terunggah"), description: tr("Klik Simpan untuk menyimpan perubahan.") });
     } catch (err) {
-      toast({ title: "Gagal mengunggah logo", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tr("Gagal mengunggah logo"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -61,7 +61,7 @@ export default function HotelProfile() {
   const save = () => {
     if (!tenant) return;
     if (!form.name.trim()) {
-      toast({ title: "Nama hotel wajib diisi", variant: "destructive" });
+      toast({ title: tr("Nama hotel wajib diisi"), variant: "destructive" });
       return;
     }
     // Empty strings are stored as NULL so the fields read as "unset", not "".
@@ -77,8 +77,8 @@ export default function HotelProfile() {
     update.mutate(
       { id: tenant.id, input },
       {
-        onSuccess: () => toast({ title: "Profil hotel disimpan" }),
-        onError: (e) => toast({ title: "Gagal menyimpan", description: (e as Error).message, variant: "destructive" }),
+        onSuccess: () => toast({ title: tr("Profil hotel disimpan") }),
+        onError: (e) => toast({ title: tr("Gagal menyimpan"), description: (e as Error).message, variant: "destructive" }),
       },
     );
   };
