@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { User, Calendar, MessageSquare, Search, Menu, X, LogOut } from "lucide-react";
+import { User, Calendar, MessageSquare, Search, Menu, X, LogOut, UtensilsCrossed } from "lucide-react";
 import ChatWidget from "@/components/portal/ChatWidget";
 import PortalBottomNav from "@/components/shared/PortalBottomNav";
 import ThemeToggle from "@/components/shared/ThemeToggle";
@@ -12,6 +12,7 @@ import { useTenant } from "@/hooks/useTenant";
 const portalNav = [
   { label: "Home", path: "/portal", icon: Search },
   { label: "My Bookings", path: "/portal/my-account", icon: Calendar },
+  { label: "Room Service", path: "/portal/order", icon: UtensilsCrossed },
   { label: "Messages", path: "/portal/chat", icon: MessageSquare },
   { label: "Account", path: "/portal/profile", icon: User },
 ];

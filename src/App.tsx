@@ -42,6 +42,7 @@ import MyAccount from "./pages/portal/MyAccount";
 import PortalBookingDetail from "./pages/portal/PortalBookingDetail";
 import PortalProfile from "./pages/portal/PortalProfile";
 import PortalChat from "./pages/portal/PortalChat";
+import PortalOrder from "./pages/portal/PortalOrder";
 
 import NotFound from "./pages/NotFound";
 
@@ -182,6 +183,7 @@ const App = () => (
                 }
               />
               <Route path="chat" element={<PortalChat />} />
+              <Route path="order" element={<PortalOrder />} />
             </Route>
 
             {/* Catch-all */}

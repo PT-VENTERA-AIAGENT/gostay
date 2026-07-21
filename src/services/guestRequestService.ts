@@ -76,6 +76,65 @@ export async function createRequest(
   return data as GuestRequest;
 }
 
+export interface RoomServiceItem {
+  name: string;
+  category?: string | null;
+  unit_price: number;
+  quantity: number;
+}
+
+export interface RoomServiceOrderInput {
+  customer_id: string;
+  booking_id: string;
+  room_id?: string | null;
+  items: RoomServiceItem[];
+  note?: string;
+  created_by: string; // the guest's own profile id
+}
+
+const idr = (n: number) =>
+  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+
+/**
+ * A guest ordering from the room-service menu. Unlike the staff createRequest,
+ * this MUST carry customer_id — the RLS insert policy (021) pins the row to the
+ * caller's own in-house booking. The picked items and total are rendered into
+ * the request's description so staff read the full order in the existing
+ * "Permintaan Tamu" queue, then post it to the folio via POS.
+ */
+export async function createRoomServiceOrder(
+  input: RoomServiceOrderInput
+): Promise<GuestRequest> {
+  const total = input.items.reduce((s, it) => s + it.unit_price * it.quantity, 0);
+  const count = input.items.reduce((s, it) => s + it.quantity, 0);
+  const lines = input.items.map(
+    (it) => `${it.quantity}× ${it.name} — ${idr(it.unit_price * it.quantity)}`
+  );
+  const description =
+    [...lines, `Total: ${idr(total)}`, input.note?.trim() ? `Catatan: ${input.note.trim()}` : null]
+      .filter(Boolean)
+      .join("\n");
+
+  // tenant_id is stamped by the trigger; customer_id is required by RLS.
+  const payload = {
+    title: `Room service — ${count} item`,
+    description,
+    priority: "normal",
+    room_id: input.room_id ?? null,
+    booking_id: input.booking_id,
+    customer_id: input.customer_id,
+    created_by: input.created_by,
+  };
+
+  const { data, error } = await db
+    .from("guest_requests")
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as GuestRequest;
+}
+
 export async function updateRequestStatus(
   id: string,
   status: GuestRequestStatus
