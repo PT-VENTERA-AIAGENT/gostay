@@ -29,6 +29,7 @@ import AddHotel from "./pages/admin/AddHotel";
 import CRM from "./pages/CRM";
 import Reviews from "./pages/Reviews";
 import WhatsApp from "./pages/settings/WhatsApp";
+import HotelProfile from "./pages/settings/HotelProfile";
 
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
@@ -146,6 +147,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "staff"]}>
                     <WhatsApp />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings/hotel"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <HotelProfile />
                   </ProtectedRoute>
                 }
               />
