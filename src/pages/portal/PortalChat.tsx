@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageTransition from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/hooks/useTenant";
 import {
   getOrCreateThread,
   getMessages,
@@ -23,6 +24,7 @@ function formatTime(iso: string) {
 
 export default function PortalChat() {
   const { user, signIn } = useAuth();
+  const { name: hotelName, initial: hotelInitial } = useTenant();
 
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -190,10 +192,10 @@ export default function PortalChat() {
           {/* Header */}
           <div className="px-4 md:px-5 py-3 border-b border-border flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
-              <span className="text-sm font-semibold text-primary">GS</span>
+              <span className="text-sm font-semibold text-primary">{hotelInitial}</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">GoStay Front Desk</p>
+              <p className="text-sm font-semibold text-foreground">{hotelName} Front Desk</p>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-success" />
                 <span className="text-xs text-muted-foreground">Online</span>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useMyProfile, useUpdateMyProfile } from "@/hooks/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/hooks/useTenant";
 import { useToast } from "@/hooks/use-toast";
 
 const SSO_ACCOUNT_URL = (import.meta.env.VITE_SSO_ISSUER as string) ?? "https://sso.ventera.ai";
@@ -22,6 +23,7 @@ function memberSince(iso?: string) {
 
 export default function PortalProfile() {
   const { user } = useAuth();
+  const { name: hotelName } = useTenant();
   const { data: profile, isLoading } = useMyProfile();
   const updateProfile = useUpdateMyProfile();
   const { toast } = useToast();
@@ -112,7 +114,7 @@ export default function PortalProfile() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Your name, email and password live in your Ventera account — GoStay never sees a password.{" "}
+              Your name, email and password live in your Ventera account — {hotelName} never sees a password.{" "}
               <a href={SSO_ACCOUNT_URL} target="_blank" rel="noreferrer" className="text-primary hover:underline">
                 Manage them at Ventera
               </a>

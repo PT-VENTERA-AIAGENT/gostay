@@ -6,6 +6,7 @@ import PageTransition, { staggerContainer, staggerItem, fadeInUp } from "@/compo
 import DatePicker from "@/components/shared/DatePicker";
 import { useRoomTypes, useAvailableRooms, useRooms } from "@/hooks/useRooms";
 import { usePublishedReviews, useReviewStats } from "@/hooks/useReviews";
+import { useTenant } from "@/hooks/useTenant";
 
 const amenityIcons: Record<string, React.ElementType> = { WiFi: Wifi, AC: Wind, TV: Tv, "Mini Bar": Coffee, Bathtub: Bath, "Sea View": Mountain };
 
@@ -43,6 +44,7 @@ const todayISO = new Date().toISOString().slice(0, 10);
 
 export default function PortalHome() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { name: hotelName } = useTenant();
 
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") ?? "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") ?? "");
@@ -95,7 +97,7 @@ export default function PortalHome() {
                   : "Direct booking, best rates"}
               </span>
             </motion.div>
-            <motion.h1 variants={staggerItem} className="text-3xl md:text-5xl font-bold text-foreground mb-3 md:mb-4 leading-tight">Find Your Perfect<br />Stay at GoStay Hotel</motion.h1>
+            <motion.h1 variants={staggerItem} className="text-3xl md:text-5xl font-bold text-foreground mb-3 md:mb-4 leading-tight">Find Your Perfect<br />Stay at {hotelName}</motion.h1>
             <motion.p variants={staggerItem} className="text-base md:text-lg text-muted-foreground mb-6 md:mb-10 max-w-2xl mx-auto">Discover comfort and luxury in the heart of the city. Book directly for the best rates and exclusive perks.</motion.p>
 
             <motion.div variants={staggerItem} className="bg-card rounded-2xl border border-border p-4 md:p-6 shadow-sm max-w-3xl mx-auto">
@@ -270,8 +272,8 @@ export default function PortalHome() {
         {/* Hotel Info */}
         <section className="px-4 md:px-8 py-12 md:py-16 bg-card border-t border-border">
           <motion.div variants={fadeInUp} initial="hidden" animate="show" className="max-w-4xl mx-auto text-center">
-            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3">About GoStay Hotel</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto mb-8 text-sm md:text-base">Located in the heart of the city, GoStay Hotel offers world-class hospitality with modern amenities.</p>
+            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3">About {hotelName}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto mb-8 text-sm md:text-base">Located in the heart of the city, {hotelName} offers world-class hospitality with modern amenities.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-2xl mx-auto">
               {[
                 { value: String(allRooms.length || 0), label: "Rooms" },
