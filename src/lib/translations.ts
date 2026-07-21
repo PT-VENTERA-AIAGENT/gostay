@@ -317,4 +317,5 @@ export const ID: Record<string, string> = {
   "Special Requests": "Permintaan Khusus",
   "No rooms yet": "Belum ada kamar",
   "Add rooms before the calendar can show anything.": "Tambah kamar dulu agar kalender bisa menampilkan sesuatu.",
+  "Monthly Revenue & Bookings": "Pendapatan & Booking Bulanan",
 };

@@ -261,14 +261,14 @@ export default function Analytics() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 print:break-before-page">
           <div className="lg:col-span-2 bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-4">Monthly Revenue &amp; Bookings</h2>
+            <h2 className="font-semibold text-foreground mb-4">{t("Monthly Revenue & Bookings")}</h2>
             <ResponsiveContainer width="100%" height={250}>
               <ComposedChart data={data.monthlyRevenue}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(45, 15%, 88%)" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(220, 10%, 46%)" />
                 <YAxis yAxisId="left" tick={{ fontSize: 12 }} stroke="hsl(220, 10%, 46%)" tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}M`} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} stroke="hsl(220, 10%, 46%)" allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name) => (name === "Revenue" ? formatIDR(v) : v)} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name) => ((name === "Revenue" || name === t("Revenue")) ? formatIDR(v) : v)} />
                 <Legend />
                 <Bar yAxisId="left" dataKey="revenue" fill="hsl(72, 45%, 45%)" radius={[4, 4, 0, 0]} name={t("Revenue")} animationDuration={1000} />
                 <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="hsl(210, 60%, 50%)" strokeWidth={2} name={t("Bookings")} dot={{ r: 3 }} />
@@ -336,7 +336,7 @@ export default function Analytics() {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" />
                   <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}M`} />
                   <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name) => (name === "Revenue" ? formatIDR(v) : v)} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name) => ((name === "Revenue" || name === t("Revenue")) ? formatIDR(v) : v)} />
                   <Legend />
                   <Bar yAxisId="left" dataKey="revenue" fill="hsl(72, 45%, 45%)" radius={[4, 4, 0, 0]} name={t("Revenue")} animationDuration={1000} />
                   <Bar yAxisId="right" dataKey="count" fill="hsl(210, 60%, 50%)" radius={[4, 4, 0, 0]} name={t("Bookings")} animationDuration={1000} />
