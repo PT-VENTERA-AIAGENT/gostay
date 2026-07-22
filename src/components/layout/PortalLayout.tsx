@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { User, Calendar, MessageSquare, Search, Menu, X, LogOut, UtensilsCrossed } from "lucide-react";
+import { User, Calendar, MessageSquare, Search, Menu, X, LogOut, UtensilsCrossed, MapPinned } from "lucide-react";
 import ChatWidget from "@/components/portal/ChatWidget";
 import PortalBottomNav from "@/components/shared/PortalBottomNav";
 import ThemeToggle from "@/components/shared/ThemeToggle";
@@ -14,6 +14,7 @@ import { useT } from "@/lib/i18n";
 
 const portalNav = [
   { label: "Beranda", path: "/portal", icon: Search },
+  { label: "Denah Hotel", path: "/portal/denah", icon: MapPinned },
   { label: "Booking Saya", path: "/portal/my-account", icon: Calendar },
   { label: "Room Service", path: "/portal/order", icon: UtensilsCrossed },
   { label: "Pesan", path: "/portal/chat", icon: MessageSquare },
