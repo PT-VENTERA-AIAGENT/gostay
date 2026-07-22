@@ -199,20 +199,29 @@ per-hotel screens; the day-to-day operator of a hotel is its `staff`.
 
 ### 2.5 Implementation Status vs. This Target
 
-This section is the **target** model. Known gaps as of this revision (to be
-closed — do not assume they are done):
+Built and live (migrations 027–028, PRs #29–#30):
 
-- **Self-serve new-hotel signup (path 1) is not built yet.** Today a first-time
-  web sign-in is provisioned into the single existing tenant via
-  `default_tenant()` (migration 014) with a role controlled by `SSO_SIGNUP_ROLE`
-  — which is why a new login currently lands as staff of the *existing* hotel.
-  Target: create a fresh tenant and make the signer its owner (`staff`).
-- **Hotel-management RLS still keys on `admin`.** Migration `011` grants rooms /
-  pricing / room-type / profile-management to `get_my_role() = 'admin'`. Under
-  this model those hotel-level powers belong to `staff` (scoped to their tenant);
-  `admin` stays reserved for Ventera. This RLS refactor is pending.
-- **User Management route is `admin`-only** (`App.tsx`). Target: open to `staff`
-  for their own tenant, with a guard that `staff` can never grant `admin`.
+- **Hotels run by their own staff.** Rooms / pricing / room-types / availability
+  / room-photo storage and per-hotel User Management are keyed on `admin`+`staff`
+  scoped to `get_my_tenant()`. Staff manage their tenant's team (staff/customer,
+  activate/deactivate) but can never touch or grant `admin` — enforced by RLS +
+  the profile column-guard trigger, mirrored in the UI. `admin` stays Ventera.
+- **Self-serve new-hotel signup.** A signed-in user names a hotel and becomes its
+  owner (`staff`) via `POST /api/hotel/create-mine` (create_tenant + re-home the
+  profile under the service role); `/create-hotel` page + portal CTA.
+- **A newcomer need not belong to a hotel.** `profiles.tenant_id` is nullable
+  (028): a first-time sign-in while 2+ hotels exist no longer fails — it lands as
+  a tenant-less `customer` (prospective owner) who is steered to "Buat Hotel".
+  Null tenant fails closed on every tenant-scoped policy.
+
+Not yet built (a **feature**, not a defect — nothing is broken without it):
+
+- **Multi-hotel public portal on one deployment.** An anonymous visitor's hotel
+  is resolved from `x-tenant-slug` (`VITE_TENANT_SLUG`, per-deployment) or the
+  sole-tenant fallback. Showing several hotels' public portals from a single
+  deployment to anonymous visitors needs a per-hotel URL (subdomain or path)
+  feeding the tenant at runtime. Signed-in flows, self-serve, and WhatsApp guests
+  (explicit tenant) are unaffected and work across any number of hotels.
 
 ---
 
