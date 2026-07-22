@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { getSession } from "@/lib/sso";
+import { currentTenantSlug } from "@/lib/tenant";
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "";
@@ -23,13 +24,14 @@ if (!isSupabaseConfigured) {
 const effectiveUrl = supabaseUrl || "https://placeholder.supabase.co";
 const effectiveAnonKey = supabaseAnonKey || "placeholder-anon-key";
 
-// Which hotel this deployment's portal belongs to. current_tenant() (011) reads
-// it from the x-tenant-slug header to scope the PUBLIC, anonymous reads — room
-// types, rates, published reviews. It is intentionally only a hint: a signed-in
-// caller's tenant comes from their profile, never this header, and the header
-// can only ever surface another hotel's already-public brochure. Set per
-// deployment; when unset the DB falls back to the sole tenant (single-hotel).
-const tenantSlug = (import.meta.env.VITE_TENANT_SLUG as string | undefined)?.trim();
+// Which hotel this portal visit belongs to. current_tenant() (011) reads it from
+// the x-tenant-slug header to scope the PUBLIC, anonymous reads — room types,
+// rates, published reviews. Resolved at runtime (src/lib/tenant.ts) so one
+// deployment can serve many hotels: a WhatsApp guest's `?hotel={slug}` link wins,
+// then a remembered slug, then the build-time default. It is intentionally only a
+// hint: a signed-in caller's tenant comes from their profile, never this header,
+// and the header can only ever surface another hotel's already-public brochure.
+const tenantSlug = currentTenantSlug();
 
 export const supabase = createClient<Database>(effectiveUrl, effectiveAnonKey, {
   // Sending it on every request (not just anon ones) is harmless: when signed

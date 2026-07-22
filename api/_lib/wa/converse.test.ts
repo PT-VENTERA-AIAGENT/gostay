@@ -22,6 +22,7 @@ const { ai, pending, booking, guest, send, crm, WaRateLimitError } = vi.hoisted(
       computeTotal: vi.fn(),
       createWaBooking: vi.fn(),
       getTenantName: vi.fn(),
+      getTenantSlug: vi.fn(),
       setCustomerName: vi.fn(),
     },
     guest: { resolveOrProvisionGuest: vi.fn(), WaRateLimitError },
@@ -64,6 +65,7 @@ beforeEach(() => {
     { id: "rt-2", name: "Suite", base_rate: 900000, max_occupancy: 2 },
   ]);
   booking.getTenantName.mockResolvedValue("Hotel Uji");
+  booking.getTenantSlug.mockResolvedValue("hotel-uji");
   booking.setCustomerName.mockResolvedValue(undefined);
 });
 

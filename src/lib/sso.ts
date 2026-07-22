@@ -2,6 +2,8 @@
 // The client secret is deliberately absent: every VITE_* value is inlined into
 // the browser bundle, so the secret lives only on the server and the token
 // exchange happens in api/sso/token.ts.
+import { currentTenantSlug } from "@/lib/tenant";
+
 const SSO_ISSUER =
   (import.meta.env.VITE_SSO_ISSUER as string) ?? "https://sso.ventera.ai";
 const CLIENT_ID = (import.meta.env.VITE_SSO_CLIENT_ID as string) ?? "gostay";
@@ -112,11 +114,19 @@ export async function handleCallback(
   sessionStorage.removeItem(TX_STATE_KEY);
 
   // redirect_uri is not sent: the server derives it from the request origin so
-  // it cannot be pointed elsewhere by a caller.
+  // it cannot be pointed elsewhere by a caller. tenant_slug carries the hotel the
+  // guest is signing up on (their `?hotel={slug}` portal link) so a brand-new
+  // profile is filed under that hotel; it only affects a first-ever insert (a
+  // returning guest keeps the tenant their profile already has) and can only ever
+  // make someone a customer, never staff/admin.
   const res = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, code_verifier: verifier }),
+    body: JSON.stringify({
+      code,
+      code_verifier: verifier,
+      ...(currentTenantSlug() ? { tenant_slug: currentTenantSlug() } : {}),
+    }),
   });
 
   if (!res.ok) return null;

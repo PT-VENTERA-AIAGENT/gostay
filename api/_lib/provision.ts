@@ -15,6 +15,14 @@ export interface ProvisionInput {
   fullName: string;
   /** ISO timestamp for last_seen_at, passed in so it matches the token's iat. */
   now: string;
+  /**
+   * The hotel a NEW guest is signing up on (their `?hotel={slug}` portal link).
+   * Files a first-ever profile under that tenant. Used only on insert (a
+   * returning user keeps their existing tenant) and only when it names a real
+   * active hotel — a bad link falls through to the deployment default rather
+   * than failing sign-in. Never confers anything but the 'customer' default.
+   */
+  tenantSlug?: string;
 }
 
 export interface ProvisionResult {
@@ -172,16 +180,28 @@ async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
   return upsertProfile(
     input,
     async ({ url, headers }) => {
-      // Resolve the tenant only when creating the row. A configured-but-unknown
-      // slug is a deployment error: fail the provision rather than let the DB
-      // default quietly file the user under the wrong hotel.
-      const { tenantSlug } = config();
-      const tenantId = await resolveTenantId(url, headers, tenantSlug);
-      if (tenantId === null && tenantSlug) {
-        return { ok: false, error: `unknown_tenant_slug_${tenantSlug}` };
+      // Resolve the tenant only when creating the row.
+      //
+      // A guest's portal link (input.tenantSlug) wins when it names a real,
+      // active hotel — that is how a WhatsApp guest signing up on hotel X's
+      // portal joins X. A bad/stale link must NOT fail sign-in, so it simply
+      // falls through to the deployment default below.
+      const clientSlug = (input.tenantSlug ?? "").trim();
+      if (clientSlug) {
+        const t = await resolveTenantId(url, headers, clientSlug);
+        if (t) return { ok: true, tenantId: t };
       }
-      // undefined → tenant_id omitted, column default (single-hotel) applies.
-      return { ok: true, tenantId: tenantId ?? undefined };
+
+      // Deployment default (single-hotel installs). A configured-but-unknown
+      // slug is a real misconfiguration: fail rather than file the user wrong.
+      const { tenantSlug: envSlug } = config();
+      const envTenant = await resolveTenantId(url, headers, envSlug);
+      if (envTenant === null && envSlug) {
+        return { ok: false, error: `unknown_tenant_slug_${envSlug}` };
+      }
+      // undefined → tenant_id omitted; the column default applies (the sole
+      // tenant while one exists, else NULL — a tenant-less prospective owner).
+      return { ok: true, tenantId: envTenant ?? undefined };
     },
     // Web sign-in is the staff entrance; a new web profile is created as staff
     // (or whatever SSO_SIGNUP_ROLE overrides to). The WhatsApp path below passes

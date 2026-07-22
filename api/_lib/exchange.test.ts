@@ -23,6 +23,8 @@ interface MockState {
   realm: string | undefined;
   tokenStatus: number;
   tokenError: string;
+  /** The id a tenants?slug=... lookup resolves to (null = no such active hotel). */
+  tenantId: string | null;
 }
 
 let server: Server;
@@ -68,6 +70,14 @@ beforeAll(async () => {
     }
 
     // ── PostgREST ──
+    if (url.pathname === "/rest/v1/tenants" && req.method === "GET") {
+      // resolveTenantId() looks a slug up here. Return a single row when the
+      // test has armed a tenant id, else empty (unknown/inactive slug).
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(state.tenantId ? [{ id: state.tenantId }] : []));
+      return;
+    }
+
     if (url.pathname === "/rest/v1/profiles") {
       if (req.method === "GET") {
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -117,6 +127,7 @@ beforeEach(() => {
   state = {
     tokenRequests: [], profileRows: [], inserts: [], patches: [],
     realm: "ventera-employees", tokenStatus: 200, tokenError: "invalid_grant",
+    tenantId: null,
   };
 });
 
@@ -205,6 +216,34 @@ describe("exchangeCode — Supabase identity bridge", () => {
   it("creates a web profile as customer by default", async () => {
     await call();
     expect(state.inserts[0].role).toBe("customer");
+  });
+
+  it("files a new guest under the hotel from their portal link (?hotel slug)", async () => {
+    state.tenantId = "11111111-1111-4111-8111-111111111111";
+    const r = await exchangeCode({
+      code: "auth-code",
+      code_verifier: "verifier-123",
+      origin: ORIGIN,
+      tenantSlug: "kopi-rintik",
+    });
+    expect(r.status).toBe(200);
+    expect(state.inserts[0].tenant_id).toBe(state.tenantId);
+    // A guest joining via a link is still only ever a customer.
+    expect(state.inserts[0].role).toBe("customer");
+  });
+
+  it("ignores a portal-link slug that names no active hotel, without failing sign-in", async () => {
+    state.tenantId = null; // the slug resolves to nothing
+    const r = await exchangeCode({
+      code: "auth-code",
+      code_verifier: "verifier-123",
+      origin: ORIGIN,
+      tenantSlug: "does-not-exist",
+    });
+    expect(r.status).toBe(200);
+    // Falls through to the deployment default (TENANT_SLUG unset here) → no
+    // tenant_id sent, so the column default applies rather than a hard failure.
+    expect(state.inserts[0]).not.toHaveProperty("tenant_id");
   });
 
   it("honours SSO_SIGNUP_ROLE override", async () => {

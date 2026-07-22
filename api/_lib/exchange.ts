@@ -29,6 +29,14 @@ export interface ExchangeRequest {
   code: string;
   code_verifier: string;
   origin: string;
+  /**
+   * The hotel a NEW guest is signing up on (their `?hotel={slug}` portal link).
+   * Files a first-ever profile under that tenant as a customer; ignored for a
+   * returning user (their profile already has a tenant) and it can never confer
+   * staff/admin. Client-supplied and validated against active tenants server-side
+   * — the same spoof-safe, public-scope-only hint x-tenant-slug already is (011).
+   */
+  tenantSlug?: string;
 }
 
 export interface ExchangeResult {
@@ -55,6 +63,7 @@ export async function exchangeCode({
   code,
   code_verifier,
   origin,
+  tenantSlug,
 }: ExchangeRequest): Promise<ExchangeResult> {
   const { issuer, clientId, clientSecret, extraOrigins } = config();
 
@@ -123,7 +132,7 @@ export async function exchangeCode({
   // Bridge the SSO identity into Supabase. Without this the browser talks to
   // PostgREST as anon, auth.uid() is NULL, and every RLS policy denies.
   const supabase = claims?.sub
-    ? await buildSupabaseSession(claims, Number(tokens.expires_in ?? 3600))
+    ? await buildSupabaseSession(claims, Number(tokens.expires_in ?? 3600), tenantSlug)
     : null;
 
   // Only the fields the client actually needs. The refresh_token, if the issuer
@@ -189,7 +198,11 @@ function decodeIdToken(idToken?: string): IdTokenClaims | null {
   }
 }
 
-async function buildSupabaseSession(claims: IdTokenClaims, expiresInSeconds: number) {
+async function buildSupabaseSession(
+  claims: IdTokenClaims,
+  expiresInSeconds: number,
+  tenantSlug?: string,
+) {
   // The bridge is all-or-nothing on the signing secret: without it we cannot
   // mint a usable token, so provisioning a row would be a pointless write to
   // the live database on every single login.
@@ -211,6 +224,7 @@ async function buildSupabaseSession(claims: IdTokenClaims, expiresInSeconds: num
       email: claims.email ?? "",
       fullName: claims.name ?? claims.email ?? "",
       now: new Date(issuedAt * 1000).toISOString(),
+      tenantSlug,
     });
     if (!result.ok) {
       // Sign-in still succeeds; the user simply sees empty data rather than a

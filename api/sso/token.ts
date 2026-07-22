@@ -25,13 +25,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const body = (typeof req.body === "string" ? JSON.parse(req.body) : req.body) as
-    | { code?: string; code_verifier?: string }
+    | { code?: string; code_verifier?: string; tenant_slug?: string }
     | undefined;
 
   const result = await exchangeCode({
     code: body?.code ?? "",
     code_verifier: body?.code_verifier ?? "",
     origin: headerValue(req.headers.origin),
+    tenantSlug: body?.tenant_slug,
   });
 
   res.status(result.status).json(result.body);
