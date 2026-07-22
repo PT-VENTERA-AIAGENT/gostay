@@ -90,6 +90,15 @@ export async function getTenantName(tenantId: string): Promise<string | null> {
   return typeof name === "string" && name.trim() ? name.trim() : null;
 }
 
+/** The tenant's slug — for building its guest-portal link (`/portal?hotel=slug`). */
+export async function getTenantSlug(tenantId: string): Promise<string | null> {
+  const res = await serviceGet(`tenants?id=eq.${encodeURIComponent(tenantId)}&select=slug`);
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ slug?: string }>;
+  const slug = rows[0]?.slug;
+  return typeof slug === "string" && slug.trim() ? slug.trim() : null;
+}
+
 /** All active room types of a tenant, cheapest first — for the "pick a type" menu. */
 export async function listRoomTypes(tenantId: string): Promise<RoomTypeLite[]> {
   const res = await serviceGet(

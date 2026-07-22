@@ -27,6 +27,7 @@ import {
   computeTotal,
   createWaBooking,
   getTenantName,
+  getTenantSlug,
   setCustomerName,
 } from "./booking";
 import {
@@ -48,6 +49,17 @@ export interface GuestMessage {
 // against the whole trimmed message so "ya", "Iya", "OK" all confirm.
 const YES = new Set(["ya", "iya", "y", "ok", "oke", "okay", "setuju", "lanjut"]);
 const NO = new Set(["batal", "cancel", "no", "tidak", "gak", "engga", "nggak"]);
+
+/**
+ * The guest-portal link for a hotel — e.g. https://app.gostay.id/portal?hotel=slug.
+ * The `?hotel=slug` is what lets one deployment show the RIGHT hotel to a guest
+ * who has only ever met it over WhatsApp (src/lib/tenant.ts reads it at runtime).
+ * Base URL from APP_PUBLIC_URL, defaulting to the production app domain.
+ */
+function portalLink(slug: string): string {
+  const base = (process.env.APP_PUBLIC_URL ?? "https://app.gostay.id").replace(/\/$/, "");
+  return `${base}/portal?hotel=${encodeURIComponent(slug)}`;
+}
 
 function formatIDR(n: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -380,10 +392,19 @@ async function confirmBooking(
 
   await clearPending(tenantId, phoneJid);
 
+  // A link to THIS hotel's guest portal, so the guest can track the booking,
+  // chat, and order from the web — carrying ?hotel=slug so the portal knows
+  // which hotel they came from. Best-effort: never block the confirmation on it.
+  const slug = await getTenantSlug(tenantId).catch(() => null);
+  const portal = slug
+    ? `\n\nPantau & kelola pesanan Anda di portal tamu:\n${portalLink(slug)}`
+    : "";
+
   const ref = booking.reference ? ` *${booking.reference}*` : "";
   await reply(
     `Terima kasih! Pesanan Anda${ref} sudah kami terima.\n\n` +
       "Status: *menunggu konfirmasi pembayaran*. Kami akan menginformasikan " +
-      `langkah pembayaran melalui chat ini sebentar lagi. Sampai jumpa di *${brand}*!`,
+      `langkah pembayaran melalui chat ini sebentar lagi. Sampai jumpa di *${brand}*!` +
+      portal,
   );
 }
