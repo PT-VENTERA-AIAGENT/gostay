@@ -165,6 +165,41 @@ describe("handleGuestMessage — quoting", () => {
     expect(booking.createWaBooking).not.toHaveBeenCalled();
   });
 
+  it("rejects a backwards date range and asks for the dates again", async () => {
+    ai.extractBookingIntent.mockResolvedValue({
+      intent: "book", check_in: "2026-07-27", check_out: "2026-07-25", guests: 2, room_type_hint: "deluxe", guest_name: "Budi", confidence: 0.9,
+    });
+    booking.findRoomType.mockResolvedValue({ id: "rt-1", name: "Deluxe", base_rate: 500000, max_occupancy: 2 });
+
+    await handleGuestMessage({ ...BASE, text: "27-25 juli 2 orang deluxe a/n Budi" });
+
+    expect(booking.computeTotal).not.toHaveBeenCalled();
+    expect(booking.getAvailableRoomsSrv).not.toHaveBeenCalled();
+    expect(repliesText().toLowerCase()).toContain("setelah check-in");
+    expect(pending.setPending).toHaveBeenCalledWith(
+      "tenant-x", BASE.phoneJid, "collecting",
+      expect.objectContaining({ check_in: null, check_out: null }),
+    );
+  });
+
+  it("steers to a fitting type when the party exceeds the room capacity", async () => {
+    ai.extractBookingIntent.mockResolvedValue({
+      intent: "book", check_in: "2026-07-20", check_out: "2026-07-22", guests: 5, room_type_hint: "deluxe", guest_name: "Budi", confidence: 0.9,
+    });
+    booking.findRoomType.mockResolvedValue({ id: "rt-1", name: "Deluxe", base_rate: 500000, max_occupancy: 2 });
+    booking.listRoomTypes.mockResolvedValue([
+      { id: "rt-1", name: "Deluxe", base_rate: 500000, max_occupancy: 2 },
+      { id: "rt-3", name: "Family", base_rate: 1200000, max_occupancy: 6 },
+    ]);
+
+    await handleGuestMessage({ ...BASE, text: "20-22 juli 5 orang deluxe a/n Budi" });
+
+    expect(booking.computeTotal).not.toHaveBeenCalled();
+    const reply = repliesText();
+    expect(reply.toLowerCase()).toContain("maksimal 2 tamu");
+    expect(reply).toContain("Family"); // the type that actually fits 5
+  });
+
   it("apologises when the type exists but no room is free", async () => {
     ai.extractBookingIntent.mockResolvedValue(fullIntent);
     booking.findRoomType.mockResolvedValue({ id: "rt-1", name: "Deluxe", base_rate: 500000, max_occupancy: 2 });

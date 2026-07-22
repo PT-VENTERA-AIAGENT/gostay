@@ -143,7 +143,7 @@ function parseModelJson(raw: string): Record<string, unknown> | null {
   }
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** Coerce arbitrary parsed JSON into a well-formed BookingIntent. */
 function coerceIntent(parsed: Record<string, unknown>): BookingIntent {
@@ -180,8 +180,26 @@ function coerceIntent(parsed: Record<string, unknown>): BookingIntent {
   };
 }
 
+/**
+ * Accept a string ONLY if it is a real calendar date in YYYY-MM-DD form. The
+ * format check alone is not enough: "2026-07-34" and "2026-02-30" both match the
+ * shape but aren't real days, and letting them through made the bot query
+ * availability with a bogus date and answer "penuh" instead of flagging the date.
+ * A round-trip through Date rejects any day that rolled over into another month.
+ */
 function isoOrNull(v: unknown): string | null {
-  return typeof v === "string" && ISO_DATE.test(v.trim()) ? v.trim() : null;
+  if (typeof v !== "string") return null;
+  const m = ISO_DATE.exec(v.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
+    return null;
+  }
+  return v.trim();
 }
 
 // ── Merge with previously-collected slots ───────────────────────────────────────
