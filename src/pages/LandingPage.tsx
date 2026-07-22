@@ -80,7 +80,7 @@ function Navbar() {
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Hotel className="h-6 w-6 text-primary" />
+          <img src="/gostay.svg" alt="GoStay" className="h-7 w-7" />
           <span className="font-bold text-lg tracking-tight">GoStay</span>
         </div>
         <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
