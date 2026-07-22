@@ -55,6 +55,13 @@ export type SsoRole = "admin" | "staff" | "customer";
 export interface SsoSession {
   claims: SsoClaims;
   access_token: string;
+  /**
+   * The raw OIDC id_token, kept solely to hand back as `id_token_hint` on
+   * RP-initiated logout (/oidc/session/end). Without it the issuer cannot tell
+   * which session to end, and logout can only clear our local copy — leaving the
+   * SSO session alive so the next "Masuk" silently reuses the previous account.
+   */
+  id_token?: string;
   expires_at: number;
   /**
    * Supabase-compatible JWT minted by /api/sso/token. supabase-js presents it
@@ -120,6 +127,7 @@ export async function handleCallback(
   const session: SsoSession = {
     claims,
     access_token: tokens.access_token as string,
+    id_token: tokens.id_token as string,
     expires_at: Date.now() + Number(tokens.expires_in ?? 3600) * 1000,
     supabase_token: (tokens.supabase_token as string | null) ?? null,
     role: (tokens.role as SsoRole | null) ?? null,
@@ -196,19 +204,45 @@ export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
+/**
+ * Origins whose `${origin}/` is registered as a post_logout_redirect_uri for the
+ * `gostay` client at Ventera. The issuer rejects any unregistered value with
+ * "post_logout_redirect_uri not registered" and strands the user on its error
+ * page, so we only ever send one from this list. Anywhere else (Vercel preview
+ * URLs, say) falls back to a local-only sign-out.
+ *
+ * Keep in lockstep with the client's Post-logout redirect URIs in SSO admin.
+ */
+const REGISTERED_POST_LOGOUT_ORIGINS = new Set([
+  "https://app.gostay.id",
+  "http://localhost:8080",
+]);
+
 export function logout() {
-  // Local sign-out: drop our session and return to the landing page.
+  // Single logout: end the Ventera SSO session too, not just our local copy.
   //
-  // We deliberately do NOT bounce through the issuer's /oidc/session/end with a
-  // post_logout_redirect_uri — that URI must be registered on the client at
-  // Ventera, and while it is not, the end-session page answers
-  // "post_logout_redirect_uri not registered" and strands the user on an error.
-  // Clearing our own session is what actually logs them out of this app.
+  // Clearing only sessionStorage left the issuer's session alive, so the next
+  // "Masuk" silently reused the previous account with no prompt ("logout tapi
+  // masih masuk akun lama"). RP-initiated logout at /oidc/session/end ends the
+  // session at the source; Ventera auto-confirms it, so there's no extra click.
   //
-  // Trade-off: the Ventera SSO session itself stays alive, so the next sign-in
-  // may not re-prompt for credentials. To get a full single-logout, register
-  // `${origin}/` as a post_logout_redirect_uri for the `gostay` client at
-  // Ventera, then this can call /oidc/session/end again.
+  // id_token_hint tells the issuer which session to end. Without a stored token
+  // (e.g. Supabase unconfigured) there's nothing to hint with, so fall back to a
+  // local-only sign-out rather than a bare, ambiguous end-session request.
+  const idToken = getSession()?.id_token;
   clearSession();
+
+  const origin = window.location.origin;
+  if (idToken && REGISTERED_POST_LOGOUT_ORIGINS.has(origin)) {
+    const params = new URLSearchParams({
+      id_token_hint: idToken,
+      post_logout_redirect_uri: `${origin}/`,
+    });
+    window.location.assign(`${SSO_ISSUER}/oidc/session/end?${params}`);
+    return;
+  }
+
+  // No token to hint with, or an origin we haven't registered a redirect for:
+  // clearing our own session is still a valid local sign-out.
   window.location.assign("/");
 }
