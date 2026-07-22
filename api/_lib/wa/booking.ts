@@ -63,6 +63,18 @@ export async function findRoomType(
   return rows[0] ?? null;
 }
 
+/**
+ * The hotel's display name, for branding the WA replies (greeting, confirmation).
+ * Null when the tenant row can't be read — callers fall back to a generic phrase.
+ */
+export async function getTenantName(tenantId: string): Promise<string | null> {
+  const res = await serviceGet(`tenants?id=eq.${encodeURIComponent(tenantId)}&select=name`);
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ name?: string }>;
+  const name = rows[0]?.name;
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+}
+
 /** All active room types of a tenant, cheapest first — for the "pick a type" menu. */
 export async function listRoomTypes(tenantId: string): Promise<RoomTypeLite[]> {
   const res = await serviceGet(
