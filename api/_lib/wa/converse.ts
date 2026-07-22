@@ -105,11 +105,11 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       guest = await resolveOrProvisionGuest(phoneJid, tenantId, displayName);
     } catch (e) {
       if (e instanceof WaRateLimitError) {
-        await rawReply("Terlalu banyak pesan dari nomor ini. Mohon coba lagi nanti ya.");
+        await rawReply("Terlalu banyak pesan dari nomor ini. Mohon coba lagi beberapa saat lagi.");
         return;
       }
       console.error("[wa/converse] provision:", (e as Error).message);
-      await rawReply("Maaf, kami sedang kesulitan memproses. Coba lagi sebentar ya.");
+      await rawReply("Mohon maaf, kami sedang kesulitan memproses permintaan Anda. Silakan coba lagi beberapa saat lagi.");
       return;
     }
 
@@ -140,7 +140,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       }
       if (NO.has(word)) {
         await clearPending(tenantId, phoneJid);
-        await reply("Baik, pemesanan dibatalkan. Ada lagi yang bisa dibantu?");
+        await reply("Baik, pemesanan dibatalkan. Ada lagi yang dapat kami bantu?");
         return;
       }
       // Anything else: the guest is changing their mind (new dates/room). Fall
@@ -155,17 +155,36 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     // as small talk. Only greet when there's NO booking in progress.
     const collecting = pending?.kind === "collecting";
     if (intent.intent !== "book" && !collecting) {
-      await reply(
-        `Halo! Selamat datang di *${brand}*. Saya asisten reservasi yang siap ` +
-          "membantu pemesanan kamar Anda. Supaya bisa langsung saya cekkan " +
-          "ketersediaan & harga, kirim *dalam satu pesan* ya:\n" +
-          "1. Nama pemesan\n" +
-          "2. Tanggal check-in\n" +
-          "3. Tanggal check-out\n" +
-          "4. Jumlah tamu\n" +
-          "5. Tipe kamar\n\n" +
-          "Contoh: a/n Budi, 25–27 Juli, 2 orang, Deluxe",
-      );
+      const types = await listRoomTypes(tenantId);
+      const header = `🏨 *${brand}*\n_Asisten Reservasi Kamar_`;
+      const divider = "──────────────────";
+      let body: string;
+      if (types.length) {
+        const menu = types
+          .map(
+            (t) =>
+              `🛏️ *${t.name}*\n` +
+              `    ${formatIDR(t.base_rate)} / malam` +
+              (t.max_occupancy ? `  ·  maks. ${t.max_occupancy} tamu` : ""),
+          )
+          .join("\n\n");
+        body =
+          `${header}\n${divider}\n` +
+          "Halo! Selamat datang. Berikut pilihan kamar & tarif per malam kami:\n\n" +
+          `${menu}\n${divider}\n`;
+      } else {
+        body = `${header}\n${divider}\nHalo! Saya siap membantu pemesanan kamar Anda.\n\n`;
+      }
+      body +=
+        "Agar dapat langsung kami periksa ketersediaan & harga, mohon kirim " +
+        "*dalam satu pesan*:\n" +
+        "1. Nama pemesan\n" +
+        "2. Tanggal check-in\n" +
+        "3. Tanggal check-out\n" +
+        "4. Jumlah tamu\n" +
+        "5. Tipe kamar\n\n" +
+        "_Contoh: a/n Budi, 25–27 Juli, 2 orang, Deluxe_";
+      await reply(body);
       return;
     }
 
@@ -197,7 +216,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       });
 
       let body =
-        "Baik! Mohon lengkapi data berikut — boleh langsung sekaligus dalam satu pesan ya:\n" +
+        "Baik. Mohon lengkapi data berikut (boleh sekaligus dalam satu pesan):\n" +
         missing.map((m) => `• ${m}`).join("\n");
 
       // When the type is what's missing, show the real menu with prices so the
@@ -206,7 +225,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
         const types = await listRoomTypes(tenantId);
         if (types.length === 0) {
           await reply(
-            "Mohon maaf, belum ada tipe kamar yang bisa dipesan saat ini. Silakan hubungi kami langsung ya.",
+            "Mohon maaf, saat ini belum ada tipe kamar yang dapat dipesan. Silakan hubungi kami secara langsung.",
           );
           return;
         }
@@ -238,8 +257,8 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
         guest_name: guestName,
       });
       await reply(
-        `Tanggal check-out (${checkOut}) harus setelah check-in (${checkIn}). ` +
-          "Boleh kirim ulang tanggalnya ya?",
+        `Tanggal check-out (${checkOut}) harus setelah tanggal check-in (${checkIn}). ` +
+          "Mohon kirim ulang tanggalnya.",
       );
       return;
     }
@@ -262,13 +281,13 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
           .map((t) => `   • *${t.name}* — ${formatIDR(t.base_rate)}/malam (maks ${t.max_occupancy} tamu)`)
           .join("\n");
         await reply(
-          `${roomType.name} maksimal ${roomType.max_occupancy} tamu, sedangkan pesanan untuk ${guests} tamu. ` +
-            `Tipe yang muat ${guests} tamu:\n${menu}\n\nPilih salah satu, atau kurangi jumlah tamu.`,
+          `${roomType.name} berkapasitas maksimal ${roomType.max_occupancy} tamu, sedangkan pesanan Anda untuk ${guests} tamu. ` +
+            `Berikut tipe yang muat untuk ${guests} tamu:\n${menu}\n\nSilakan pilih salah satu, atau sesuaikan jumlah tamu.`,
         );
       } else {
         await reply(
-          `Mohon maaf, untuk ${guests} tamu belum ada satu tipe kamar yang muat ` +
-            "(mungkin perlu beberapa kamar). Silakan hubungi kami langsung ya.",
+          `Mohon maaf, untuk ${guests} tamu belum ada satu tipe kamar yang memadai ` +
+            "(kemungkinan memerlukan beberapa kamar). Silakan hubungi kami secara langsung.",
         );
       }
       return;
@@ -278,7 +297,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     if (rooms.length === 0) {
       await reply(
         `Mohon maaf, ${roomType.name} sedang penuh untuk ${checkIn} s/d ${checkOut}. ` +
-          "Mau coba tanggal lain?",
+          "Apakah Anda ingin mencoba tanggal lain?",
       );
       return;
     }
@@ -308,7 +327,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     );
   } catch (err) {
     console.error("[wa/converse] error:", (err as Error).message);
-    await rawReply("Maaf, terjadi kendala. Mohon coba beberapa saat lagi.").catch(() => {});
+    await rawReply("Mohon maaf, terjadi kendala. Silakan coba beberapa saat lagi.").catch(() => {});
   }
 }
 
@@ -339,7 +358,7 @@ async function confirmBooking(
   const rooms = await getAvailableRoomsSrv(tenantId, checkIn, checkOut, roomTypeId);
   if (rooms.length === 0) {
     await clearPending(tenantId, phoneJid);
-    await reply("Mohon maaf, kamar baru saja terisi untuk tanggal itu. Mau coba tanggal lain?");
+    await reply("Mohon maaf, kamar baru saja terisi untuk tanggal tersebut. Apakah Anda ingin mencoba tanggal lain?");
     return;
   }
 

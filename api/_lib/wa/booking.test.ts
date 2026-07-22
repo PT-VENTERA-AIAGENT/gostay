@@ -212,7 +212,16 @@ describe("getAvailableRoomsSrv", () => {
     expect(free.map((r) => r.id)).toEqual(["room-2"]);
   });
 
-  it("keeps a room whose booking is cancelled (only confirmed/checked_in block)", async () => {
+  it("excludes a room held by a PENDING booking — WA bookings hold their room", async () => {
+    // Regression: pending stays used to be ignored, so the same room double-booked.
+    state.bookings = [
+      { room_id: "room-1", tenant_id: TENANT, status: "pending", check_in: "2026-07-20", check_out: "2026-07-22" },
+    ];
+    const free = await getAvailableRoomsSrv(TENANT, "2026-07-21", "2026-07-23", "rt-deluxe");
+    expect(free.map((r) => r.id)).toEqual(["room-2"]);
+  });
+
+  it("keeps a room whose booking is cancelled (only cancelled/no-show/checked_out free it)", async () => {
     state.bookings = [
       { room_id: "room-1", tenant_id: TENANT, status: "cancelled", check_in: "2026-07-20", check_out: "2026-07-22" },
     ];

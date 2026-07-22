@@ -105,11 +105,11 @@ export async function listRoomTypes(tenantId: string): Promise<RoomTypeLite[]> {
 /**
  * The free rooms of one room type over [checkIn, checkOut), within one tenant.
  *
- * Ports src/services/roomService.getAvailableRooms (which runs the join in the
- * `available_rooms` SECURITY DEFINER RPC) to the service-role path: fetch the
- * type's active rooms, then subtract any room with an overlapping active
- * booking. "Active booking" mirrors the RPC exactly — status in
- * (confirmed, checked_in); cancelled/no-show/pending stays do not hold a room.
+ * Fetch the type's active rooms, then subtract any room with an overlapping
+ * active booking. A room is HELD by any pending/confirmed/checked_in stay —
+ * pending included, because a WhatsApp booking is created as `pending` and must
+ * block the room immediately, otherwise the same room double-books (two pending
+ * stays never see each other). Only cancelled / no-show / checked_out free it.
  *
  * Overlap is the half-open test the room board uses: a stay conflicts when it
  * starts before this checkout and ends after this checkin (check_out is
@@ -138,7 +138,7 @@ export async function getAvailableRoomsSrv(
   const conflictsRes = await serviceGet(
     `bookings?tenant_id=eq.${encodeURIComponent(tenantId)}` +
       `&room_id=in.(${ids.map(encodeURIComponent).join(",")})` +
-      `&status=in.(confirmed,checked_in)` +
+      `&status=in.(pending,confirmed,checked_in)` +
       `&check_in=lt.${encodeURIComponent(checkOut)}` +
       `&check_out=gt.${encodeURIComponent(checkIn)}` +
       `&select=room_id`,
