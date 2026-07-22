@@ -49,6 +49,32 @@ export interface ProvisionWithTenantInput {
   now: string;
 }
 
+const VALID_ROLES: AppRole[] = ["admin", "staff", "customer"];
+
+/**
+ * The role a brand-new WEB (SSO) profile is created with.
+ *
+ * The web sign-in is the staff entrance: the back office at /dashboard lives
+ * behind it, and real guests never arrive this way — they are provisioned as
+ * 'customer' through the WhatsApp path (provisionProfileWithTenant), whose
+ * booking flow decides their tenant. So a first-time web signup defaults to
+ * 'staff'.
+ *
+ * This is a FIXED server-side default, not derived from anything in the SSO
+ * token (realm included), so a caller cannot steer it — the token still confers
+ * no authority. And it only applies at creation: once the row exists, role is
+ * owned by the database. An admin promoting or demoting through User Management
+ * outlives every later login (upsertProfile never PATCHes role).
+ *
+ * Override with SSO_SIGNUP_ROLE for a deployment whose web login is also open to
+ * guests (e.g. SSO_SIGNUP_ROLE=customer). An unset or unrecognised value keeps
+ * the 'staff' default.
+ */
+function webSignupRole(): AppRole {
+  const raw = (process.env.SSO_SIGNUP_ROLE ?? "").trim() as AppRole;
+  return VALID_ROLES.includes(raw) ? raw : "staff";
+}
+
 function config() {
   return {
     url: (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, ""),
@@ -143,18 +169,25 @@ export async function provisionProfileWithTenant(input: ProvisionWithTenantInput
 }
 
 async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
-  return upsertProfile(input, async ({ url, headers }) => {
-    // Resolve the tenant only when creating the row. A configured-but-unknown
-    // slug is a deployment error: fail the provision rather than let the DB
-    // default quietly file the user under the wrong hotel.
-    const { tenantSlug } = config();
-    const tenantId = await resolveTenantId(url, headers, tenantSlug);
-    if (tenantId === null && tenantSlug) {
-      return { ok: false, error: `unknown_tenant_slug_${tenantSlug}` };
-    }
-    // undefined → tenant_id omitted, column default (single-hotel) applies.
-    return { ok: true, tenantId: tenantId ?? undefined };
-  });
+  return upsertProfile(
+    input,
+    async ({ url, headers }) => {
+      // Resolve the tenant only when creating the row. A configured-but-unknown
+      // slug is a deployment error: fail the provision rather than let the DB
+      // default quietly file the user under the wrong hotel.
+      const { tenantSlug } = config();
+      const tenantId = await resolveTenantId(url, headers, tenantSlug);
+      if (tenantId === null && tenantSlug) {
+        return { ok: false, error: `unknown_tenant_slug_${tenantSlug}` };
+      }
+      // undefined → tenant_id omitted, column default (single-hotel) applies.
+      return { ok: true, tenantId: tenantId ?? undefined };
+    },
+    // Web sign-in is the staff entrance; a new web profile is created as staff
+    // (or whatever SSO_SIGNUP_ROLE overrides to). The WhatsApp path below passes
+    // no role, so a guest keeps the 'customer' column default.
+    webSignupRole(),
+  );
 }
 
 /** The subset of profile fields both provisioning paths write. */
@@ -180,6 +213,10 @@ type TenantResolution = { ok: true; tenantId: string | undefined } | { ok: false
 async function upsertProfile(
   input: ProfileFields,
   resolveTenant: (ctx: { url: string; headers: Record<string, string> }) => Promise<TenantResolution>,
+  // The role to stamp on a NEWLY created row. Omitted on the WhatsApp path, so
+  // the 'customer' column default applies; the web path passes 'staff'. Never
+  // sent on the PATCH of a returning user — an admin's role decision is final.
+  newProfileRole?: AppRole,
 ): Promise<ProvisionResult> {
   const { url, serviceKey } = config();
   if (!url || !serviceKey) {
@@ -235,9 +272,11 @@ async function upsertProfile(
     return { ok: false, created: false, role: null, isActive: false, error: tenant.error };
   }
 
-  // `role` is deliberately absent: the column defaults to 'customer', so a new
-  // arrival gets the least privilege and is promoted later through the database.
-  // Sending a role here would let the SSO token influence authorization.
+  // `role` is set only for the web sign-in (staff entrance); the WhatsApp path
+  // leaves it absent so the column default ('customer') gives a guest the least
+  // privilege. Either way this is a fixed server-side value — never taken from
+  // the SSO token — so the token cannot influence authorization, and an admin
+  // can still re-decide the role afterwards through the database.
   const insert = await fetch(`${url}/rest/v1/profiles`, {
     method: "POST",
     headers: { ...headers, Prefer: "return=representation" },
@@ -247,6 +286,7 @@ async function upsertProfile(
       ...(input.email !== undefined ? { email: input.email } : {}),
       full_name: input.fullName,
       last_seen_at: input.now,
+      ...(newProfileRole ? { role: newProfileRole } : {}),
       // Omitted when the resolver returns undefined (single-hotel web install),
       // so the column default applies; sent explicitly otherwise.
       ...(tenant.tenantId ? { tenant_id: tenant.tenantId } : {}),

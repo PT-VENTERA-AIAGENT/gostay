@@ -52,9 +52,11 @@ export function profileIdFor(ssoSub: string): string {
  * Roles are not derived from anything in the SSO token.
  *
  * `profiles.role` is the only source of truth: it is what get_my_role() reads,
- * and therefore what every RLS policy enforces. A new profile takes the schema
- * default ('customer'); promoting someone is a database change, made through
- * User Management or the Supabase SQL editor.
+ * and therefore what every RLS policy enforces. A new profile is created with a
+ * fixed default decided by the entry point — 'staff' for a web sign-in (the
+ * back-office entrance), 'customer' for a WhatsApp guest — never from anything
+ * in the token. Changing it afterwards is a database change, made through User
+ * Management or the Supabase SQL editor.
  *
  * Mapping the SSO realm to a role as well would create a second source of
  * truth that could silently disagree with the database — and it would mean
