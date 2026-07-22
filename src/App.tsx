@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/lib/i18n";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
+import ErrorBoundary from "@/components/shared/ErrorBoundary";
 
 import StaffLayout from "./components/layout/StaffLayout";
 import PortalLayout from "./components/layout/PortalLayout";
@@ -61,6 +62,7 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
+  <ErrorBoundary boundary="app">
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -68,6 +70,7 @@ const App = () => (
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <LanguageProvider>
         <AuthProvider>
+          <ErrorBoundary boundary="routes">
           <Routes>
             {/* Public landing page */}
             <Route path="/" element={<LandingPage />} />
@@ -200,6 +203,7 @@ const App = () => (
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ErrorBoundary>
           <PromoPopup />
           <ExitIntentPopup />
         </AuthProvider>
@@ -207,6 +211,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
