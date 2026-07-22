@@ -29,6 +29,7 @@ import GuestRequests from "./pages/GuestRequests";
 import Analytics from "./pages/Analytics";
 import UserManagement from "./pages/UserManagement";
 import AddHotel from "./pages/admin/AddHotel";
+import CreateHotel from "./pages/CreateHotel";
 import CRM from "./pages/CRM";
 import Reviews from "./pages/Reviews";
 import WhatsApp from "./pages/settings/WhatsApp";
@@ -99,6 +100,18 @@ const App = () => (
             <Route path="/register" element={<Navigate to="/login" replace />} />
             <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
 
+            {/* Self-serve hotel creation: any signed-in user (no hotel yet) can
+                register their own hotel and become its owner (staff). Standalone
+                — no staff layout, since the caller may still be a customer. */}
+            <Route
+              path="/create-hotel"
+              element={
+                <ProtectedRoute>
+                  <CreateHotel />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Staff/Admin pages — require authentication */}
             <Route
               element={
@@ -122,7 +135,7 @@ const App = () => (
               <Route
                 path="/users"
                 element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
                     <UserManagement />
                   </ProtectedRoute>
                 }

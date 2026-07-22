@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Star, Wifi, Wind, Tv, Coffee, Bath, Mountain, Users, MapPin, ArrowRight, Shield, Clock, CreditCard, Phone } from "lucide-react";
+import { Search, Star, Wifi, Wind, Tv, Coffee, Bath, Mountain, Users, MapPin, ArrowRight, Shield, Clock, CreditCard, Phone, Store } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem, fadeInUp } from "@/components/shared/PageTransition";
 import DatePicker from "@/components/shared/DatePicker";
 import { useRoomTypes, useAvailableRooms, useRooms } from "@/hooks/useRooms";
 import { usePublishedReviews, useReviewStats } from "@/hooks/useReviews";
 import { useTenant } from "@/hooks/useTenant";
+import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/i18n";
 
 const amenityIcons: Record<string, React.ElementType> = { WiFi: Wifi, AC: Wind, TV: Tv, "Mini Bar": Coffee, Bathtub: Bath, "Sea View": Mountain };
@@ -46,6 +47,7 @@ const todayISO = new Date().toISOString().slice(0, 10);
 export default function PortalHome() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { name: hotelName } = useTenant();
+  const { user, role } = useAuth();
   const t = useT();
 
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") ?? "");
@@ -88,6 +90,26 @@ export default function PortalHome() {
   return (
     <PageTransition>
       <div>
+        {/* Self-serve: a signed-in guest who wants to run their own hotel. Shown
+            only to authenticated customers — not to anonymous browsers, and not
+            to staff/admin who already have a hotel. */}
+        {user && role === "customer" && (
+          <div className="bg-primary/5 border-b border-border px-4 md:px-8 py-3">
+            <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+              <span className="text-sm text-foreground flex items-center gap-2">
+                <Store className="w-4 h-4 text-primary shrink-0" />
+                {t("Punya hotel? Daftarkan dan kelola sendiri.")}
+              </span>
+              <Link
+                to="/create-hotel"
+                className="shrink-0 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+              >
+                {t("Buat Hotel")} <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Hero */}
         <section className="relative bg-primary/5 px-4 md:px-8 py-12 md:py-20">
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="max-w-4xl mx-auto text-center">
