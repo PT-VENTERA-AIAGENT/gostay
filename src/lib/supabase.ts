@@ -2,12 +2,26 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { getSession } from "@/lib/sso";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "";
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase environment variables are not set. See .env.example.");
+// createClient THROWS ("supabaseUrl is required.") when the URL is empty — and
+// because this module is imported at bundle-init, that throw happens before
+// React mounts, white-screening the ENTIRE app (public landing included) with
+// no error boundary able to catch it. A build that shipped without
+// VITE_SUPABASE_URL set is exactly how gostay.id went blank. Fall back to a
+// syntactically valid placeholder so the app always boots: public pages render,
+// and any data call fails loudly (caught by query error states / ErrorBoundary)
+// instead of blanking everything.
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+if (!isSupabaseConfigured) {
+  console.error(
+    "[supabase] Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY at build time — " +
+      "data features are disabled. Set them in the deployment's environment and redeploy.",
+  );
 }
+const effectiveUrl = supabaseUrl || "https://placeholder.supabase.co";
+const effectiveAnonKey = supabaseAnonKey || "placeholder-anon-key";
 
 // Which hotel this deployment's portal belongs to. current_tenant() (011) reads
 // it from the x-tenant-slug header to scope the PUBLIC, anonymous reads — room
@@ -17,7 +31,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // deployment; when unset the DB falls back to the sole tenant (single-hotel).
 const tenantSlug = (import.meta.env.VITE_TENANT_SLUG as string | undefined)?.trim();
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(effectiveUrl, effectiveAnonKey, {
   // Sending it on every request (not just anon ones) is harmless: when signed
   // in, current_tenant() prefers the profile and ignores the header.
   ...(tenantSlug ? { global: { headers: { "x-tenant-slug": tenantSlug } } } : {}),

@@ -22,6 +22,32 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/gostay.png" />
+
+    <!-- Last-resort error handler. A crash while the JS bundle initialises (e.g.
+         a missing build-time env var) happens BEFORE React mounts, so the React
+         ErrorBoundary cannot catch it and the page would otherwise stay blank.
+         This inline script runs first and paints a readable fallback if #root
+         never fills. -->
+    <script>
+      (function () {
+        function showFatal() {
+          var root = document.getElementById("root");
+          if (!root || root.childElementCount > 0) return;
+          root.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;padding:24px;text-align:center;color:#334155;background:#fafaf9">' +
+            '<div style="max-width:420px">' +
+            '<div style="font-size:40px;margin-bottom:12px">⚠️</div>' +
+            '<h1 style="font-size:20px;font-weight:700;margin:0 0 8px">Gagal memuat aplikasi</h1>' +
+            '<p style="font-size:14px;color:#64748b;margin:0 0 20px;line-height:1.5">Terjadi kesalahan saat memuat GoStay. Silakan muat ulang halaman. Jika berlanjut, hubungi tim kami.</p>' +
+            '<button onclick="location.reload()" style="background:#111827;color:#fff;border:0;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Muat ulang</button>' +
+            '</div></div>';
+        }
+        window.addEventListener("error", showFatal);
+        window.addEventListener("unhandledrejection", showFatal);
+        // Safety net: if the app hasn't mounted a few seconds after load, show it.
+        window.addEventListener("load", function () { setTimeout(showFatal, 5000); });
+      })();
+    </script>
   </head>
 
   <body>
