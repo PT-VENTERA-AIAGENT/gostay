@@ -54,25 +54,25 @@ const VALID_ROLES: AppRole[] = ["admin", "staff", "customer"];
 /**
  * The role a brand-new WEB (SSO) profile is created with.
  *
- * The web sign-in is the staff entrance: the back office at /dashboard lives
- * behind it, and real guests never arrive this way — they are provisioned as
- * 'customer' through the WhatsApp path (provisionProfileWithTenant), whose
- * booking flow decides their tenant. So a first-time web signup defaults to
- * 'staff'.
+ * Defaults to 'customer' — the least-privilege, tenant-safe answer. A hotel's
+ * staff are NOT born here: per the role model (PRD §2.1–2.2), staff belong to a
+ * specific hotel and are created either by Ventera's onboarding wizard or, in
+ * the target self-serve flow (PRD §2.2 path 1), by spinning up a NEW tenant and
+ * making the signer its owner. Until that self-serve flow exists, minting a
+ * stranger straight into the single existing tenant as 'staff' would hand them
+ * another hotel's dashboard and guest data — a cross-tenant leak. So a plain web
+ * signup lands as a portal-only 'customer'.
  *
- * This is a FIXED server-side default, not derived from anything in the SSO
- * token (realm included), so a caller cannot steer it — the token still confers
- * no authority. And it only applies at creation: once the row exists, role is
- * owned by the database. An admin promoting or demoting through User Management
- * outlives every later login (upsertProfile never PATCHes role).
+ * FIXED server-side default, never derived from the SSO token (realm included),
+ * so a caller cannot steer it. Only applies at creation; afterwards role is
+ * owned by the database (upsertProfile never PATCHes it).
  *
- * Override with SSO_SIGNUP_ROLE for a deployment whose web login is also open to
- * guests (e.g. SSO_SIGNUP_ROLE=customer). An unset or unrecognised value keeps
- * the 'staff' default.
+ * SSO_SIGNUP_ROLE can override for a specific deployment, but an unset or
+ * unrecognised value keeps the safe 'customer' default.
  */
 function webSignupRole(): AppRole {
   const raw = (process.env.SSO_SIGNUP_ROLE ?? "").trim() as AppRole;
-  return VALID_ROLES.includes(raw) ? raw : "staff";
+  return VALID_ROLES.includes(raw) ? raw : "customer";
 }
 
 function config() {
