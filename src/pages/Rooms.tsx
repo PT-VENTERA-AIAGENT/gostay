@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useT, tr } from "@/lib/i18n";
 import { Link } from "react-router-dom";
-import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays, ChevronDown } from "lucide-react";
+import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays, ChevronDown, LayoutGrid, Map as MapIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
@@ -21,6 +21,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import RoomFormDialog from "@/components/rooms/RoomFormDialog";
+import FloorPlanEditor from "@/components/rooms/floorplan/FloorPlanEditor";
 import DatePicker from "@/components/shared/DatePicker";
 import type { Room } from "@/types/database.types";
 
@@ -112,6 +113,8 @@ export default function Rooms() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [date, setDate] = useState(todayISO());
+  // "grid" = the status board; "plan" = the editable top-down site plan (denah).
+  const [view, setView] = useState<"grid" | "plan">("grid");
 
   const { data: rooms = [], isLoading, error } = useRooms();
   const { data: roomTypes = [] } = useRoomTypes();
@@ -184,15 +187,35 @@ export default function Rooms() {
             </p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
+            {/* View switcher: status board vs editable site plan */}
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <button
+                onClick={() => setView("grid")}
+                className={cn("flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-md text-xs md:text-sm font-medium transition-colors btn-press", view === "grid" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+              >
+                <LayoutGrid className="w-4 h-4" /> <span className="hidden sm:inline">{t("Grid")}</span>
+              </button>
+              <button
+                onClick={() => setView("plan")}
+                className={cn("flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-md text-xs md:text-sm font-medium transition-colors btn-press", view === "plan" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+              >
+                <MapIcon className="w-4 h-4" /> <span className="hidden sm:inline">{t("Denah")}</span>
+              </button>
+            </div>
             <Link to="/rooms/types" className="px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2 btn-press">
               <Settings className="w-4 h-4" /> <span className="hidden sm:inline">{t("Room Types")}</span>
             </Link>
-            <button onClick={openAdd} className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t("Add Room")}</span>
-            </button>
+            {view === "grid" && (
+              <button onClick={openAdd} className="bg-primary text-primary-foreground px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t("Add Room")}</span>
+              </button>
+            )}
           </div>
         </div>
 
+        {view === "plan" && <FloorPlanEditor />}
+
+        {view === "grid" && (<>
         {/* Date selector — the board reflects room status for this night. */}
         <div className="flex items-center gap-2 flex-wrap">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
@@ -286,6 +309,7 @@ export default function Rooms() {
             <button onClick={() => { setSearch(""); setStatusFilter("all"); setTypeFilter("All"); }} className="text-sm text-primary font-medium hover:underline">{t("Clear filters")}</button>
           </div>
         )}
+        </>)}
 
         <RoomFormDialog open={dialogOpen} onOpenChange={setDialogOpen} room={editingRoom} />
       </div>
