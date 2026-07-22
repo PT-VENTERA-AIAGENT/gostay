@@ -27,6 +27,7 @@ import {
   computeTotal,
   createWaBooking,
   getTenantName,
+  setCustomerName,
 } from "./booking";
 import {
   resolveOrProvisionGuest,
@@ -68,6 +69,7 @@ function knownFromPending(
       check_out: (p.check_out as string) ?? null,
       guests: (p.guests as number) ?? null,
       room_type_hint: (p.room_type_hint as string) ?? null,
+      guest_name: (p.guest_name as string) ?? null,
     };
   }
   if (pending.kind === "confirm_booking") {
@@ -76,6 +78,7 @@ function knownFromPending(
       check_out: (p.checkOut as string) ?? null,
       guests: (p.guests as number) ?? null,
       room_type_hint: (p.roomTypeName as string) ?? null,
+      guest_name: (p.guestName as string) ?? null,
     };
   }
   return undefined;
@@ -156,11 +159,12 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
         `Halo! Selamat datang di *${brand}*. Saya asisten reservasi yang siap ` +
           "membantu pemesanan kamar Anda. Supaya bisa langsung saya cekkan " +
           "ketersediaan & harga, kirim *dalam satu pesan* ya:\n" +
-          "1. Tanggal check-in\n" +
-          "2. Tanggal check-out\n" +
-          "3. Jumlah tamu\n" +
-          "4. Tipe kamar\n\n" +
-          "Contoh: 25–27 Juli, 2 orang, Deluxe",
+          "1. Nama pemesan\n" +
+          "2. Tanggal check-in\n" +
+          "3. Tanggal check-out\n" +
+          "4. Jumlah tamu\n" +
+          "5. Tipe kamar\n\n" +
+          "Contoh: a/n Budi, 25–27 Juli, 2 orang, Deluxe",
       );
       return;
     }
@@ -174,6 +178,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       : null;
 
     const missing: string[] = [];
+    if (!intent.guest_name) missing.push("Nama pemesan");
     if (!intent.check_in) missing.push("Tanggal check-in");
     if (!intent.check_out) missing.push("Tanggal check-out");
     if (!intent.guests) missing.push("Jumlah tamu");
@@ -188,6 +193,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
         check_out: intent.check_out,
         guests: intent.guests,
         room_type_hint: roomType?.name ?? null,
+        guest_name: intent.guest_name,
       });
 
       let body =
@@ -208,7 +214,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
         body += `\n\nPilihan tipe kamar:\n${menu}`;
       }
 
-      body += "\n\nContoh: 25–27 Juli, 2 orang, Deluxe";
+      body += "\n\nContoh: a/n Budi, 25–27 Juli, 2 orang, Deluxe";
       await reply(body);
       return;
     }
@@ -217,6 +223,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const checkIn = intent.check_in as string;
     const checkOut = intent.check_out as string;
     const guests = intent.guests as number;
+    const guestName = intent.guest_name as string;
     if (!roomType) return; // unreachable: a missing type is collected in step 3
 
     const rooms = await getAvailableRoomsSrv(tenantId, checkIn, checkOut, roomType.id);
@@ -236,12 +243,14 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       checkIn,
       checkOut,
       guests,
+      guestName,
       nights,
       total,
     });
 
     await reply(
       "*Ringkasan Pemesanan*\n" +
+        `Atas nama: ${guestName}\n` +
         `Kamar: ${roomType.name}\n` +
         `Check-in: ${checkIn}\n` +
         `Check-out: ${checkOut} (${nights} malam)\n` +
@@ -273,6 +282,7 @@ async function confirmBooking(
   const checkOut = payload.checkOut as string;
   const guests = payload.guests as number;
   const total = payload.total as number;
+  const guestName = (payload.guestName as string) ?? "";
 
   // Guest is already provisioned (at the top of handleGuestMessage), so we hold
   // { profileId, customerId } and go straight to committing the booking.
@@ -284,6 +294,11 @@ async function confirmBooking(
     await reply("Mohon maaf, kamar baru saja terisi untuk tanggal itu. Mau coba tanggal lain?");
     return;
   }
+
+  // Record who the reservation is under (the name the guest gave), so CRM and the
+  // folio show it instead of the WhatsApp push-name. Best-effort — never block the
+  // booking on this.
+  if (guestName) await setCustomerName(guest.customerId, guestName).catch(() => {});
 
   const booking = await createWaBooking({
     tenantId,

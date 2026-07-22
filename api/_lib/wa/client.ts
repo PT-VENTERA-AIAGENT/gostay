@@ -79,3 +79,23 @@ export async function serviceInsert(
     body: JSON.stringify(row),
   });
 }
+
+/**
+ * A service-role UPDATE (PATCH) against `/rest/v1/<pathAndQuery>`.
+ *
+ * `pathAndQuery` is the table plus its PostgREST filter, already encoded by the
+ * caller, e.g. `customers?id=eq.<uuid>`. Defaults to `Prefer: return=minimal`.
+ */
+export async function serviceUpdate(
+  pathAndQuery: string,
+  patch: Record<string, unknown>,
+  prefer = "return=minimal",
+): Promise<Response> {
+  const { url, serviceKey } = serviceConfig();
+  if (!url || !serviceKey) throw new Error("wa_service_not_configured");
+  return fetch(`${url}/rest/v1/${pathAndQuery}`, {
+    method: "PATCH",
+    headers: { ...serviceHeaders(serviceKey), Prefer: prefer },
+    body: JSON.stringify(patch),
+  });
+}
