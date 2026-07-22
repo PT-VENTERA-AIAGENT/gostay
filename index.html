@@ -19,9 +19,13 @@
     <meta name="twitter:description" content="Kelola hotel lebih mudah dengan GoStay. Reservasi online, manajemen kamar, dan analitik bisnis dalam satu platform." />
 
     <link rel="canonical" href="https://gostay.id" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Favicon is the "G" house mark only — the full wordmark is illegible at
+         16px. PNG for modern browsers, .ico (also the G) as the /favicon.ico
+         fallback Google and older browsers fetch. The full logo lives at
+         /gostay.svg for in-app use. -->
+    <link rel="icon" type="image/png" sizes="128x128" href="/favicon-mark.png" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
-    <link rel="apple-touch-icon" href="/gostay.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <!-- Last-resort error handler. A crash while the JS bundle initialises (e.g.
          a missing build-time env var) happens BEFORE React mounts, so the React
