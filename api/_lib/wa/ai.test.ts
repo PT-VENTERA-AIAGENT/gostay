@@ -85,6 +85,15 @@ describe("extractBookingIntent — model leg (mocked OpenAI)", () => {
     });
   });
 
+  it("nulls a well-formed but non-existent date (34 Juli / 30 Feb)", async () => {
+    state.content = JSON.stringify({
+      intent: "book", check_in: "2026-07-30", check_out: "2026-07-34", guests: 2, confidence: 0.8,
+    });
+    const r = await extractBookingIntent("30-34 juli 2 orang");
+    expect(r.check_in).toBe("2026-07-30");
+    expect(r.check_out).toBeNull(); // 2026-07-34 is not a real calendar day
+  });
+
   it("calls gpt-4o-mini with low temperature and json_object response_format", async () => {
     state.content = JSON.stringify({ intent: "chat", confidence: 0.5 });
     await extractBookingIntent("halo");

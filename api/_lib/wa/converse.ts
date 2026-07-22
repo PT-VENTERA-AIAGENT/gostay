@@ -226,6 +226,54 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const guestName = intent.guest_name as string;
     if (!roomType) return; // unreachable: a missing type is collected in step 3
 
+    // Dates are real calendar days by now (isoOrNull rejects "34 Juli"), but the
+    // range can still be backwards ("27-25 Juli") — never quote a negative stay.
+    // ISO strings compare correctly with <=.
+    if (checkOut <= checkIn) {
+      await setPending(tenantId, phoneJid, "collecting", {
+        check_in: null,
+        check_out: null,
+        guests,
+        room_type_hint: roomType.name,
+        guest_name: guestName,
+      });
+      await reply(
+        `Tanggal check-out (${checkOut}) harus setelah check-in (${checkIn}). ` +
+          "Boleh kirim ulang tanggalnya ya?",
+      );
+      return;
+    }
+
+    // Occupancy guard: one room can't hold more guests than its capacity. Steer
+    // the guest to a type that fits (or to reduce the party) instead of quoting
+    // an over-capacity room.
+    if (roomType.max_occupancy && guests > roomType.max_occupancy) {
+      const types = await listRoomTypes(tenantId);
+      const fits = types.filter((t) => (t.max_occupancy ?? 0) >= guests);
+      await setPending(tenantId, phoneJid, "collecting", {
+        check_in: checkIn,
+        check_out: checkOut,
+        guests,
+        room_type_hint: null,
+        guest_name: guestName,
+      });
+      if (fits.length > 0) {
+        const menu = fits
+          .map((t) => `   • *${t.name}* — ${formatIDR(t.base_rate)}/malam (maks ${t.max_occupancy} tamu)`)
+          .join("\n");
+        await reply(
+          `${roomType.name} maksimal ${roomType.max_occupancy} tamu, sedangkan pesanan untuk ${guests} tamu. ` +
+            `Tipe yang muat ${guests} tamu:\n${menu}\n\nPilih salah satu, atau kurangi jumlah tamu.`,
+        );
+      } else {
+        await reply(
+          `Mohon maaf, untuk ${guests} tamu belum ada satu tipe kamar yang muat ` +
+            "(mungkin perlu beberapa kamar). Silakan hubungi kami langsung ya.",
+        );
+      }
+      return;
+    }
+
     const rooms = await getAvailableRoomsSrv(tenantId, checkIn, checkOut, roomType.id);
     if (rooms.length === 0) {
       await reply(
