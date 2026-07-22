@@ -30,6 +30,9 @@ import Analytics from "./pages/Analytics";
 import UserManagement from "./pages/UserManagement";
 import AddHotel from "./pages/admin/AddHotel";
 import CreateHotel from "./pages/CreateHotel";
+import LeadList from "./pages/admin/LeadList";
+import LeadDetail from "./pages/admin/LeadDetail";
+import CampaignsPage from "./pages/admin/Campaigns";
 import CRM from "./pages/CRM";
 import Reviews from "./pages/Reviews";
 import WhatsApp from "./pages/settings/WhatsApp";
@@ -145,6 +148,30 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AddHotel />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/leads"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <LeadList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/leads/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <LeadDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/campaigns"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <CampaignsPage />
                   </ProtectedRoute>
                 }
               />

@@ -1,8 +1,9 @@
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
   CalendarDays, DollarSign, Star,
-  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store, Building2
+  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store, Building2, Target
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,8 +34,13 @@ const bottomItems = [
   { icon: Star, label: "Ulasan", path: "/reviews" },
 ];
 
+const adminItems = [
+  { icon: Target, label: "Lead Gen", path: "/admin/leads" },
+];
+
 export default function AppSidebar() {
   const t = useT();
+  const { role } = useAuth();
   const { pathname, search } = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "true");
 
@@ -184,6 +190,43 @@ export default function AppSidebar() {
           </motion.div>
         ))}
       </div>
+
+      {role === "admin" && (
+        <div className="flex flex-col gap-1 mt-2 pt-2 border-t border-sidebar-border">
+          {!collapsed && (
+            <span className="text-xs text-muted-foreground px-3 pb-1 uppercase tracking-wide">Platform</span>
+          )}
+          {adminItems.map((item) => (
+            <motion.div key={item.path} whileHover={{ x: collapsed ? 0 : 2 }} whileTap={{ scale: 0.97 }}>
+              <Link
+                to={item.path}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
+                  collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
+                  isActive(item.path)
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <item.icon className="w-5 h-5 shrink-0" />
+                <AnimatePresence>
+                  {!collapsed && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: "auto" }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="overflow-hidden whitespace-nowrap"
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Collapse toggle */}
       <button
