@@ -57,8 +57,16 @@ export default function UserManagement() {
   const { data: users, isLoading, error } = useProfiles();
   const updateRole = useUpdateUserRole();
   const setActive = useSetUserActive();
-  const { user: me } = useAuth();
+  const { user: me, role: myRole } = useAuth();
   const { toast } = useToast();
+
+  // `admin` is Ventera-only (PRD §2). A hotel's staff run User Management for
+  // their own team but may never grant admin, nor touch an existing admin row —
+  // the database enforces the same via RLS + the profile column guard (027), so
+  // this is UX, not the security boundary.
+  const isAdmin = myRole === "admin";
+  const assignableRoles: UserRole[] = isAdmin ? ["admin", "staff", "customer"] : ["staff", "customer"];
+  const canManage = (u: Profile) => u.id !== me?.id && (isAdmin || u.role !== "admin");
 
   const all = users ?? [];
   const team = all.filter(isTeamMember);
@@ -197,12 +205,9 @@ export default function UserManagement() {
                         </td>
                         <td className="px-4 py-3">
                           {/* Changing your own role could lock the last admin out
-                              of this page, so leave that to someone else. */}
-                          {isMe ? (
-                            <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", roleConfig[u.role].cls)}>
-                              {roleConfig[u.role].label}
-                            </span>
-                          ) : (
+                              of this page, so leave that to someone else. Staff
+                              also cannot edit an admin (Ventera) row. */}
+                          {canManage(u) ? (
                             <select
                               value={u.role}
                               onChange={(e) => changeRole(u, e.target.value as UserRole)}
@@ -213,10 +218,14 @@ export default function UserManagement() {
                                 roleConfig[u.role].cls,
                               )}
                             >
-                              <option value="admin">{t("Admin")}</option>
-                              <option value="staff">{t("Staff")}</option>
-                              <option value="customer">{t("Customer")}</option>
+                              {assignableRoles.map((r) => (
+                                <option key={r} value={r}>{t(roleConfig[r].label)}</option>
+                              ))}
                             </select>
+                          ) : (
+                            <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", roleConfig[u.role].cls)}>
+                              {roleConfig[u.role].label}
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground font-mono">{u.phone ?? "—"}</td>
@@ -228,7 +237,7 @@ export default function UserManagement() {
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{formatLastSeen(u.last_seen_at)}</td>
                         <td className="px-4 py-3 text-right">
-                          {!isMe && (
+                          {canManage(u) && (
                             <button
                               onClick={() => toggleActive(u)}
                               disabled={setActive.isPending}
@@ -273,7 +282,7 @@ export default function UserManagement() {
                       </span>
                       <span>{formatLastSeen(u.last_seen_at)}</span>
                     </div>
-                    {!isMe && (
+                    {canManage(u) && (
                       <div className="flex items-center gap-2">
                         <select
                           value={u.role}
@@ -282,9 +291,9 @@ export default function UserManagement() {
                           aria-label={`Role for ${u.full_name || u.email}`}
                           className="flex-1 text-xs bg-muted border border-border rounded-lg px-2 py-2 text-foreground outline-none"
                         >
-                          <option value="admin">{t("Admin")}</option>
-                          <option value="staff">{t("Staff")}</option>
-                          <option value="customer">{t("Customer")}</option>
+                          {assignableRoles.map((r) => (
+                            <option key={r} value={r}>{t(roleConfig[r].label)}</option>
+                          ))}
                         </select>
                         <button
                           onClick={() => toggleActive(u)}
