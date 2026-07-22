@@ -22,6 +22,7 @@ const { ai, pending, booking, guest, send, crm, WaRateLimitError } = vi.hoisted(
       computeTotal: vi.fn(),
       createWaBooking: vi.fn(),
       getTenantName: vi.fn(),
+      setCustomerName: vi.fn(),
     },
     guest: { resolveOrProvisionGuest: vi.fn(), WaRateLimitError },
     send: { sendText: vi.fn() },
@@ -63,6 +64,7 @@ beforeEach(() => {
     { id: "rt-2", name: "Suite", base_rate: 900000, max_occupancy: 2 },
   ]);
   booking.getTenantName.mockResolvedValue("Hotel Uji");
+  booking.setCustomerName.mockResolvedValue(undefined);
 });
 
 describe("handleGuestMessage — intent routing", () => {
@@ -121,7 +123,7 @@ describe("handleGuestMessage — intent routing", () => {
 
 describe("handleGuestMessage — quoting", () => {
   const fullIntent = {
-    intent: "book", check_in: "2026-07-20", check_out: "2026-07-22", guests: 2, room_type_hint: "deluxe", confidence: 0.9,
+    intent: "book", check_in: "2026-07-20", check_out: "2026-07-22", guests: 2, room_type_hint: "deluxe", guest_name: "Budi", confidence: 0.9,
   };
 
   it("prices an available room and parks a 'confirm_booking' pending", async () => {
@@ -139,6 +141,8 @@ describe("handleGuestMessage — quoting", () => {
     const reply = repliesText();
     expect(reply).toContain("Ringkasan");
     expect(reply).toContain("Deluxe");
+    expect(reply).toContain("Atas nama"); // booking is shown under the guest's name
+    expect(reply).toContain("Budi");
     expect(reply.toUpperCase()).toContain("YA");
     expect(booking.createWaBooking).not.toHaveBeenCalled(); // not yet — waiting for YA
   });
@@ -177,7 +181,7 @@ describe("handleGuestMessage — quoting", () => {
 describe("handleGuestMessage — confirmation", () => {
   const confirmPending = {
     kind: "confirm_booking",
-    payload: { roomTypeId: "rt-1", roomTypeName: "Deluxe", checkIn: "2026-07-20", checkOut: "2026-07-22", guests: 2, nights: 2, total: 1000000 },
+    payload: { roomTypeId: "rt-1", roomTypeName: "Deluxe", checkIn: "2026-07-20", checkOut: "2026-07-22", guests: 2, guestName: "Budi", nights: 2, total: 1000000 },
   };
 
   it("YA provisions the guest, books, clears pending, and replies with the reference", async () => {
@@ -194,6 +198,7 @@ describe("handleGuestMessage — confirmation", () => {
     );
     expect(pending.clearPending).toHaveBeenCalled();
     expect(repliesText()).toContain("GS-0001");
+    expect(booking.setCustomerName).toHaveBeenCalledWith("cust-1", "Budi"); // records the booking name
   });
 
   it("BATAL clears the pending and books nothing", async () => {

@@ -80,6 +80,7 @@ describe("extractBookingIntent — model leg (mocked OpenAI)", () => {
       check_out: "2026-07-22",
       guests: 2,
       room_type_hint: "deluxe",
+      guest_name: null,
       confidence: 0.9,
     });
   });
@@ -201,5 +202,11 @@ describe("extractBookingIntent — deterministic fallback (no OPENAI_API_KEY)", 
     const r = await extractBookingIntent("kamar standar buat 1 orang");
     expect(r.room_type_hint).toBe("standard");
     expect(r.guests).toBe(1);
+  });
+
+  it("extracts the booker name from 'atas nama' / 'a/n' phrases", async () => {
+    expect((await extractBookingIntent("atas nama Budi Santoso")).guest_name).toBe("Budi Santoso");
+    expect((await extractBookingIntent("deluxe a/n Andi")).guest_name).toBe("Andi");
+    expect((await extractBookingIntent("2 orang deluxe")).guest_name).toBeNull();
   });
 });

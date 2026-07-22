@@ -9,7 +9,7 @@
 // path. It talks to PostgREST through the raw service-role fetch helpers in
 // client.ts, same as provision.ts / inbound.ts.
 
-import { serviceGet, serviceInsert } from "./client";
+import { serviceGet, serviceInsert, serviceUpdate } from "./client";
 
 // ─── Shapes ──────────────────────────────────────────────────────────────────
 
@@ -61,6 +61,21 @@ export async function findRoomType(
   if (!res.ok) throw new Error(`wa_room_type_lookup_failed_${res.status}`);
   const rows = (await res.json()) as RoomTypeLite[];
   return rows[0] ?? null;
+}
+
+/**
+ * Set a customer's display name — used when a WA guest states the booking name
+ * ("atas nama Budi"), so CRM and the folio show who the reservation is for
+ * rather than the WhatsApp push-name. Best-effort: a failure is swallowed by the
+ * caller so it can never block a booking that is otherwise valid.
+ */
+export async function setCustomerName(customerId: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  await serviceUpdate(
+    `customers?id=eq.${encodeURIComponent(customerId)}`,
+    { full_name: trimmed },
+  );
 }
 
 /**

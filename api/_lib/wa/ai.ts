@@ -20,6 +20,7 @@ export interface BookingSlots {
   check_out: string | null;
   guests: number | null;
   room_type_hint: string | null;
+  guest_name: string | null;
 }
 
 export interface BookingIntent extends BookingSlots {
@@ -106,18 +107,19 @@ function systemPrompt(known: BookingSlots): string {
   return `Kamu asisten reservasi hotel via WhatsApp. Tugasmu mengekstrak niat dan detail booking dari pesan tamu (Bahasa Indonesia atau Inggris).
 
 Kembalikan HANYA satu objek JSON valid, tanpa markdown, dengan bentuk PERSIS:
-{"intent":"book"|"chat"|"other","check_in":"YYYY-MM-DD"|null,"check_out":"YYYY-MM-DD"|null,"guests":<integer>|null,"room_type_hint":"<string>"|null,"confidence":<number 0..1>}
+{"intent":"book"|"chat"|"other","check_in":"YYYY-MM-DD"|null,"check_out":"YYYY-MM-DD"|null,"guests":<integer>|null,"room_type_hint":"<string>"|null,"guest_name":"<string>"|null,"confidence":<number 0..1>}
 
 ATURAN:
 - intent: "book" bila tamu ingin memesan/menanyakan ketersediaan kamar; "chat" untuk sapaan/obrolan biasa; "other" bila di luar konteks reservasi.
 - check_in / check_out: tanggal format "YYYY-MM-DD". Hari ini adalah ${today}; asumsikan tahun berjalan bila tamu tidak menyebut tahun. null bila tidak disebut. Untuk rentang seperti "20-22 juli", check_in="…-07-20" dan check_out="…-07-22".
 - guests: jumlah tamu sebagai bilangan bulat (mis. "2 orang" -> 2). null bila tidak disebut.
 - room_type_hint: kata TIPE kamar (mis. "deluxe", "suite", "standard", "family"). null bila tidak disebut. JANGAN ambil NOMOR kamar sebagai tipe — "kamar 101" / "no 101" itu nomor kamar (bukan tipe), set null.
+- guest_name: NAMA pemesan bila disebut ("atas nama Budi", "a/n Budi", "an. Budi", "nama saya Budi", "untuk Budi"). null bila tidak disebut. JANGAN mengarang nama; jangan ambil tipe kamar/angka sebagai nama.
 - confidence: keyakinanmu 0..1.
 
 Slot yang sudah terkumpul dari percakapan sebelumnya (pertahankan bila tamu tidak mengubahnya): ${context}
 
-LANJUTAN: bila slot di atas SUDAH ada isinya dan pesan tamu berupa angka/tanggal singkat, itu jawaban untuk slot yang MASIH kosong — set intent="book" dan isi slot itu. Contoh: check_in sudah "2026-07-21", tamu kirim "23" → check_out="2026-07-23" (bulan & tahun sama). Angka setelah ditanya jumlah tamu → guests.
+LANJUTAN: bila slot di atas SUDAH ada isinya dan pesan tamu berupa angka/tanggal singkat, itu jawaban untuk slot yang MASIH kosong — set intent="book" dan isi slot itu. Contoh: check_in sudah "2026-07-21", tamu kirim "23" → check_out="2026-07-23" (bulan & tahun sama). Angka setelah ditanya jumlah tamu → guests. Bila HANYA nama yang masih kosong dan tamu mengirim sebuah nama (mis. "Budi Santoso"), isi guest_name dengan teks itu.
 
 Kembalikan HANYA objek JSON tersebut.`;
 }
@@ -170,6 +172,10 @@ function coerceIntent(parsed: Record<string, unknown>): BookingIntent {
       typeof parsed.room_type_hint === "string" && parsed.room_type_hint.trim()
         ? parsed.room_type_hint.trim()
         : null,
+    guest_name:
+      typeof parsed.guest_name === "string" && parsed.guest_name.trim()
+        ? parsed.guest_name.trim()
+        : null,
     confidence,
   };
 }
@@ -192,6 +198,10 @@ function normaliseKnown(known?: Partial<BookingSlots>): BookingSlots {
       typeof known?.room_type_hint === "string" && known.room_type_hint.trim()
         ? known.room_type_hint.trim()
         : null,
+    guest_name:
+      typeof known?.guest_name === "string" && known.guest_name.trim()
+        ? known.guest_name.trim()
+        : null,
   };
 }
 
@@ -208,6 +218,7 @@ function mergeIntent(fresh: BookingIntent, known: BookingSlots): BookingIntent {
     check_out: fresh.check_out ?? known.check_out,
     guests: fresh.guests ?? known.guests,
     room_type_hint: fresh.room_type_hint ?? known.room_type_hint,
+    guest_name: fresh.guest_name ?? known.guest_name,
   };
 }
 
@@ -242,9 +253,10 @@ function fallbackExtract(text: string): BookingIntent {
   const { check_in, check_out } = extractDates(lower);
   const guests = extractGuests(lower);
   const room_type_hint = ROOM_HINTS.find((h) => lower.includes(h)) ?? null;
+  const guest_name = extractName(text);
 
   const hasDate = Boolean(check_in || check_out);
-  const intent: BookingIntent["intent"] = hasDate || room_type_hint ? "book" : "chat";
+  const intent: BookingIntent["intent"] = hasDate || room_type_hint || guest_name ? "book" : "chat";
 
   return {
     intent,
@@ -253,8 +265,20 @@ function fallbackExtract(text: string): BookingIntent {
     guests,
     // Normalise the Indonesian "standar" spelling to the keyword staff expect.
     room_type_hint: room_type_hint === "standar" ? "standard" : room_type_hint,
+    guest_name,
     confidence: 0.3,
   };
+}
+
+/**
+ * "atas nama Budi", "a/n Budi Santoso", "a.n Budi", "nama saya Budi".
+ * The abbreviation must carry a separator (a/n, a.n) so a bare "an" inside a
+ * word (e.g. "makan") can never be mistaken for a name marker.
+ */
+function extractName(text: string): string | null {
+  const m = text.match(/(?:atas\s+nama|\ba[./]n\b|\bnama(?:\s+saya)?)\s*:?\s*([A-Za-z][A-Za-z .'-]{1,49})/i);
+  const name = m?.[1]?.trim().replace(/[.,]+$/, "");
+  return name ? name : null;
 }
 
 function pad(n: number): string {
