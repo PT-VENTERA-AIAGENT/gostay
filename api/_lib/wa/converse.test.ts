@@ -77,22 +77,42 @@ describe("handleGuestMessage — intent routing", () => {
     expect(booking.findRoomType).not.toHaveBeenCalled();
   });
 
-  it("asks for the missing slots and stores a 'collecting' pending", async () => {
+  it("resolves a valid type up-front and asks the remaining slots in one message", async () => {
     ai.extractBookingIntent.mockResolvedValue({
       intent: "book", check_in: "2026-07-20", check_out: null, guests: null, room_type_hint: "deluxe", confidence: 0.7,
     });
+    // "deluxe" is a real type — so it's kept, and only the still-missing fields
+    // (check-out, guests) get asked, all at once.
+    booking.findRoomType.mockResolvedValue({ id: "rt-1", name: "Deluxe", base_rate: 500000, max_occupancy: 2 });
 
     await handleGuestMessage({ ...BASE, text: "mau nginap 20 juli deluxe" });
 
     expect(pending.setPending).toHaveBeenCalledWith(
       "tenant-x", BASE.phoneJid, "collecting",
-      expect.objectContaining({ check_in: "2026-07-20", room_type_hint: "deluxe" }),
+      expect.objectContaining({ check_in: "2026-07-20", room_type_hint: "Deluxe" }),
     );
-    const reply = repliesText();
-    expect(reply).toContain("tanggal check-out");
+    const reply = repliesText().toLowerCase();
+    expect(reply).toContain("check-out");
     expect(reply).toContain("jumlah tamu");
-    expect(reply).not.toContain("tanggal check-in"); // already have it
-    expect(booking.findRoomType).not.toHaveBeenCalled();
+    expect(reply).not.toContain("check-in"); // already have it
+    expect(reply).not.toContain("tipe kamar"); // valid type isn't re-asked
+  });
+
+  it("asks for the type (with a priced menu) together with the missing slots", async () => {
+    ai.extractBookingIntent.mockResolvedValue({
+      intent: "book", check_in: "2026-07-20", check_out: null, guests: null, room_type_hint: null, confidence: 0.7,
+    });
+    booking.findRoomType.mockResolvedValue(null);
+
+    await handleGuestMessage({ ...BASE, text: "mau nginap 20 juli" });
+
+    const reply = repliesText();
+    expect(reply.toLowerCase()).toContain("check-out");
+    expect(reply.toLowerCase()).toContain("jumlah tamu");
+    expect(reply.toLowerCase()).toContain("tipe kamar");
+    // the menu is shown so the guest can pick the type in the same reply
+    expect(reply).toContain("Deluxe");
+    expect(reply).toContain("Suite");
   });
 });
 

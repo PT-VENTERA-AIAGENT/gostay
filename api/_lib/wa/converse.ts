@@ -101,11 +101,11 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       guest = await resolveOrProvisionGuest(phoneJid, tenantId, displayName);
     } catch (e) {
       if (e instanceof WaRateLimitError) {
-        await rawReply("Terlalu banyak pesan dari nomor ini. Mohon coba lagi nanti ya. 🙏");
+        await rawReply("Terlalu banyak pesan dari nomor ini. Mohon coba lagi nanti ya.");
         return;
       }
       console.error("[wa/converse] provision:", (e as Error).message);
-      await rawReply("Maaf, kami sedang kesulitan memproses. Coba lagi sebentar ya. 🙏");
+      await rawReply("Maaf, kami sedang kesulitan memproses. Coba lagi sebentar ya.");
       return;
     }
 
@@ -132,7 +132,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       }
       if (NO.has(word)) {
         await clearPending(tenantId, phoneJid);
-        await reply("Baik, pemesanan dibatalkan. Ada lagi yang bisa dibantu? 😊");
+        await reply("Baik, pemesanan dibatalkan. Ada lagi yang bisa dibantu?");
         return;
       }
       // Anything else: the guest is changing their mind (new dates/room). Fall
@@ -148,56 +148,70 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const collecting = pending?.kind === "collecting";
     if (intent.intent !== "book" && !collecting) {
       await reply(
-        "Halo! 👋 Saya asisten reservasi hotel. Untuk memesan kamar, sebutkan " +
-          "tanggal menginap, jumlah tamu, dan tipe kamar yang diinginkan ya.",
+        "Halo! Saya asisten reservasi hotel. Supaya bisa langsung saya cekkan " +
+          "ketersediaan & harga, kirim *dalam satu pesan* ya:\n" +
+          "1. Tanggal check-in\n" +
+          "2. Tanggal check-out\n" +
+          "3. Jumlah tamu\n" +
+          "4. Tipe kamar\n\n" +
+          "Contoh: 25–27 Juli, 2 orang, Deluxe",
       );
       return;
     }
 
-    // ── 3. Collect missing slots ────────────────────────────────────────────
+    // ── 3. Collect everything still missing — in ONE question ───────────────
+    // Resolve the room TYPE up-front so it's gathered together with the dates
+    // and guest count instead of in a separate follow-up. This keeps the chat
+    // short: the guest can answer every remaining field in a single message.
+    const roomType = intent.room_type_hint
+      ? await findRoomType(tenantId, intent.room_type_hint)
+      : null;
+
     const missing: string[] = [];
-    if (!intent.check_in) missing.push("tanggal check-in");
-    if (!intent.check_out) missing.push("tanggal check-out");
-    if (!intent.guests) missing.push("jumlah tamu");
+    if (!intent.check_in) missing.push("Tanggal check-in");
+    if (!intent.check_out) missing.push("Tanggal check-out");
+    if (!intent.guests) missing.push("Jumlah tamu");
+    // A named-but-unknown type (or a room NUMBER like "101") leaves roomType null
+    // → we treat the type as still missing and show the real menu below.
+    const needType = !roomType;
+    if (needType) missing.push("Tipe kamar");
 
     if (missing.length > 0) {
       await setPending(tenantId, phoneJid, "collecting", {
         check_in: intent.check_in,
         check_out: intent.check_out,
         guests: intent.guests,
-        room_type_hint: intent.room_type_hint,
+        room_type_hint: roomType?.name ?? null,
       });
-      await reply(`Baik! Boleh sebutkan ${missing.join(", ")}?`);
+
+      let body =
+        "Baik! Mohon lengkapi data berikut — boleh langsung sekaligus dalam satu pesan ya:\n" +
+        missing.map((m) => `• ${m}`).join("\n");
+
+      // When the type is what's missing, show the real menu with prices so the
+      // guest can pick it inside the same reply.
+      if (needType) {
+        const types = await listRoomTypes(tenantId);
+        if (types.length === 0) {
+          await reply(
+            "Mohon maaf, belum ada tipe kamar yang bisa dipesan saat ini. Silakan hubungi kami langsung ya.",
+          );
+          return;
+        }
+        const menu = types.map((t) => `   • *${t.name}* — ${formatIDR(t.base_rate)}/malam`).join("\n");
+        body += `\n\nPilihan tipe kamar:\n${menu}`;
+      }
+
+      body += "\n\nContoh: 25–27 Juli, 2 orang, Deluxe";
+      await reply(body);
       return;
     }
 
-    // ── 4. Price it against real availability ───────────────────────────────
+    // ── 4. Price it against real availability (all fields present) ──────────
     const checkIn = intent.check_in as string;
     const checkOut = intent.check_out as string;
     const guests = intent.guests as number;
-
-    // Resolve the room TYPE. If none was clearly named (or the guest gave a room
-    // NUMBER like "101", which isn't a type), show the real menu with prices and
-    // keep the dates/guests so their next reply picks a type and continues.
-    const roomType = intent.room_type_hint
-      ? await findRoomType(tenantId, intent.room_type_hint)
-      : null;
-    if (!roomType) {
-      const types = await listRoomTypes(tenantId);
-      await setPending(tenantId, phoneJid, "collecting", {
-        check_in: checkIn,
-        check_out: checkOut,
-        guests,
-        room_type_hint: null,
-      });
-      if (types.length === 0) {
-        await reply("Mohon maaf, belum ada tipe kamar yang bisa dipesan saat ini. Silakan hubungi kami langsung ya. 🙏");
-        return;
-      }
-      const menu = types.map((t) => `• *${t.name}* — ${formatIDR(t.base_rate)}/malam`).join("\n");
-      await reply(`Tipe kamar yang tersedia untuk ${checkIn} s/d ${checkOut}:\n${menu}\n\nMau pilih tipe yang mana?`);
-      return;
-    }
+    if (!roomType) return; // unreachable: a missing type is collected in step 3
 
     const rooms = await getAvailableRoomsSrv(tenantId, checkIn, checkOut, roomType.id);
     if (rooms.length === 0) {
@@ -221,7 +235,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     });
 
     await reply(
-      "📋 *Ringkasan Pemesanan*\n" +
+      "*Ringkasan Pemesanan*\n" +
         `Kamar: ${roomType.name}\n` +
         `Check-in: ${checkIn}\n` +
         `Check-out: ${checkOut} (${nights} malam)\n` +
@@ -231,7 +245,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     );
   } catch (err) {
     console.error("[wa/converse] error:", (err as Error).message);
-    await rawReply("Maaf, terjadi kendala. Mohon coba beberapa saat lagi. 🙏").catch(() => {});
+    await rawReply("Maaf, terjadi kendala. Mohon coba beberapa saat lagi.").catch(() => {});
   }
 }
 
@@ -279,8 +293,8 @@ async function confirmBooking(
 
   const ref = booking.reference ? ` *${booking.reference}*` : "";
   await reply(
-    `✅ Pemesanan Anda${ref} berhasil dibuat!\n\n` +
+    `Pemesanan Anda${ref} berhasil dibuat.\n\n` +
       "Status: *menunggu konfirmasi* dari hotel. Tim kami akan segera " +
-      "menghubungi Anda untuk konfirmasi pembayaran. Terima kasih! 🙏",
+      "menghubungi Anda untuk konfirmasi pembayaran. Terima kasih.",
   );
 }
