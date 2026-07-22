@@ -58,8 +58,12 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
  * renders, and the session it comes from is editable. Enforcement lives in the
  * RLS policies keyed on auth.uid().
  */
+const VALID_ROLES: UserRole[] = ["admin", "staff", "customer"];
 function resolveRole(session: SsoSession): UserRole | null {
-  return session.role ?? null;
+  // Defence in depth: getSession() already nulls unknown roles, but validate
+  // here too so a role only ever gates the UI when it's one RLS recognises.
+  const r = session.role;
+  return r && VALID_ROLES.includes(r as UserRole) ? (r as UserRole) : null;
 }
 
 /**
