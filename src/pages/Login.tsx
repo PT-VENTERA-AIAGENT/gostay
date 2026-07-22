@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Hotel } from "lucide-react";
 import { useAuth, roleHome } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { tr } from "@/lib/i18n";
@@ -45,9 +44,9 @@ export default function Login() {
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4"
+            className="w-14 h-14 mx-auto mb-4"
           >
-            <Hotel className="w-6 h-6 text-primary-foreground" />
+            <img src="/gostay.svg" alt="GoStay" className="w-full h-full object-contain" />
           </motion.div>
           <h1 className="text-2xl font-bold text-foreground">GoStay</h1>
           <p className="text-muted-foreground mt-1 text-sm">Sistem Manajemen Hotel</p>
