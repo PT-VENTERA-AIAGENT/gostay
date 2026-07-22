@@ -197,21 +197,42 @@ describe("exchangeCode — Supabase identity bridge", () => {
       full_name: "Rafli Staff",
     });
     expect(state.inserts[0].last_seen_at).toBeTruthy();
-    // The column default applies, so a new arrival is a guest.
-    expect(r.body.role).toBe("customer");
+    // The web sign-in is the staff entrance, so a new web arrival is staff.
+    expect(r.body.role).toBe("staff");
   });
 
-  it("never sends a role on insert — the database decides", async () => {
+  it("creates a web profile as staff, not the column default", async () => {
     await call();
-    expect(state.inserts[0]).not.toHaveProperty("role");
+    // A fixed server-side default for the web entrance — not derived from the
+    // token. Guests never reach this path; they come through WhatsApp.
+    expect(state.inserts[0].role).toBe("staff");
+  });
+
+  it("honours SSO_SIGNUP_ROLE when a deployment opens web login to guests", async () => {
+    const prev = process.env.SSO_SIGNUP_ROLE;
+    process.env.SSO_SIGNUP_ROLE = "customer";
+    try {
+      const r = await call();
+      expect(state.inserts[0].role).toBe("customer");
+      expect(r.body.role).toBe("customer");
+    } finally {
+      if (prev === undefined) delete process.env.SSO_SIGNUP_ROLE;
+      else process.env.SSO_SIGNUP_ROLE = prev;
+    }
   });
 
   it("ignores the realm entirely, even a privileged-looking one", async () => {
-    // An employee realm must not confer anything: roles come from the database.
+    // The role is a fixed default for the entry point, never read from the
+    // realm: a different realm claim changes nothing about what gets stored.
     state.realm = "ventera-employees";
     const r = await call();
-    expect(state.inserts[0]).not.toHaveProperty("role");
-    expect(r.body.role).toBe("customer");
+    expect(state.inserts[0].role).toBe("staff");
+    expect(r.body.role).toBe("staff");
+    state.inserts = [];
+    state.profileRows = [];
+    state.realm = "customers";
+    const r2 = await call();
+    expect(r2.body.role).toBe("staff");
   });
 
   it("gives the same result whatever the realm claims", async () => {

@@ -85,6 +85,14 @@ export async function startLogin(returnTo = "/") {
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",
+    // Force the IdP to re-authenticate rather than silently reusing an existing
+    // Ventera session. Without this, logging out of GoStay only drops our local
+    // session while the SSO session at the issuer stays alive — so the next
+    // "Masuk" hands back the *previous* user's token with no prompt, and you get
+    // logged straight back into the account you just left ("logout tapi masih
+    // masuk akun lama"). Re-prompting is also the right default for the shared
+    // front-desk devices this app runs on.
+    prompt: "login",
   });
 
   window.location.assign(`${SSO_ISSUER}/oidc/auth?${params}`);
