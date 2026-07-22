@@ -156,14 +156,14 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const collecting = pending?.kind === "collecting";
     if (intent.intent !== "book" && !collecting) {
       const types = await listRoomTypes(tenantId);
-      const header = `🏨 *${brand}*\n_Asisten Reservasi Kamar_`;
+      const header = `*${brand}*\n_Asisten Reservasi Kamar_`;
       const divider = "──────────────────";
       let body: string;
       if (types.length) {
         const menu = types
           .map(
             (t) =>
-              `🛏️ *${t.name}*\n` +
+              `*${t.name}*\n` +
               `    ${formatIDR(t.base_rate)} / malam` +
               (t.max_occupancy ? `  ·  maks. ${t.max_occupancy} tamu` : ""),
           )
