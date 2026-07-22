@@ -21,7 +21,7 @@ import {
   RefreshCw,
   AlertTriangle,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { AppLink } from "@/lib/site";
 import { useAuth, roleHome } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -80,7 +80,7 @@ function Navbar() {
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center">
-          <img src="/gostay.svg" alt="GoStay" className="h-10 w-auto" />
+          <img src="/gostay.svg" alt="GoStay" className="h-14 w-auto" />
         </div>
         <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
           <a href="#pain" className="hover:text-foreground transition-colors">Masalah</a>
@@ -93,12 +93,12 @@ function Navbar() {
           {session ? (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <Link to={home}>{role === "admin" || role === "staff" ? "Dashboard" : "Portal Saya"}</Link>
+                <AppLink to={home}>{role === "admin" || role === "staff" ? "Dashboard" : "Portal Saya"}</AppLink>
               </Button>
               <Button variant="outline" size="sm" onClick={signOut}>Keluar</Button>
             </>
           ) : (
-            <Button size="sm" asChild><Link to="/login">Masuk</Link></Button>
+            <Button size="sm" asChild><AppLink to="/login">Masuk</AppLink></Button>
           )}
         </div>
       </div>
@@ -137,10 +137,10 @@ function Hero() {
 
           <motion.div variants={childFade} className="flex flex-col sm:flex-row gap-3 mt-2">
             <Button size="lg" className="gap-2" asChild>
-              <Link to="/register">Coba Gratis 14 Hari <ArrowRight className="h-4 w-4" /></Link>
+              <AppLink to="/register">Coba Gratis 14 Hari <ArrowRight className="h-4 w-4" /></AppLink>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link to="/login">Lihat Demo Dashboard</Link>
+              <AppLink to="/login">Lihat Demo Dashboard</AppLink>
             </Button>
           </motion.div>
 
@@ -290,7 +290,7 @@ function DashboardPreview() {
 
         <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.4 }}
           className="text-center text-xs text-muted-foreground mt-4">
-          Dashboard nyata GoStay — bukan mockup. <Link to="/login" className="text-primary hover:underline font-medium">Coba langsung gratis →</Link>
+          Dashboard nyata GoStay — bukan mockup. <AppLink to="/login" className="text-primary hover:underline font-medium">Coba langsung gratis →</AppLink>
         </motion.p>
       </div>
     </section>
@@ -414,7 +414,7 @@ function WAChatbot() {
 
             <motion.div variants={childFade}>
               <Button size="lg" className="gap-2" asChild>
-                <Link to="/register">Aktifkan WA Bot Saya <ArrowRight className="h-4 w-4" /></Link>
+                <AppLink to="/register">Aktifkan WA Bot Saya <ArrowRight className="h-4 w-4" /></AppLink>
               </Button>
             </motion.div>
           </motion.div>
@@ -743,7 +743,7 @@ function CTA() {
           </motion.p>
           <motion.div variants={childFade} className="flex flex-col sm:flex-row gap-3">
             <Button size="lg" className="gap-2" asChild>
-              <Link to="/register">Coba Gratis 14 Hari <ArrowRight className="h-4 w-4" /></Link>
+              <AppLink to="/register">Coba Gratis 14 Hari <ArrowRight className="h-4 w-4" /></AppLink>
             </Button>
             <Button size="lg" variant="outline" asChild>
               <a href="https://wa.me/6281318000263?text=Halo%2C%20saya%20mau%20coba%20GoStay%20untuk%20hotel%20saya" target="_blank" rel="noopener noreferrer">
@@ -777,7 +777,7 @@ function Footer() {
           <a href="#wa-bot" className="hover:text-foreground transition-colors">WA Bot</a>
           <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
           <a href="mailto:info@gostay.id" className="hover:text-foreground transition-colors">Kontak</a>
-          <Link to="/login" className="hover:text-foreground transition-colors">Masuk</Link>
+          <AppLink to="/login" className="hover:text-foreground transition-colors">Masuk</AppLink>
         </nav>
       </div>
     </footer>

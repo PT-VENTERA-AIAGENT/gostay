@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/lib/i18n";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import ErrorBoundary from "@/components/shared/ErrorBoundary";
+import { isAppHost, isLandingHost, appHref } from "@/lib/site";
 
 import StaffLayout from "./components/layout/StaffLayout";
 import PortalLayout from "./components/layout/PortalLayout";
@@ -52,6 +53,12 @@ import NotFound from "./pages/NotFound";
 import { PromoPopup } from "./components/PromoPopup";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
 
+/** Leave this SPA for another origin (landing → app domain). */
+function ExternalRedirect({ to }: { to: string }) {
+  if (typeof window !== "undefined") window.location.replace(to);
+  return null;
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -72,11 +79,15 @@ const App = () => (
         <AuthProvider>
           <ErrorBoundary boundary="routes">
           <Routes>
-            {/* Public landing page */}
-            <Route path="/" element={<LandingPage />} />
+            {/* Root: the app domain (app.gostay.id) is the application, so its "/"
+                goes straight to login (which forwards signed-in users to their
+                home); every other host shows the marketing landing page. */}
+            <Route path="/" element={isAppHost() ? <Navigate to="/login" replace /> : <LandingPage />} />
 
-            {/* Auth pages (no layout, no auth required) */}
-            <Route path="/login" element={<Login />} />
+            {/* Auth pages (no layout, no auth required). On the landing domain,
+                login belongs on the app domain — send the user there rather than
+                running an SSO exchange the landing deployment isn't configured for. */}
+            <Route path="/login" element={isLandingHost() ? <ExternalRedirect to={appHref("/login")} /> : <Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
 
             {/* Ventera SSO owns registration and passwords — GoStay never sees
