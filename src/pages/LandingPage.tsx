@@ -79,9 +79,8 @@ function Navbar() {
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img src="/gostay.svg" alt="GoStay" className="h-7 w-7" />
-          <span className="font-bold text-lg tracking-tight">GoStay</span>
+        <div className="flex items-center">
+          <img src="/gostay.svg" alt="GoStay" className="h-10 w-auto" />
         </div>
         <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
           <a href="#pain" className="hover:text-foreground transition-colors">Masalah</a>
