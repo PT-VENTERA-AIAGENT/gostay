@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useT, tr } from "@/lib/i18n";
 import { Link } from "react-router-dom";
-import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays, ChevronDown, LayoutGrid, Map as MapIcon } from "lucide-react";
+import { Search, Plus, Settings, DoorOpen, Loader2, CalendarDays, ChevronDown, LayoutGrid, Map as MapIcon, Pencil, MapPinned } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import RoomFormDialog from "@/components/rooms/RoomFormDialog";
 import FloorPlanEditor from "@/components/rooms/floorplan/FloorPlanEditor";
+import FloorPlanViewer from "@/components/rooms/floorplan/FloorPlanViewer";
+import { useFloorPlan } from "@/hooks/useFloorPlan";
 import DatePicker from "@/components/shared/DatePicker";
 import type { Room } from "@/types/database.types";
 
@@ -113,8 +115,10 @@ export default function Rooms() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [date, setDate] = useState(todayISO());
-  // "grid" = the status board; "plan" = the editable top-down site plan (denah).
+  // "grid" = the status board; "plan" = the top-down site plan (denah).
   const [view, setView] = useState<"grid" | "plan">("grid");
+  // Within the denah: "status" (live read-only map) vs "edit" (layout editor).
+  const [denahMode, setDenahMode] = useState<"status" | "edit">("status");
 
   const { data: rooms = [], isLoading, error } = useRooms();
   const { data: roomTypes = [] } = useRoomTypes();
@@ -141,6 +145,22 @@ export default function Rooms() {
   }, [dayBookings]);
 
   const statusOf = (room: Room) => statusForDate(room.is_active, bookingStatusByRoom.get(room.id));
+
+  // For the denah "status" view: room_id → live status, and room_id → occupant.
+  const { data: floorPlan } = useFloorPlan();
+  const statusByRoom = useMemo(() => {
+    const m = new Map<string, RoomStatus>();
+    for (const r of rooms) m.set(r.id, statusForDate(r.is_active, bookingStatusByRoom.get(r.id)));
+    return m;
+  }, [rooms, bookingStatusByRoom]);
+  const occupantByRoom = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const b of dayBookings) {
+      const name = b.customers?.full_name ?? (b as { guest_name?: string }).guest_name;
+      if (name && (!m.has(b.room_id) || b.status === "checked_in")) m.set(b.room_id, name);
+    }
+    return m;
+  }, [dayBookings]);
 
   function openAdd() { setEditingRoom(null); setDialogOpen(true); }
   function openEdit(room: Room) { setEditingRoom(room); setDialogOpen(true); }
@@ -213,7 +233,40 @@ export default function Rooms() {
           </div>
         </div>
 
-        {view === "plan" && <FloorPlanEditor />}
+        {view === "plan" && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
+              <button
+                onClick={() => setDenahMode("status")}
+                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs md:text-sm font-medium transition-colors btn-press", denahMode === "status" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+              >
+                <MapPinned className="w-4 h-4" /> {t("Status")}
+              </button>
+              <button
+                onClick={() => setDenahMode("edit")}
+                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs md:text-sm font-medium transition-colors btn-press", denahMode === "edit" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+              >
+                <Pencil className="w-4 h-4" /> {t("Edit Denah")}
+              </button>
+            </div>
+
+            {denahMode === "edit" ? (
+              <FloorPlanEditor />
+            ) : (
+              <div className="h-[calc(100vh-16rem)] min-h-[480px]">
+                <FloorPlanViewer
+                  plan={floorPlan ?? undefined}
+                  rooms={rooms}
+                  statusByRoom={statusByRoom}
+                  occupantByRoom={occupantByRoom}
+                  mode="staff"
+                  caption={isToday ? "Status hari ini" : `Status ${new Date(date + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}`}
+                  onPickRoom={(room) => openEdit(room)}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {view === "grid" && (<>
         {/* Date selector — the board reflects room status for this night. */}

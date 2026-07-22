@@ -47,6 +47,7 @@ import PortalBookingDetail from "./pages/portal/PortalBookingDetail";
 import PortalProfile from "./pages/portal/PortalProfile";
 import PortalChat from "./pages/portal/PortalChat";
 import PortalOrder from "./pages/portal/PortalOrder";
+import PortalFloorPlan from "./pages/portal/PortalFloorPlan";
 
 import NotFound from "./pages/NotFound";
 
@@ -179,6 +180,7 @@ const App = () => (
             {/* Customer Portal — public (no auth required to browse) */}
             <Route path="/portal" element={<PortalLayout />}>
               <Route index element={<PortalHome />} />
+              <Route path="denah" element={<PortalFloorPlan />} />
               <Route path="rooms/:slug" element={<PortalRoomDetail />} />
               <Route path="book/details" element={<BookingDetails />} />
               <Route path="book/review" element={<BookingReview />} />
