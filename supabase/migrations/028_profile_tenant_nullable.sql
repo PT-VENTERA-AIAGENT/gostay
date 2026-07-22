@@ -1,0 +1,23 @@
+-- ─── Multi-tenancy: a newly signed-up user need not belong to a hotel yet ─────
+--
+-- 010 made profiles.tenant_id NOT NULL; 014 defaulted it to default_tenant(),
+-- which is the sole active hotel while there is exactly one and NULL the moment
+-- a second exists. Together those turned "a new person signs in while 2+ hotels
+-- exist" into a hard insert failure (null tenant_id violates NOT NULL) — so
+-- onboarding a second hotel silently broke every subsequent first-time sign-in.
+--
+-- The role model (PRD §2.2) says a newcomer has NO hotel yet: they self-serve a
+-- new one (become its owner/staff), are invited into one, or arrive as a guest
+-- of a specific hotel. So tenant_id becomes nullable. A null-tenant profile is a
+-- prospective owner / as-yet-unaffiliated user:
+--   * it fails closed on every tenant-scoped policy — `tenant_id = get_my_tenant()`
+--     is NULL, which matches no rows, so they read and write nothing hotel-owned;
+--   * get_my_tenant() returns NULL, so the app sends them to the guest portal
+--     with the "Buat Hotel" call to action;
+--   * gaining a tenant later (self-serve create-hotel, or an operator) is a
+--     service-role action, exactly as before.
+--
+-- default_tenant() stays as the column default: while one hotel exists it fills
+-- tenant_id as a convenience; once two do it returns NULL, which is now a valid,
+-- intended value rather than an error.
+alter table profiles alter column tenant_id drop not null;
