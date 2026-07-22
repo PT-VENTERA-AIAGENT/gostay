@@ -154,10 +154,37 @@ export function sessionExpiryMs(session: SsoSession): number {
   return tokenExp ? Math.min(session.expires_at, tokenExp) : session.expires_at;
 }
 
+const VALID_ROLES: SsoRole[] = ["admin", "staff", "customer"];
+
 export function getSession(): SsoSession | null {
   const raw = sessionStorage.getItem(SESSION_KEY);
   if (!raw) return null;
-  const session = JSON.parse(raw) as SsoSession;
+
+  // Storage is user-writable, so treat everything in it as untrusted input:
+  // malformed JSON, a missing subject, an unknown role, or a lapsed clock all
+  // collapse to "no session" (and the bad value is cleared) rather than being
+  // handed to the app. RLS on auth.uid() is still the real boundary — this just
+  // stops a tampered blob from steering what the browser renders or from
+  // throwing on parse.
+  let session: SsoSession;
+  try {
+    session = JSON.parse(raw) as SsoSession;
+  } catch {
+    sessionStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+
+  if (!session || typeof session !== "object" || typeof session.claims?.sub !== "string") {
+    sessionStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+
+  // Never carry a role the database wouldn't recognise; unknown → null, which
+  // denies every gated route.
+  if (session.role != null && !VALID_ROLES.includes(session.role)) {
+    session.role = null;
+  }
+
   if (Date.now() >= sessionExpiryMs(session)) {
     sessionStorage.removeItem(SESSION_KEY);
     return null;
