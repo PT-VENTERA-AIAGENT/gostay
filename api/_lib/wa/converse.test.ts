@@ -175,7 +175,7 @@ describe("handleGuestMessage — quoting", () => {
 
     expect(booking.computeTotal).not.toHaveBeenCalled();
     expect(booking.getAvailableRoomsSrv).not.toHaveBeenCalled();
-    expect(repliesText().toLowerCase()).toContain("setelah check-in");
+    expect(repliesText().toLowerCase()).toContain("harus setelah tanggal check-in");
     expect(pending.setPending).toHaveBeenCalledWith(
       "tenant-x", BASE.phoneJid, "collecting",
       expect.objectContaining({ check_in: null, check_out: null }),
