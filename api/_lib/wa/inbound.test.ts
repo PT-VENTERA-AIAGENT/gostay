@@ -7,6 +7,7 @@ import {
   parseMessages,
   resolveTenant,
   recordInbound,
+  isDirectChat,
 } from "./inbound";
 
 const SECRET = "wa-webhook-secret-value-1234567890";
@@ -147,6 +148,27 @@ describe("parseMessages", () => {
     expect(parseMessages({})).toEqual([]);
     expect(parseMessages(undefined)).toEqual([]);
     expect(parseMessages({ messages: [] })).toEqual([]);
+  });
+});
+
+describe("isDirectChat", () => {
+  it("accepts one-to-one guest JIDs", () => {
+    expect(isDirectChat("628123456789@s.whatsapp.net")).toBe(true);
+    expect(isDirectChat("628123456789@c.us")).toBe(true);
+    expect(isDirectChat("123456789@lid")).toBe(true);
+    // Case-insensitive on the server part.
+    expect(isDirectChat("628@S.WhatsApp.Net")).toBe(true);
+  });
+
+  it("rejects groups, broadcasts and channels (the spam source)", () => {
+    expect(isDirectChat("120363000000000000@g.us")).toBe(false);
+    expect(isDirectChat("status@broadcast")).toBe(false);
+    expect(isDirectChat("120363000000000000@newsletter")).toBe(false);
+  });
+
+  it("rejects malformed or serverless JIDs", () => {
+    expect(isDirectChat("")).toBe(false);
+    expect(isDirectChat("628123456789")).toBe(false);
   });
 });
 

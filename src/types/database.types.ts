@@ -1,3 +1,5 @@
+import type { SitePlan } from "@/types/floorPlan";
+
 export type UserRole = "admin" | "staff" | "customer";
 export type BookingStatus =
   | "pending"
@@ -84,6 +86,11 @@ export interface Database {
         Insert: ReviewInsert;
         Update: ReviewUpdate;
       };
+      floor_plans: {
+        Row: FloorPlanRow;
+        Insert: FloorPlanInsert;
+        Update: FloorPlanUpdate;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -97,6 +104,23 @@ export interface Database {
     };
   };
 }
+
+// ─── Floor plans (denah) ─────────────────────────────────────────────────────
+// One editable top-down site plan per hotel; `data` is the whole canvas as JSON.
+export interface FloorPlanRow {
+  id: string;
+  tenant_id: string;
+  data: SitePlan;
+  updated_at: string;
+}
+// tenant_id is stamped server-side (set_tenant_id trigger), so it is optional on
+// insert — but the client passes it as the upsert conflict target.
+export interface FloorPlanInsert {
+  tenant_id?: string;
+  data: SitePlan;
+  updated_at?: string;
+}
+export type FloorPlanUpdate = Partial<FloorPlanInsert>;
 
 // ─── Profiles ────────────────────────────────────────────────────────────────
 export interface Profile {

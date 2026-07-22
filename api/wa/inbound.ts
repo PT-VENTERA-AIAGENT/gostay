@@ -17,6 +17,7 @@ import {
   recordInbound,
   sessionIdOf,
   receivedAtOf,
+  isDirectChat,
 } from "../_lib/wa/inbound";
 import { handleGuestMessage } from "../_lib/wa/converse";
 
@@ -62,6 +63,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (msg.fromMe) continue;
       // A message with no id or sender is unusable (and cannot be deduped).
       if (!msg.waMessageId || !msg.phoneJid) continue;
+      // Only ever answer one-to-one guest chats. Group/broadcast/channel JIDs
+      // are dropped here — answering them spams every member ("kok spam grup").
+      // Dropped before recordInbound so group traffic leaves no inbound rows.
+      if (!isDirectChat(msg.phoneJid)) continue;
 
       // Idempotency first: a duplicate delivery is dropped before any work.
       const seen = await recordInbound({

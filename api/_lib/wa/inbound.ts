@@ -70,6 +70,23 @@ interface InboundBody {
   messages?: WAMessage[];
 }
 
+/**
+ * True only for a one-to-one guest chat.
+ *
+ * WhatsApp group (`@g.us`), broadcast/status (`@broadcast`) and channel
+ * (`@newsletter`) JIDs must never be auto-answered: the booking bot replying
+ * inside a group posts its welcome/room-list to everyone in it — the "kok spam
+ * grup" report. Individual chats use `@s.whatsapp.net`, the legacy `@c.us`, or
+ * WhatsApp's privacy alias `@lid`. We whitelist those rather than blacklist the
+ * group suffixes so any unfamiliar multi-recipient JID also stays silent.
+ */
+export function isDirectChat(jid: string): boolean {
+  const at = jid.lastIndexOf("@");
+  if (at < 0) return false;
+  const server = jid.slice(at + 1).toLowerCase();
+  return server === "s.whatsapp.net" || server === "c.us" || server === "lid";
+}
+
 /** The session id (hotel selector) from the request body, "" when absent. */
 export function sessionIdOf(body: unknown): string {
   const b = (body ?? {}) as InboundBody;
