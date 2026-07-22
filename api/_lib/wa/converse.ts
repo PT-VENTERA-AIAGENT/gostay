@@ -26,6 +26,7 @@ import {
   getAvailableRoomsSrv,
   computeTotal,
   createWaBooking,
+  getTenantName,
 } from "./booking";
 import {
   resolveOrProvisionGuest,
@@ -111,10 +112,14 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
 
     // Wire the conversation into the native Messages UI: one thread per guest,
     // the inbound message logged as the guest, replies logged as the bot.
-    const [botId, threadId] = await Promise.all([
+    const [botId, threadId, hotelName] = await Promise.all([
       getOrCreateBotProfile(tenantId),
       getOrCreateThread(tenantId, guest.customerId),
+      getTenantName(tenantId),
     ]);
+    // The guest is chatting the hotel's OWN WhatsApp, so the bot speaks AS the
+    // hotel. Fall back to a neutral phrase when the name can't be read.
+    const brand = hotelName ?? "hotel kami";
     await logMessage(tenantId, threadId, guest.profileId, trimmed, true); // inbound
     const reply = async (body: string) => {
       await logMessage(tenantId, threadId, botId, body, false); // outbound
@@ -127,7 +132,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     // ── 1. Awaiting a YES/NO on a priced quote ──────────────────────────────
     if (pending?.kind === "confirm_booking") {
       if (YES.has(word)) {
-        await confirmBooking(msg, pending.payload, reply, guest);
+        await confirmBooking(msg, pending.payload, reply, guest, brand);
         return;
       }
       if (NO.has(word)) {
@@ -148,7 +153,8 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const collecting = pending?.kind === "collecting";
     if (intent.intent !== "book" && !collecting) {
       await reply(
-        "Halo! Saya asisten reservasi hotel. Supaya bisa langsung saya cekkan " +
+        `Halo! Selamat datang di *${brand}*. Saya asisten reservasi yang siap ` +
+          "membantu pemesanan kamar Anda. Supaya bisa langsung saya cekkan " +
           "ketersediaan & harga, kirim *dalam satu pesan* ya:\n" +
           "1. Tanggal check-in\n" +
           "2. Tanggal check-out\n" +
@@ -258,6 +264,7 @@ async function confirmBooking(
   payload: Record<string, unknown>,
   reply: (body: string) => Promise<unknown>,
   guest: { profileId: string; customerId: string },
+  brand: string,
 ): Promise<void> {
   const { tenantId, phoneJid } = msg;
 
@@ -293,8 +300,8 @@ async function confirmBooking(
 
   const ref = booking.reference ? ` *${booking.reference}*` : "";
   await reply(
-    `Pemesanan Anda${ref} berhasil dibuat.\n\n` +
-      "Status: *menunggu konfirmasi* dari hotel. Tim kami akan segera " +
-      "menghubungi Anda untuk konfirmasi pembayaran. Terima kasih.",
+    `Terima kasih! Pesanan Anda${ref} sudah kami terima.\n\n` +
+      "Status: *menunggu konfirmasi pembayaran*. Kami akan menginformasikan " +
+      `langkah pembayaran melalui chat ini sebentar lagi. Sampai jumpa di *${brand}*!`,
   );
 }

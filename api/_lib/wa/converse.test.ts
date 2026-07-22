@@ -21,6 +21,7 @@ const { ai, pending, booking, guest, send, crm, WaRateLimitError } = vi.hoisted(
       getAvailableRoomsSrv: vi.fn(),
       computeTotal: vi.fn(),
       createWaBooking: vi.fn(),
+      getTenantName: vi.fn(),
     },
     guest: { resolveOrProvisionGuest: vi.fn(), WaRateLimitError },
     send: { sendText: vi.fn() },
@@ -61,6 +62,7 @@ beforeEach(() => {
     { id: "rt-1", name: "Deluxe", base_rate: 500000, max_occupancy: 2 },
     { id: "rt-2", name: "Suite", base_rate: 900000, max_occupancy: 2 },
   ]);
+  booking.getTenantName.mockResolvedValue("Hotel Uji");
 });
 
 describe("handleGuestMessage — intent routing", () => {
@@ -73,6 +75,7 @@ describe("handleGuestMessage — intent routing", () => {
 
     expect(send.sendText).toHaveBeenCalledTimes(1);
     expect(repliesText().toLowerCase()).toContain("asisten reservasi");
+    expect(repliesText()).toContain("Hotel Uji"); // branded with the hotel name
     expect(pending.setPending).not.toHaveBeenCalled();
     expect(booking.findRoomType).not.toHaveBeenCalled();
   });
