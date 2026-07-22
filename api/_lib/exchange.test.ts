@@ -197,24 +197,23 @@ describe("exchangeCode — Supabase identity bridge", () => {
       full_name: "Rafli Staff",
     });
     expect(state.inserts[0].last_seen_at).toBeTruthy();
-    // The web sign-in is the staff entrance, so a new web arrival is staff.
-    expect(r.body.role).toBe("staff");
+    // Least-privilege default: a plain web signup is a portal-only customer.
+    // Hotel staff come from onboarding / self-serve tenant creation, not here.
+    expect(r.body.role).toBe("customer");
   });
 
-  it("creates a web profile as staff, not the column default", async () => {
+  it("creates a web profile as customer by default", async () => {
     await call();
-    // A fixed server-side default for the web entrance — not derived from the
-    // token. Guests never reach this path; they come through WhatsApp.
-    expect(state.inserts[0].role).toBe("staff");
+    expect(state.inserts[0].role).toBe("customer");
   });
 
-  it("honours SSO_SIGNUP_ROLE when a deployment opens web login to guests", async () => {
+  it("honours SSO_SIGNUP_ROLE override", async () => {
     const prev = process.env.SSO_SIGNUP_ROLE;
-    process.env.SSO_SIGNUP_ROLE = "customer";
+    process.env.SSO_SIGNUP_ROLE = "staff";
     try {
       const r = await call();
-      expect(state.inserts[0].role).toBe("customer");
-      expect(r.body.role).toBe("customer");
+      expect(state.inserts[0].role).toBe("staff");
+      expect(r.body.role).toBe("staff");
     } finally {
       if (prev === undefined) delete process.env.SSO_SIGNUP_ROLE;
       else process.env.SSO_SIGNUP_ROLE = prev;
@@ -222,17 +221,17 @@ describe("exchangeCode — Supabase identity bridge", () => {
   });
 
   it("ignores the realm entirely, even a privileged-looking one", async () => {
-    // The role is a fixed default for the entry point, never read from the
-    // realm: a different realm claim changes nothing about what gets stored.
+    // The role is a fixed server-side default, never read from the realm: a
+    // different realm claim changes nothing about what gets stored.
     state.realm = "ventera-employees";
     const r = await call();
-    expect(state.inserts[0].role).toBe("staff");
-    expect(r.body.role).toBe("staff");
+    expect(state.inserts[0].role).toBe("customer");
+    expect(r.body.role).toBe("customer");
     state.inserts = [];
     state.profileRows = [];
     state.realm = "customers";
     const r2 = await call();
-    expect(r2.body.role).toBe("staff");
+    expect(r2.body.role).toBe("customer");
   });
 
   it("gives the same result whatever the realm claims", async () => {

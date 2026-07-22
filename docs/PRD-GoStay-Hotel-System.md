@@ -102,54 +102,117 @@ The system is designed to replace fragmented tools (spreadsheets, third-party PM
 
 ### 2.1 Role Definitions
 
-The system has three primary roles with distinct permission boundaries:
+GoStay is **multi-tenant**: each hotel is a **tenant**, and every account belongs
+to exactly one tenant (`profiles.tenant_id`) — the sole exception is the Ventera
+platform operator, who is cross-tenant. `profiles.role` is the **single source of
+truth** for authorization: it is what `get_my_role()` reads inside every RLS
+policy. Nothing in the SSO token (realm included) grants a role.
 
-| Role | Description | Access Level |
-|------|-------------|-------------|
-| `admin` | Hotel owner or general manager | Full system access, configuration, analytics, user management |
-| `staff` | Front desk agents, reservations team | Bookings, chat, call logs, room availability; no system configuration |
-| `customer` | Guests booking via the portal | Self-service portal only; own bookings and chat thread |
+There are three roles. **Read this carefully — it is the canonical definition;
+older text that called `admin` a "hotel owner" was wrong.**
 
-### 2.2 Persona Profiles
+| Role | Who it is | Tenant scope | What it can do |
+|------|-----------|--------------|----------------|
+| `admin` | **Ventera** — the platform operator. The **only** admin. | Cross-tenant (every hotel) | Onboard hotels, oversee the platform. Acts through server-side service-role endpoints (`requirePlatformAdmin`), **not** per-hotel screens. A hotel owner is **never** `admin`. |
+| `staff` | A **hotel's** own people — the **owner** and their employees. | Exactly one tenant (their hotel) | Run that hotel end to end: bookings, rooms & pricing, availability, chat, call logs, POS, guests, and **their own hotel's user/staff management**. **Cannot** grant the `admin` role. |
+| `customer` | A **guest** of one specific hotel. | Exactly one tenant | Portal self-service only: their own bookings and chat thread. |
 
-#### Persona A — Admin: "Maria, Hotel Owner"
-- **Age:** 45
-- **Tech Comfort:** Moderate
-- **Primary Goals:** See occupancy and revenue at a glance, manage room pricing, add/remove staff accounts, resolve escalated guest issues
+> **Why the confusion existed:** `admin` is *not* a hotel role. The person who
+> owns/runs a hotel is `staff`. "Admin" means Ventera, the platform operator, and
+> its cross-hotel reach comes from service-role server endpoints — a signed-in
+> user's *browser* is always scoped to their own tenant by RLS (`get_my_tenant()`).
+
+### 2.2 Multi-Tenancy & How Accounts Are Created
+
+Each hotel is one tenant; `profiles.tenant_id` binds a user to exactly one hotel.
+All private data is isolated per tenant by RLS keyed on `get_my_tenant()` (from
+the caller's profile, unspoofable) — see migration `011_tenancy_rls.sql`. Ventera
+(`admin`) reaches across hotels only via service-role platform endpoints, never
+via direct browser RLS.
+
+Accounts come into being through four distinct paths — **never** by a stranger
+silently joining an existing hotel:
+
+1. **New hotel, self-serve (web SSO first sign-in).** A brand-new person signing
+   in on the web becomes the **owner (`staff`) of a NEW hotel (a new tenant
+   created for them)**. They are *not* added to any existing hotel's staff, and
+   they are *not* a guest.
+2. **New hotel, Ventera-driven.** A Ventera `admin` onboards a hotel through the
+   admin wizard: create the tenant, then provision its first `staff` (owner).
+3. **Additional hotel staff.** An existing hotel's `staff` adds more `staff` to
+   **their own** hotel through User Management (same tenant, role `staff`; they
+   can never mint an `admin`).
+4. **Guests.** Created as `customer` bound to the hotel they interact with —
+   via WhatsApp (the booking bot) or portal sign-up. Guests come from WhatsApp,
+   not from the staff web login.
+
+### 2.3 Persona Profiles
+
+#### Persona A — Platform Operator (`admin`): "Ventera Ops"
+- **Who:** The GoStay/Ventera platform team — the only `admin`.
+- **Primary Goals:** Onboard new hotels, keep the platform healthy, support hotels across tenants.
+- **Key Features Used:** Hotel onboarding wizard, cross-tenant platform tooling (service-role endpoints).
+
+#### Persona B — Hotel Owner (`staff`): "Maria, Hotel Owner"
+- **Age:** 45 · **Tech Comfort:** Moderate
+- **Primary Goals:** See her hotel's occupancy and revenue, manage room pricing, add/remove **her hotel's** staff accounts, resolve escalated guest issues
 - **Pain Points:** Currently uses three separate tools; loses time reconciling data; no real-time revenue view
-- **Key Features Used:** Dashboard analytics, room management, user management, reports
+- **Key Features Used:** Dashboard analytics, room management, **user management (her hotel only)**, reports
+- **Note:** Maria is `staff`, not `admin`. As the hotel's owner she has full run of *her* tenant, but she is one hotel among many — never cross-tenant.
 
-#### Persona B — Staff: "James, Front Desk Agent"
-- **Age:** 28
-- **Tech Comfort:** High
-- **Primary Goals:** Check guests in/out quickly, respond to chat messages, log phone inquiries, create bookings on behalf of walk-in or phone customers
-- **Pain Points:** Flipping between phone, chat app, and PMS during busy check-in times; no caller ID lookup
-- **Key Features Used:** Booking calendar, check-in/check-out workflow, live chat inbox, call log
+#### Persona C — Hotel Employee (`staff`): "James, Front Desk Agent"
+- **Age:** 28 · **Tech Comfort:** High
+- **Primary Goals:** Check guests in/out quickly, respond to chat, log phone inquiries, create bookings for walk-in/phone customers
+- **Pain Points:** Flipping between phone, chat app, and PMS during busy check-in; no caller ID lookup
+- **Key Features Used:** Booking calendar, check-in/check-out, live chat inbox, call log
 
-#### Persona C — Customer: "David, Business Traveler"
-- **Age:** 34
-- **Tech Comfort:** High
-- **Primary Goals:** Find and book a room quickly, receive instant confirmation, communicate with the hotel about special requests
-- **Pain Points:** Slow OTA booking flows, unclear room descriptions, no direct communication channel pre-arrival
+#### Persona D — Customer: "David, Business Traveler"
+- **Age:** 34 · **Tech Comfort:** High
+- **Primary Goals:** Find and book a room quickly, get instant confirmation, message the hotel about requests
+- **Pain Points:** Slow OTA flows, unclear room descriptions, no direct pre-arrival channel
 - **Key Features Used:** Booking portal, room search, confirmation page, chat widget
 
-### 2.3 Permission Matrix
+### 2.4 Permission Matrix
 
-| Feature | Admin | Staff | Customer |
-|---------|-------|-------|----------|
-| View all bookings | Yes | Yes | Own only |
-| Create/modify bookings | Yes | Yes | Own only (portal) |
-| Cancel bookings | Yes | Yes | Own only (within policy) |
-| Check-in / Check-out | Yes | Yes | No |
-| Manage rooms | Yes | No | No |
-| Set room pricing | Yes | No | No |
-| View all chat threads | Yes | Yes | Own only |
-| Send chat messages | Yes | Yes | Yes |
-| View call logs | Yes | Yes | No |
-| Create call log entry | Yes | Yes | No |
-| View analytics dashboard | Yes | View-only | No |
-| Manage staff accounts | Yes | No | No |
-| System configuration | Yes | No | No |
+Everything a `staff` or `customer` sees is **scoped to their own tenant** by RLS.
+`admin` (Ventera) is cross-tenant and acts through platform endpoints.
+
+| Feature | `admin` (Ventera) | `staff` (hotel) | `customer` |
+|---------|-------------------|-----------------|------------|
+| Onboard hotels / create tenants | Yes | No | No |
+| Cross-hotel oversight | Yes | No | No |
+| View all bookings (own hotel) | Yes* | Yes | Own only |
+| Create/modify bookings | Yes* | Yes | Own only (portal) |
+| Cancel bookings | Yes* | Yes | Own only (within policy) |
+| Check-in / Check-out | Yes* | Yes | No |
+| Manage rooms | Yes* | **Yes** | No |
+| Set room pricing | Yes* | **Yes** | No |
+| View all chat threads | Yes* | Yes | Own only |
+| Send chat messages | Yes* | Yes | Yes |
+| View / create call logs | Yes* | Yes | No |
+| View analytics dashboard | Yes* | Yes | No |
+| Manage staff accounts (own hotel) | Yes* | **Yes** | No |
+| Grant the `admin` role | Yes | **No** | No |
+
+\* Ventera `admin` performs these through cross-tenant platform tooling, not the
+per-hotel screens; the day-to-day operator of a hotel is its `staff`.
+
+### 2.5 Implementation Status vs. This Target
+
+This section is the **target** model. Known gaps as of this revision (to be
+closed — do not assume they are done):
+
+- **Self-serve new-hotel signup (path 1) is not built yet.** Today a first-time
+  web sign-in is provisioned into the single existing tenant via
+  `default_tenant()` (migration 014) with a role controlled by `SSO_SIGNUP_ROLE`
+  — which is why a new login currently lands as staff of the *existing* hotel.
+  Target: create a fresh tenant and make the signer its owner (`staff`).
+- **Hotel-management RLS still keys on `admin`.** Migration `011` grants rooms /
+  pricing / room-type / profile-management to `get_my_role() = 'admin'`. Under
+  this model those hotel-level powers belong to `staff` (scoped to their tenant);
+  `admin` stays reserved for Ventera. This RLS refactor is pending.
+- **User Management route is `admin`-only** (`App.tsx`). Target: open to `staff`
+  for their own tenant, with a guard that `staff` can never grant `admin`.
 
 ---
 
