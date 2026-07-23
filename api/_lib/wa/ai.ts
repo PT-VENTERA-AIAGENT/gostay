@@ -99,6 +99,42 @@ export async function extractBookingIntent(
   return mergeIntent(fallbackExtract(message), knownSlots);
 }
 
+// ── Room-service intent (deterministic, no model) ───────────────────────────────
+
+// Phrases that mark a guest asking for room service (food/drinks/amenities) rather
+// than a room booking. Matched as case-insensitive substrings — a keyword check is
+// deliberately enough here (no OpenAI round-trip), because the room-service branch
+// only proceeds once the guest is confirmed in-house anyway.
+const ROOM_SERVICE_HINTS = [
+  "room service",
+  "roomservice",
+  "pesan makan",
+  "pesan minum",
+  "order makan",
+  "mau makan",
+  "mau minum",
+  "makanan",
+  "minuman",
+  "makan",
+  "minum",
+  "lapar",
+  "haus",
+  "laundry",
+  "cuci baju",
+  "cuci pakaian",
+  "spa",
+];
+
+/**
+ * True when the message reads as a room-service request. Deterministic and
+ * synchronous — never calls the model. The caller still gates the flow on the
+ * guest actually being in-house, so a loose match here is harmless.
+ */
+export function detectRoomServiceIntent(text: string): boolean {
+  const lower = (text ?? "").toLowerCase();
+  return ROOM_SERVICE_HINTS.some((h) => lower.includes(h));
+}
+
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
 function systemPrompt(known: BookingSlots): string {
