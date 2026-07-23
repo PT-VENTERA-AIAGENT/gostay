@@ -84,6 +84,7 @@ export default function PlatformHotels() {
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="px-4 py-3 font-medium">{tr("Hotel")}</th>
+                    <th className="px-4 py-3 font-medium">{tr("Pemilik akun")}</th>
                     <th className="px-4 py-3 font-medium">WhatsApp</th>
                     <th className="px-4 py-3 font-medium text-center">{tr("Mode Pembayaran")}</th>
                     <th className="px-4 py-3 font-medium text-center">{tr("Pembayaran Aktif")}</th>
@@ -98,6 +99,19 @@ export default function PlatformHotels() {
                           <p className="font-medium text-foreground">{h.name}</p>
                           <code className="text-xs text-muted-foreground">GOSTAY-{h.slug}</code>
                           {!h.is_active && <span className="ml-2 text-xs text-destructive">{tr("nonaktif")}</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {h.owner ? (
+                            <div className="min-w-0">
+                              <p className="text-foreground truncate max-w-[220px]">{h.owner.full_name ?? tr("Tanpa nama")}</p>
+                              <p className="text-xs text-muted-foreground truncate max-w-[220px]">
+                                {h.owner.email ?? h.owner.phone ?? "—"}
+                                {h.staff_count > 1 && <span className="ml-1">· +{h.staff_count - 1} staf</span>}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{tr("Belum ada")}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {h.wa_linked ? (
