@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  listHotelPayments, setHotelMode, setHotelPaymentsActive,
+  listHotelPayments, setHotelMode, setHotelPaymentsActive, setHotelPayment,
 } from "@/services/adminPaymentService";
 
 export const adminPaymentKeys = {
@@ -32,6 +32,18 @@ export function useSetHotelPaymentsActive() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: adminPaymentKeys.list() });
       qc.invalidateQueries({ queryKey: ["platform"] }); // keep the platform console in sync
+    },
+  });
+}
+
+export function useSetHotelPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { tenantId: string; state: "off" | "test" | "live"; by: string }) =>
+      setHotelPayment(v.tenantId, v.state, v.by),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: adminPaymentKeys.list() });
+      qc.invalidateQueries({ queryKey: ["platform"] });
     },
   });
 }

@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
-import { Building2, Search, Loader2, ShieldCheck, FlaskConical, Radio, MessageCircle } from "lucide-react";
+import { Building2, Search, Loader2, ShieldCheck, FlaskConical, Radio, MessageCircle, Ban } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { tr } from "@/lib/i18n";
-import { usePlatformHotels, useSetHotelMode, useSetHotelPaymentsActive } from "@/hooks/usePlatform";
+import { usePlatformHotels, useSetHotelPayment } from "@/hooks/usePlatform";
 import type { HotelOverview } from "@/services/platformService";
+
+type PayState = "off" | "test" | "live";
 
 export default function PlatformHotels() {
   const { user } = useAuth();
@@ -14,31 +16,26 @@ export default function PlatformHotels() {
   const by = user?.email ?? user?.id ?? "admin";
 
   const { data: hotels = [], isLoading } = usePlatformHotels();
-  const setMode = useSetHotelMode();
-  const setActive = useSetHotelPaymentsActive();
+  const setPayment = useSetHotelPayment();
   const [q, setQ] = useState("");
 
   const visible = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return s ? hotels.filter((h) => (h.name + h.slug).toLowerCase().includes(s)) : hotels;
+    return s ? hotels.filter((h) => (h.name + h.slug + (h.wa_number ?? "")).toLowerCase().includes(s)) : hotels;
   }, [hotels, q]);
 
   const liveCount = hotels.filter((h) => h.mode === "live" && h.payments_active).length;
 
-  async function toggleMode(h: HotelOverview) {
-    const next = h.mode === "live" ? "test" : "live";
+  const stateOf = (h: HotelOverview): PayState => (!h.payments_active ? "off" : h.mode === "live" ? "live" : "test");
+
+  async function set(h: HotelOverview, state: PayState) {
+    if (stateOf(h) === state) return;
     try {
-      await setMode.mutateAsync({ tenantId: h.tenant_id, mode: next, by });
-      toast({ title: `${h.name} → ${next === "live" ? "Live" : "Test"}` });
+      await setPayment.mutateAsync({ tenantId: h.tenant_id, state, by });
+      const label = state === "off" ? tr("Nonaktif") : state === "live" ? "Live" : "Test";
+      toast({ title: `${h.name} → ${label}` });
     } catch (e) {
       toast({ title: tr("Gagal mengubah mode"), description: (e as Error).message, variant: "destructive" });
-    }
-  }
-  async function togglePaymentsActive(h: HotelOverview) {
-    try {
-      await setActive.mutateAsync({ tenantId: h.tenant_id, active: !h.payments_active, by });
-    } catch (e) {
-      toast({ title: tr("Gagal mengubah status"), description: (e as Error).message, variant: "destructive" });
     }
   }
 
@@ -86,13 +83,12 @@ export default function PlatformHotels() {
                     <th className="px-4 py-3 font-medium">{tr("Hotel")}</th>
                     <th className="px-4 py-3 font-medium">{tr("Pemilik akun")}</th>
                     <th className="px-4 py-3 font-medium">WhatsApp</th>
-                    <th className="px-4 py-3 font-medium text-center">{tr("Mode Pembayaran")}</th>
-                    <th className="px-4 py-3 font-medium text-center">{tr("Pembayaran Aktif")}</th>
+                    <th className="px-4 py-3 font-medium text-center">{tr("Pembayaran")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visible.map((h) => {
-                    const isLive = h.mode === "live";
+                    const st = stateOf(h);
                     return (
                       <tr key={h.tenant_id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
                         <td className="px-4 py-3">
@@ -114,37 +110,37 @@ export default function PlatformHotels() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {h.wa_linked ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs text-success"><MessageCircle className="w-3.5 h-3.5" /> {tr("Tertaut")}</span>
+                          {h.wa_number ? (
+                            <div className="min-w-0">
+                              <p className="text-foreground font-mono text-xs">+{h.wa_number}</p>
+                              <p className={cn("text-xs flex items-center gap-1", h.wa_linked ? "text-success" : "text-muted-foreground")}>
+                                <MessageCircle className="w-3 h-3" /> {h.wa_linked ? tr("Tertaut") : tr("Terputus")}
+                              </p>
+                            </div>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><MessageCircle className="w-3.5 h-3.5" /> {tr("Belum")}</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
+                          {/* Single control: Off | Test | Live (no more separate active toggle) */}
                           <div className="flex items-center justify-center">
                             <div className="inline-flex rounded-lg border border-border overflow-hidden">
-                              <button onClick={() => !isLive || toggleMode(h)} disabled={setMode.isPending}
-                                className={cn("px-3 py-1.5 text-xs font-semibold flex items-center gap-1 transition-colors",
-                                  !isLive ? "bg-warning/15 text-warning" : "text-muted-foreground hover:bg-muted")}>
+                              <button onClick={() => set(h, "off")} disabled={setPayment.isPending}
+                                className={cn("px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1 transition-colors",
+                                  st === "off" ? "bg-muted-foreground/15 text-foreground" : "text-muted-foreground hover:bg-muted")}>
+                                <Ban className="w-3.5 h-3.5" /> {tr("Nonaktif")}
+                              </button>
+                              <button onClick={() => set(h, "test")} disabled={setPayment.isPending}
+                                className={cn("px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1 border-l border-border transition-colors",
+                                  st === "test" ? "bg-warning/15 text-warning" : "text-muted-foreground hover:bg-muted")}>
                                 <FlaskConical className="w-3.5 h-3.5" /> Test
                               </button>
-                              <button onClick={() => isLive || toggleMode(h)} disabled={setMode.isPending}
-                                className={cn("px-3 py-1.5 text-xs font-semibold flex items-center gap-1 transition-colors",
-                                  isLive ? "bg-success/15 text-success" : "text-muted-foreground hover:bg-muted")}>
+                              <button onClick={() => set(h, "live")} disabled={setPayment.isPending}
+                                className={cn("px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1 border-l border-border transition-colors",
+                                  st === "live" ? "bg-success/15 text-success" : "text-muted-foreground hover:bg-muted")}>
                                 <Radio className="w-3.5 h-3.5" /> Live
                               </button>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center">
-                            <button onClick={() => togglePaymentsActive(h)} disabled={setActive.isPending}
-                              role="switch" aria-checked={h.payments_active}
-                              className={cn("relative w-11 h-6 rounded-full transition-colors",
-                                h.payments_active ? "bg-primary" : "bg-muted-foreground/30")}>
-                              <span className={cn("absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
-                                h.payments_active && "translate-x-5")} />
-                            </button>
                           </div>
                         </td>
                       </tr>

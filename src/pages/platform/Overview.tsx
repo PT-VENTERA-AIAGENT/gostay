@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom";
-import { Building2, Radio, CalendarCheck, ConciergeBell, MessageCircle, ArrowRight } from "lucide-react";
+import { Building2, Radio, CalendarCheck, ConciergeBell, MessageCircle, ArrowRight, BedDouble } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { tr } from "@/lib/i18n";
-import { usePlatformHotels, usePlatformReservations, usePlatformGuestRequests } from "@/hooks/usePlatform";
+import { usePlatformHotels, usePlatformReservations, usePlatformGuestRequests, usePlatformRoomAvailability } from "@/hooks/usePlatform";
 
 function formatIDR(n: number) { return "Rp" + Math.round(n).toLocaleString("id-ID"); }
+function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 export default function PlatformOverview() {
   const { data: hotels = [] } = usePlatformHotels();
   const { data: reservations = [] } = usePlatformReservations();
   const { data: requests = [] } = usePlatformGuestRequests();
+  const { data: availability = [] } = usePlatformRoomAvailability(todayISO());
 
   const liveHotels = hotels.filter((h) => h.mode === "live" && h.payments_active).length;
   const waLinked = hotels.filter((h) => h.wa_linked).length;
@@ -17,9 +19,12 @@ export default function PlatformOverview() {
   const revToday = reservations
     .filter((r) => new Date(r.created_at).toDateString() === new Date().toDateString())
     .reduce((s, r) => s + r.total_amount, 0);
+  const roomsAvail = availability.reduce((s, r) => s + r.available, 0);
+  const roomsTotal = availability.reduce((s, r) => s + r.total, 0);
 
   const cards = [
     { icon: Building2, label: tr("Hotel"), value: `${hotels.length}`, sub: `${liveHotels} Live`, to: "/platform/hotels" },
+    { icon: BedDouble, label: tr("Kamar tersedia hari ini"), value: `${roomsAvail}/${roomsTotal}`, sub: tr("Tersedia"), to: "/platform/rooms" },
     { icon: MessageCircle, label: tr("WhatsApp tertaut"), value: `${waLinked}/${hotels.length}`, sub: tr("hotel"), to: "/platform/hotels" },
     { icon: CalendarCheck, label: tr("Reservasi (terbaru)"), value: `${reservations.length}`, sub: `${formatIDR(revToday)} ${tr("hari ini")}`, to: "/platform/reservations" },
     { icon: ConciergeBell, label: tr("Permintaan tamu aktif"), value: `${openReq}`, sub: tr("perlu ditangani"), to: "/platform/requests" },
@@ -35,7 +40,7 @@ export default function PlatformOverview() {
           <p className="text-sm text-muted-foreground mt-1">{tr("Pantauan lintas hotel untuk super admin Ventera.")}</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 md:gap-4">
           {cards.map((c) => (
             <Link key={c.label} to={c.to}
               className="bg-card rounded-xl border border-border p-4 hover:border-primary/40 transition-colors group">

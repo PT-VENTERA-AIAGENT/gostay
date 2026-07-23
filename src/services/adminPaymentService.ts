@@ -51,3 +51,18 @@ export async function setHotelPaymentsActive(tenantId: string, active: boolean, 
     .upsert({ tenant_id: tenantId, is_active: active, updated_by: by }, { onConflict: "tenant_id" });
   if (error) throw error;
 }
+
+/**
+ * Set a hotel's payment state in one shot — the single [Off | Test | Live]
+ * control. "off" disables online payments; "test"/"live" enable them in that
+ * environment. One upsert so active + mode never disagree.
+ */
+export async function setHotelPayment(
+  tenantId: string, state: "off" | "test" | "live", by: string,
+): Promise<void> {
+  const patch: Record<string, unknown> = { tenant_id: tenantId, updated_by: by };
+  if (state === "off") patch.is_active = false;
+  else { patch.is_active = true; patch.mode = state; }
+  const { error } = await db.from("hotel_payment_config").upsert(patch, { onConflict: "tenant_id" });
+  if (error) throw error;
+}
