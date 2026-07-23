@@ -8,6 +8,9 @@ import {
   resolveTenant,
   recordInbound,
   isDirectChat,
+  toEpochMs,
+  shouldAutoReply,
+  checkReplyRateLimit,
 } from "./inbound";
 
 const SECRET = "wa-webhook-secret-value-1234567890";
@@ -17,6 +20,8 @@ interface MockState {
   sessions: Array<{ session_id: string; tenant_id: string; is_active: boolean }>;
   seenMessageIds: Set<string>;
   inserts: Array<Record<string, unknown>>;
+  /** per-key call counts for the check_wa_rate_limit RPC mock. */
+  rateCounts: Map<string, number>;
 }
 
 let server: Server;
@@ -63,6 +68,17 @@ beforeAll(async () => {
       return;
     }
 
+    // ── check_wa_rate_limit RPC (checkReplyRateLimit) ──
+    if (url.pathname === "/rest/v1/rpc/check_wa_rate_limit" && req.method === "POST") {
+      const { p_phone, p_max } = JSON.parse(await readBody(req));
+      const seen = state.rateCounts.get(p_phone) ?? 0;
+      const allowed = seen < p_max;
+      if (allowed) state.rateCounts.set(p_phone, seen + 1);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(allowed));
+      return;
+    }
+
     res.writeHead(404);
     res.end();
   });
@@ -79,8 +95,10 @@ beforeAll(async () => {
 afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
 beforeEach(() => {
-  state = { sessions: [], seenMessageIds: new Set(), inserts: [] };
+  state = { sessions: [], seenMessageIds: new Set(), inserts: [], rateCounts: new Map() };
   process.env.WA_WEBHOOK_SECRET = SECRET;
+  delete process.env.WA_REPLY_MAX;
+  delete process.env.WA_REPLY_WINDOW;
 });
 
 describe("verifySecret", () => {
@@ -148,6 +166,92 @@ describe("parseMessages", () => {
     expect(parseMessages({})).toEqual([]);
     expect(parseMessages(undefined)).toEqual([]);
     expect(parseMessages({ messages: [] })).toEqual([]);
+  });
+
+  it("extracts messageTimestamp (epoch seconds) as epoch millis", () => {
+    const parsed = parseMessages({
+      messages: [
+        {
+          key: { remoteJid: "628a@s.whatsapp.net", id: "MID1" },
+          messageTimestamp: 1_700_000_000,
+          message: { conversation: "halo" },
+        },
+      ],
+    });
+    expect(parsed[0].timestamp).toBe(1_700_000_000_000);
+  });
+
+  it("leaves timestamp undefined when the gateway omits it", () => {
+    const parsed = parseMessages({
+      messages: [{ key: { remoteJid: "628a@s.whatsapp.net", id: "MID1" } }],
+    });
+    expect(parsed[0].timestamp).toBeUndefined();
+  });
+});
+
+describe("toEpochMs", () => {
+  it("converts epoch seconds to millis", () => {
+    expect(toEpochMs(1_700_000_000)).toBe(1_700_000_000_000);
+    expect(toEpochMs("1700000000")).toBe(1_700_000_000_000);
+  });
+
+  it("reads a protobuf Long's low field (seconds)", () => {
+    expect(toEpochMs({ low: 1_700_000_000, high: 0 })).toBe(1_700_000_000_000);
+  });
+
+  it("passes through values already in millis", () => {
+    expect(toEpochMs(1_700_000_000_000)).toBe(1_700_000_000_000);
+  });
+
+  it("returns undefined for junk", () => {
+    expect(toEpochMs(undefined)).toBeUndefined();
+    expect(toEpochMs(null)).toBeUndefined();
+    expect(toEpochMs("")).toBeUndefined();
+    expect(toEpochMs("abc")).toBeUndefined();
+    expect(toEpochMs(0)).toBeUndefined();
+    expect(toEpochMs({})).toBeUndefined();
+  });
+});
+
+describe("shouldAutoReply (history-sync guard)", () => {
+  const now = Date.parse("2026-07-23T10:00:00.000Z");
+  const receivedAt = "2026-07-23T10:00:01.000Z"; // gateway forwarded ~now
+
+  it("answers a live message (sent seconds ago)", () => {
+    const ts = now - 3_000;
+    expect(shouldAutoReply(ts, receivedAt, now)).toBe(true);
+  });
+
+  it("silences a backlog message replayed at link-time", () => {
+    const ts = Date.parse("2026-07-22T08:00:00.000Z"); // ~26h old
+    expect(shouldAutoReply(ts, receivedAt, now)).toBe(false);
+  });
+
+  it("silences anything past the age window", () => {
+    const ts = now - 6 * 60 * 1000; // 6 min > 5 min default
+    expect(shouldAutoReply(ts, undefined, now)).toBe(false);
+  });
+
+  it("answers just inside the age window", () => {
+    const ts = now - 4 * 60 * 1000; // 4 min < 5 min default
+    expect(shouldAutoReply(ts, undefined, now)).toBe(true);
+  });
+
+  it("fails open when there is no timestamp", () => {
+    expect(shouldAutoReply(undefined, receivedAt, now)).toBe(true);
+  });
+
+  it("treats a future-dated (clock-skew) message as fresh", () => {
+    expect(shouldAutoReply(now + 30_000, receivedAt, now)).toBe(true);
+  });
+
+  it("uses receivedAt, not our clock, as the age reference", () => {
+    // Message and gateway forward are contemporaneous (both old), but OUR clock
+    // is hours ahead. Ageing against receivedAt keeps it fresh; against `now`
+    // it would be wrongly silenced.
+    const ts = Date.parse("2026-07-23T05:00:00.000Z");
+    const forwarded = "2026-07-23T05:00:02.000Z";
+    expect(shouldAutoReply(ts, forwarded, now)).toBe(true);
   });
 });
 
@@ -219,5 +323,39 @@ describe("recordInbound", () => {
     expect(await recordInbound(msg)).toBe("duplicate");
     // The retry did not write a second row.
     expect(state.inserts).toHaveLength(1);
+  });
+});
+
+describe("checkReplyRateLimit", () => {
+  const jid = "628a@s.whatsapp.net";
+
+  it("allows replies up to the cap, then throttles", async () => {
+    process.env.WA_REPLY_MAX = "3";
+    expect(await checkReplyRateLimit(jid)).toBe(true);
+    expect(await checkReplyRateLimit(jid)).toBe(true);
+    expect(await checkReplyRateLimit(jid)).toBe(true);
+    expect(await checkReplyRateLimit(jid)).toBe(false); // 4th over the cap of 3
+  });
+
+  it("namespaces its counter under 'reply:' so it never shares provisioning budget", async () => {
+    process.env.WA_REPLY_MAX = "3";
+    await checkReplyRateLimit(jid);
+    expect(state.rateCounts.has(`reply:${jid}`)).toBe(true);
+    expect(state.rateCounts.has(jid)).toBe(false);
+  });
+
+  it("keeps a separate budget per number", async () => {
+    process.env.WA_REPLY_MAX = "1";
+    expect(await checkReplyRateLimit("628a@s.whatsapp.net")).toBe(true);
+    expect(await checkReplyRateLimit("628a@s.whatsapp.net")).toBe(false);
+    // A different number is unaffected.
+    expect(await checkReplyRateLimit("628b@s.whatsapp.net")).toBe(true);
+  });
+
+  it("fails open when the service is unconfigured", async () => {
+    const saved = process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_URL;
+    expect(await checkReplyRateLimit(jid)).toBe(true);
+    process.env.SUPABASE_URL = saved;
   });
 });
