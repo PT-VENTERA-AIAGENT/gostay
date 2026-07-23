@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation, Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { User, Calendar, MessageSquare, Search, Menu, X, LogOut, UtensilsCrossed, MapPinned } from "lucide-react";
 import ChatWidget from "@/components/portal/ChatWidget";
@@ -24,9 +24,19 @@ const portalNav = [
 export default function PortalLayout() {
   const { pathname } = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
-  const { session, user, signOut } = useAuth();
-  const { name: hotelName, initial: hotelInitial, tenant } = useTenant();
+  const { session, user, role, signOut } = useAuth();
+  const { name: hotelName, initial: hotelInitial, tenant, isLoading: tenantLoading } = useTenant();
   const t = useT();
+
+  // A signed-in user who belongs to no hotel is a prospective OWNER, not a guest
+  // of anyone. Send them to self-serve "Buat Hotel" instead of the default
+  // hotel's portal (which the sole-tenant fallback would otherwise render, making
+  // them look like a guest of that hotel). Staff/admin have their own dashboard;
+  // guests of a real hotel (WhatsApp / portal-link) carry a tenant and stay here.
+  const hasNoHotel = session && role !== "staff" && role !== "admin" && !tenantLoading && tenant === null;
+  if (hasNoHotel) {
+    return <Navigate to="/create-hotel" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

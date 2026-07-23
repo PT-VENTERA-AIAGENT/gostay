@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { exchangeCode } from "./api/_lib/exchange";
 import waInbound from "./api/wa/inbound";
+import hotelCreateMine from "./api/hotel/create-mine";
+import waConnect from "./api/wa/connect";
 
 // In production /api/sso/token is served by the Vercel function in api/sso/.
 // `vite dev` does not run those, so mount the same handler on the dev server —
@@ -31,6 +33,7 @@ function ssoDevApi(): Plugin {
             code: body.code ?? "",
             code_verifier: body.code_verifier ?? "",
             origin: req.headers.origin ?? "",
+            tenantSlug: body.tenant_slug,
           });
 
           res.statusCode = result.status;
@@ -82,6 +85,83 @@ function waDevApi(): Plugin {
   };
 }
 
+// Self-serve hotel creation. In production api/hotel/create-mine.ts is a Vercel
+// function; mount the same handler on the dev server so "Buat Hotel" works in
+// local dev too. Same req/res adaptation as waDevApi.
+function hotelDevApi(): Plugin {
+  return {
+    name: "hotel-dev-api",
+    configureServer(server) {
+      server.middlewares.use("/api/hotel/create-mine", async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const raw = Buffer.concat(chunks).toString("utf8");
+
+        const vres = {
+          statusCode: 200,
+          status(code: number) { this.statusCode = code; res.statusCode = code; return vres; },
+          setHeader(name: string, value: string) { res.setHeader(name, value); return vres; },
+          json(body: unknown) {
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(body));
+          },
+        };
+
+        try {
+          await (hotelCreateMine as unknown as (q: unknown, s: unknown) => Promise<void>)(
+            { method: req.method, headers: req.headers, body: raw },
+            vres,
+          );
+        } catch {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "dev_handler_error" }));
+        }
+      });
+    },
+  };
+}
+
+// Self-service WhatsApp linking for a hotel. In production api/wa/connect.ts is a
+// Vercel function; mount it here so the WhatsApp settings page works in local dev.
+// Handles GET/POST/DELETE and needs the URL query (?tenantId=) parsed through.
+// NOTE: the actual QR pairing still needs the wa-ventera gateway env
+// (WA_VENTERA_BASE_URL / WA_VENTERA_INT_KEY); without them the handler degrades
+// gracefully to { status: "none" } instead of throwing.
+function waConnectDevApi(): Plugin {
+  return {
+    name: "wa-connect-dev-api",
+    configureServer(server) {
+      server.middlewares.use("/api/wa/connect", async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const raw = Buffer.concat(chunks).toString("utf8");
+        const parsed = new URL(req.url ?? "", "http://localhost");
+        const query = Object.fromEntries(parsed.searchParams.entries());
+
+        const vres = {
+          statusCode: 200,
+          status(code: number) { this.statusCode = code; res.statusCode = code; return vres; },
+          setHeader(name: string, value: string) { res.setHeader(name, value); return vres; },
+          json(body: unknown) {
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(body));
+          },
+        };
+
+        try {
+          await (waConnect as unknown as (q: unknown, s: unknown) => Promise<void>)(
+            { method: req.method, headers: req.headers, body: raw, query },
+            vres,
+          );
+        } catch {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "dev_handler_error" }));
+        }
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Prefix "" loads unprefixed vars too (SSO_CLIENT_SECRET), which Vite keeps
@@ -99,7 +179,7 @@ export default defineConfig(({ mode }) => {
         overlay: false,
       },
     },
-    plugins: [react(), ssoDevApi(), waDevApi()],
+    plugins: [react(), ssoDevApi(), waDevApi(), hotelDevApi(), waConnectDevApi()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

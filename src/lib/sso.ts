@@ -228,6 +228,18 @@ const REGISTERED_POST_LOGOUT_ORIGINS = new Set([
   "http://localhost:8080",
 ]);
 
+/**
+ * Whether `${origin}/` is safe to send as a post_logout_redirect_uri — i.e. it
+ * is registered on the `gostay` client. Production hosts are enumerated above;
+ * for local dev we allow any localhost port (whatever the developer registered
+ * for their vite port), since dev ports shift (8080/8081/8082…) and stranding on
+ * the issuer's error page is a dev-only annoyance they can fix by registering it.
+ */
+function canSingleLogout(origin: string): boolean {
+  if (REGISTERED_POST_LOGOUT_ORIGINS.has(origin)) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
 export function logout() {
   // Single logout: end the Ventera SSO session too, not just our local copy.
   //
@@ -243,7 +255,7 @@ export function logout() {
   clearSession();
 
   const origin = window.location.origin;
-  if (idToken && REGISTERED_POST_LOGOUT_ORIGINS.has(origin)) {
+  if (idToken && canSingleLogout(origin)) {
     const params = new URLSearchParams({
       id_token_hint: idToken,
       post_logout_redirect_uri: `${origin}/`,
