@@ -1,21 +1,19 @@
 import { useMemo, useState } from "react";
-import { CreditCard, Search, Loader2, ShieldCheck, FlaskConical, Radio } from "lucide-react";
+import { Building2, Search, Loader2, ShieldCheck, FlaskConical, Radio, MessageCircle } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { tr } from "@/lib/i18n";
-import {
-  useHotelPayments, useSetHotelMode, useSetHotelPaymentsActive,
-} from "@/hooks/useAdminPayments";
-import type { HotelPaymentRow } from "@/services/adminPaymentService";
+import { usePlatformHotels, useSetHotelMode, useSetHotelPaymentsActive } from "@/hooks/usePlatform";
+import type { HotelOverview } from "@/services/platformService";
 
-export default function PaymentControl() {
+export default function PlatformHotels() {
   const { user } = useAuth();
   const { toast } = useToast();
   const by = user?.email ?? user?.id ?? "admin";
 
-  const { data: hotels = [], isLoading } = useHotelPayments();
+  const { data: hotels = [], isLoading } = usePlatformHotels();
   const setMode = useSetHotelMode();
   const setActive = useSetHotelPaymentsActive();
   const [q, setQ] = useState("");
@@ -27,16 +25,16 @@ export default function PaymentControl() {
 
   const liveCount = hotels.filter((h) => h.mode === "live" && h.payments_active).length;
 
-  async function toggleMode(h: HotelPaymentRow) {
+  async function toggleMode(h: HotelOverview) {
     const next = h.mode === "live" ? "test" : "live";
     try {
       await setMode.mutateAsync({ tenantId: h.tenant_id, mode: next, by });
-      toast({ title: `${h.name} → ${next === "live" ? tr("Live") : tr("Test")}` });
+      toast({ title: `${h.name} → ${next === "live" ? "Live" : "Test"}` });
     } catch (e) {
       toast({ title: tr("Gagal mengubah mode"), description: (e as Error).message, variant: "destructive" });
     }
   }
-  async function togglePaymentsActive(h: HotelPaymentRow) {
+  async function togglePaymentsActive(h: HotelOverview) {
     try {
       await setActive.mutateAsync({ tenantId: h.tenant_id, active: !h.payments_active, by });
     } catch (e) {
@@ -50,33 +48,31 @@ export default function PaymentControl() {
         <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-              <CreditCard className="w-6 h-6 text-primary" /> {tr("Kontrol Pembayaran Hotel")}
+              <Building2 className="w-6 h-6 text-primary" /> {tr("Semua Hotel")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {tr("Atur mode pembayaran Live/Test tiap hotel. Hanya super admin Ventera.")}
+              {tr("Kelola mode pembayaran Live/Test setiap hotel dan pantau koneksi WhatsApp.")}
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm">
+            <span className="px-3 py-1.5 rounded-lg bg-muted text-foreground font-medium">{hotels.length} {tr("hotel")}</span>
             <span className="px-3 py-1.5 rounded-lg bg-success/10 text-success font-medium flex items-center gap-1.5">
-              <Radio className="w-4 h-4" /> {liveCount} {tr("hotel Live")}
+              <Radio className="w-4 h-4" /> {liveCount} Live
             </span>
           </div>
         </div>
 
-        {/* Warning banner */}
         <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 mb-4 flex gap-2.5 text-sm text-foreground">
           <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-warning" />
           <p>{tr("Mode Live memproses uang asli lewat Xendit. Pastikan hotel siap sebelum diaktifkan.")}</p>
         </div>
 
-        {/* Search */}
         <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 mb-4 max-w-sm">
           <Search className="w-4 h-4 text-muted-foreground" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Cari hotel...")}
             className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
         </div>
 
-        {/* Table */}
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
             {isLoading ? (
@@ -88,7 +84,7 @@ export default function PaymentControl() {
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="px-4 py-3 font-medium">{tr("Hotel")}</th>
-                    <th className="px-4 py-3 font-medium">Prefix</th>
+                    <th className="px-4 py-3 font-medium">WhatsApp</th>
                     <th className="px-4 py-3 font-medium text-center">{tr("Mode Pembayaran")}</th>
                     <th className="px-4 py-3 font-medium text-center">{tr("Pembayaran Aktif")}</th>
                   </tr>
@@ -100,24 +96,28 @@ export default function PaymentControl() {
                       <tr key={h.tenant_id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
                         <td className="px-4 py-3">
                           <p className="font-medium text-foreground">{h.name}</p>
-                          {!h.is_active && <span className="text-xs text-destructive">{tr("Hotel nonaktif")}</span>}
+                          <code className="text-xs text-muted-foreground">GOSTAY-{h.slug}</code>
+                          {!h.is_active && <span className="ml-2 text-xs text-destructive">{tr("nonaktif")}</span>}
                         </td>
                         <td className="px-4 py-3">
-                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">GOSTAY-{h.slug}</code>
+                          {h.wa_linked ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-success"><MessageCircle className="w-3.5 h-3.5" /> {tr("Tertaut")}</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><MessageCircle className="w-3.5 h-3.5" /> {tr("Belum")}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
-                          {/* Live / Test segmented toggle (Storo routing style) */}
                           <div className="flex items-center justify-center">
                             <div className="inline-flex rounded-lg border border-border overflow-hidden">
                               <button onClick={() => !isLive || toggleMode(h)} disabled={setMode.isPending}
                                 className={cn("px-3 py-1.5 text-xs font-semibold flex items-center gap-1 transition-colors",
                                   !isLive ? "bg-warning/15 text-warning" : "text-muted-foreground hover:bg-muted")}>
-                                <FlaskConical className="w-3.5 h-3.5" /> {tr("Test")}
+                                <FlaskConical className="w-3.5 h-3.5" /> Test
                               </button>
                               <button onClick={() => isLive || toggleMode(h)} disabled={setMode.isPending}
                                 className={cn("px-3 py-1.5 text-xs font-semibold flex items-center gap-1 transition-colors",
                                   isLive ? "bg-success/15 text-success" : "text-muted-foreground hover:bg-muted")}>
-                                <Radio className="w-3.5 h-3.5" /> {tr("Live")}
+                                <Radio className="w-3.5 h-3.5" /> Live
                               </button>
                             </div>
                           </div>

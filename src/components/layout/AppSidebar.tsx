@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
   CalendarDays, DollarSign, Star,
-  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store, Building2, Target, Wallet, CreditCard
+  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store, Building2, Wallet, Radio
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -33,11 +33,6 @@ const bottomItems = [
   { icon: MessageCircle, label: "WhatsApp", path: "/settings/whatsapp" },
   { icon: Users, label: "Manajemen Pengguna", path: "/users" },
   { icon: Star, label: "Ulasan", path: "/reviews" },
-];
-
-const adminItems = [
-  { icon: Target, label: "Lead Gen", path: "/admin/leads" },
-  { icon: CreditCard, label: "Kontrol Pembayaran", path: "/admin/payments" },
 ];
 
 export default function AppSidebar() {
@@ -196,40 +191,23 @@ export default function AppSidebar() {
         ))}
       </div>
 
+      {/* Super admin: a single link OUT to the separate Ventera platform console
+          (cross-hotel). The platform tools no longer live in this hotel sidebar. */}
       {role === "admin" && (
-        <div className="flex flex-col gap-1 mt-2 pt-2 border-t border-sidebar-border">
-          {!collapsed && (
-            <span className="text-xs text-muted-foreground px-3 pb-1 uppercase tracking-wide">Platform</span>
-          )}
-          {adminItems.map((item) => (
-            <motion.div key={item.path} whileHover={{ x: collapsed ? 0 : 2 }} whileTap={{ scale: 0.97 }}>
-              <Link
-                to={item.path}
-                title={collapsed ? item.label : undefined}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
-                  collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
-                  isActive(item.path)
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                )}
-              >
-                <item.icon className="w-5 h-5 shrink-0" />
-                <AnimatePresence>
-                  {!collapsed && (
-                    <motion.span
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: "auto" }}
-                      exit={{ opacity: 0, width: 0 }}
-                      className="overflow-hidden whitespace-nowrap"
-                    >
-                      {item.label}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </Link>
-            </motion.div>
-          ))}
+        <div className="mt-2 pt-2 border-t border-sidebar-border">
+          <motion.div whileHover={{ x: collapsed ? 0 : 2 }} whileTap={{ scale: 0.97 }}>
+            <Link
+              to="/platform"
+              title={collapsed ? t("Console Platform") : undefined}
+              className={cn(
+                "flex items-center gap-3 rounded-lg text-sm font-semibold transition-colors bg-slate-900 text-slate-100 hover:bg-slate-800",
+                collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
+              )}
+            >
+              <Radio className="w-5 h-5 shrink-0" />
+              {!collapsed && <span className="overflow-hidden whitespace-nowrap">{t("Console Platform")}</span>}
+            </Link>
+          </motion.div>
         </div>
       )}
       </div>
