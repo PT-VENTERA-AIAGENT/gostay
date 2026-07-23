@@ -259,6 +259,48 @@ export async function checkReplyRateLimit(phoneJid: string): Promise<boolean> {
   return (await res.json().catch(() => true)) === true;
 }
 
+/**
+ * Greeting cooldown: allow at most ONE greeting per number per window.
+ *
+ * The greeting branch fires whenever there's no pending booking and the message
+ * isn't a clear booking — so a backlog burst (the offline queue replayed on
+ * re-link) would otherwise send one greeting PER old message. This collapses any
+ * such burst to a single greeting: returns true only the first time in the window,
+ * false afterwards. Separate `greet:` namespace so it never shares the reply or
+ * provisioning counters. Window overridable via WA_GREET_COOLDOWN.
+ *
+ * FAILS OPEN (returns true) when unconfigured or the limiter errors — a hiccup
+ * must never permanently mute the hotel's first hello.
+ */
+const DEFAULT_GREET_COOLDOWN = "1 hour";
+
+function greetCooldown(): string {
+  const raw = process.env.WA_GREET_COOLDOWN;
+  return typeof raw === "string" && raw.trim() !== "" ? raw : DEFAULT_GREET_COOLDOWN;
+}
+
+export async function checkGreetCooldown(phoneJid: string): Promise<boolean> {
+  const { url, serviceKey } = serviceConfig();
+  if (!url || !serviceKey) return true;
+
+  let res: Response;
+  try {
+    res = await fetch(`${url}/rest/v1/rpc/check_wa_rate_limit`, {
+      method: "POST",
+      headers: serviceHeaders(serviceKey),
+      body: JSON.stringify({
+        p_phone: `greet:${phoneJid}`,
+        p_max: 1,
+        p_window: greetCooldown(),
+      }),
+    });
+  } catch {
+    return true;
+  }
+  if (!res.ok) return true;
+  return (await res.json().catch(() => true)) === true;
+}
+
 // ─── Tenant resolution ───────────────────────────────────────────────────────
 
 /**

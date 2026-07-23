@@ -43,6 +43,7 @@ import {
 } from "./guest";
 import { sendText } from "./send";
 import { getOrCreateBotProfile, getOrCreateThread, logMessage } from "./crm";
+import { checkGreetCooldown } from "./inbound";
 
 export interface GuestMessage {
   tenantId: string;
@@ -207,6 +208,12 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     // as small talk. Only greet when there's NO booking in progress.
     const collecting = pending?.kind === "collecting";
     if (intent.intent !== "book" && !collecting) {
+      // Anti-spam: greet a number at most once per cooldown window. On a
+      // freshly-linked session the offline-queue backlog would otherwise fire one
+      // greeting per replayed message — the "kok spam" report. The message is
+      // still logged above; we just don't send a repeat hello.
+      if (!(await checkGreetCooldown(phoneJid))) return;
+
       const types = await listRoomTypes(tenantId);
       const header = `*${brand}*\n_Asisten Reservasi Kamar_`;
       const divider = "──────────────────";
