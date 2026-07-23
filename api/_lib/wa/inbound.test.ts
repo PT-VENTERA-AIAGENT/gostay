@@ -11,6 +11,7 @@ import {
   toEpochMs,
   shouldAutoReply,
   checkReplyRateLimit,
+  checkGreetCooldown,
 } from "./inbound";
 
 const SECRET = "wa-webhook-secret-value-1234567890";
@@ -99,6 +100,7 @@ beforeEach(() => {
   process.env.WA_WEBHOOK_SECRET = SECRET;
   delete process.env.WA_REPLY_MAX;
   delete process.env.WA_REPLY_WINDOW;
+  delete process.env.WA_GREET_COOLDOWN;
 });
 
 describe("verifySecret", () => {
@@ -356,6 +358,34 @@ describe("checkReplyRateLimit", () => {
     const saved = process.env.SUPABASE_URL;
     delete process.env.SUPABASE_URL;
     expect(await checkReplyRateLimit(jid)).toBe(true);
+    process.env.SUPABASE_URL = saved;
+  });
+});
+
+describe("checkGreetCooldown", () => {
+  const jid = "628a@s.whatsapp.net";
+
+  it("greets once per window, then stays silent (loop breaker)", async () => {
+    expect(await checkGreetCooldown(jid)).toBe(true);
+    expect(await checkGreetCooldown(jid)).toBe(false);
+    expect(await checkGreetCooldown(jid)).toBe(false);
+  });
+
+  it("uses a 'greet:' namespace separate from the reply counter", async () => {
+    await checkGreetCooldown(jid);
+    expect(state.rateCounts.has(`greet:${jid}`)).toBe(true);
+    expect(state.rateCounts.has(`reply:${jid}`)).toBe(false);
+  });
+
+  it("greets each number independently", async () => {
+    expect(await checkGreetCooldown("628a@s.whatsapp.net")).toBe(true);
+    expect(await checkGreetCooldown("628b@s.whatsapp.net")).toBe(true);
+  });
+
+  it("fails open when the service is unconfigured", async () => {
+    const saved = process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_URL;
+    expect(await checkGreetCooldown(jid)).toBe(true);
     process.env.SUPABASE_URL = saved;
   });
 });

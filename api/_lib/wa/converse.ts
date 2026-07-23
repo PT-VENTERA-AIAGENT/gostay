@@ -43,6 +43,7 @@ import {
 } from "./guest";
 import { sendText } from "./send";
 import { getOrCreateBotProfile, getOrCreateThread, logMessage } from "./crm";
+import { checkGreetCooldown } from "./inbound";
 
 export interface GuestMessage {
   tenantId: string;
@@ -56,6 +57,42 @@ export interface GuestMessage {
 // against the whole trimmed message so "ya", "Iya", "OK" all confirm.
 const YES = new Set(["ya", "iya", "y", "ok", "oke", "okay", "setuju", "lanjut"]);
 const NO = new Set(["batal", "cancel", "no", "tidak", "gak", "engga", "nggak"]);
+
+// Openers that a guest actually starts a chat with. The welcome greeting fires
+// ONLY for these — never for every stray/unrecognised message — so the bot can't
+// spam a greeting per message (a looping/echoing number, or an offline backlog).
+// Overridable per deployment via WA_GREETING_TRIGGERS (comma-separated); a future
+// step makes this a per-hotel setting the staff can edit.
+const DEFAULT_GREETING_TRIGGERS = [
+  "halo", "hallo", "helo", "hai", "hi", "hey", "hello",
+  "assalamualaikum", "assalamualaikum wr wb", "permisi", "spasi",
+  "pagi", "siang", "sore", "malam", "selamat",
+  "info", "menu", "help", "bantuan", "tanya", "start", "mulai", "p",
+];
+
+function greetingTriggers(): string[] {
+  const raw = process.env.WA_GREETING_TRIGGERS;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    return raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  }
+  return DEFAULT_GREETING_TRIGGERS;
+}
+
+/**
+ * True when the message reads like a chat opener (a greeting), not an arbitrary
+ * sentence. We keep it tight: only short messages (≤ 4 words) whose words include
+ * a trigger count — so "halo" / "selamat pagi" / "hi kak" greet, but a long
+ * unrelated message (or an echo of our own reply) does not, which is what stops
+ * the greeting loop.
+ */
+export function isGreetingTrigger(text: string): boolean {
+  const cleaned = text.toLowerCase().replace(/[^\p{L}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  if (!cleaned) return false;
+  const words = cleaned.split(" ");
+  if (words.length > 4) return false;
+  const triggers = new Set(greetingTriggers());
+  return words.some((w) => triggers.has(w));
+}
 
 /**
  * The guest-portal link for a hotel — e.g. https://app.gostay.id/portal?hotel=slug.
@@ -207,6 +244,14 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     // as small talk. Only greet when there's NO booking in progress.
     const collecting = pending?.kind === "collecting";
     if (intent.intent !== "book" && !collecting) {
+      // Narrow trigger: the welcome greeting fires ONLY for an actual opener
+      // ("halo", "hai", …) — never for every stray message. This is the core
+      // anti-spam/anti-loop rule: a message that isn't a greeting gets no reply,
+      // so an echoing/looping number can't pull an endless stream of greetings.
+      if (!isGreetingTrigger(trimmed)) return;
+      // And even a real greeting is answered at most once per window per number.
+      if (!(await checkGreetCooldown(phoneJid))) return;
+
       const types = await listRoomTypes(tenantId);
       const header = `*${brand}*\n_Asisten Reservasi Kamar_`;
       const divider = "──────────────────";
