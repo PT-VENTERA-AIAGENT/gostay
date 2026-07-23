@@ -41,7 +41,7 @@ vi.mock("./send", () => send);
 vi.mock("./crm", () => crm);
 vi.mock("./roomservice", () => roomservice);
 
-import { handleGuestMessage } from "./converse";
+import { handleGuestMessage, isGreetingTrigger } from "./converse";
 
 const BASE = { tenantId: "tenant-x", sessionId: "hotel-x-sess", phoneJid: "628111@s.whatsapp.net" };
 
@@ -89,6 +89,22 @@ describe("handleGuestMessage — intent routing", () => {
     expect(repliesText()).toContain("Hotel Uji"); // branded with the hotel name
     expect(pending.setPending).not.toHaveBeenCalled();
     expect(booking.findRoomType).not.toHaveBeenCalled();
+  });
+
+  it("stays SILENT for a non-greeting, non-booking message (anti-loop)", async () => {
+    ai.extractBookingIntent.mockResolvedValue({
+      intent: "chat", check_in: null, check_out: null, guests: null, room_type_hint: null, confidence: 0.9,
+    });
+
+    // An echo of our own welcome (a long, non-opener message) must NOT be greeted,
+    // or a number that bounces our replies back would loop forever.
+    await handleGuestMessage({
+      ...BASE,
+      text: "*Hotel Uji* _Asisten Reservasi Kamar_ Halo! Saya siap membantu pemesanan kamar Anda.",
+    });
+
+    expect(send.sendText).not.toHaveBeenCalled();
+    expect(pending.setPending).not.toHaveBeenCalled();
   });
 
   it("resolves a valid type up-front and asks the remaining slots in one message", async () => {
@@ -435,5 +451,31 @@ describe("handleGuestMessage — resilience", () => {
 
     await expect(handleGuestMessage({ ...BASE, text: "20-22 juli 2 orang" })).resolves.toBeUndefined();
     expect(repliesText().toLowerCase()).toContain("kendala");
+  });
+});
+
+describe("isGreetingTrigger", () => {
+  it("accepts real openers (short, greeting words)", () => {
+    for (const t of ["halo", "Halo!", "hai", "hi", "hi kak", "selamat pagi", "assalamualaikum", "P", "menu"]) {
+      expect(isGreetingTrigger(t)).toBe(true);
+    }
+  });
+
+  it("rejects arbitrary / long messages and our own echoed reply (the loop source)", () => {
+    for (const t of [
+      "",
+      "tolong kirim invoice kemarin ya pak terima kasih",
+      "nomor rekening berapa",
+      "*Hotel Uji* _Asisten Reservasi Kamar_ Halo! Saya siap membantu pemesanan kamar Anda",
+    ]) {
+      expect(isGreetingTrigger(t)).toBe(false);
+    }
+  });
+
+  it("honors WA_GREETING_TRIGGERS override", () => {
+    process.env.WA_GREETING_TRIGGERS = "ping,mulai";
+    expect(isGreetingTrigger("ping")).toBe(true);
+    expect(isGreetingTrigger("halo")).toBe(false); // no longer a trigger under the override
+    delete process.env.WA_GREETING_TRIGGERS;
   });
 });
