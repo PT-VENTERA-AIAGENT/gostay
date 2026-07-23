@@ -20,7 +20,8 @@ export interface HotelOverview {
   is_active: boolean;
   mode: "live" | "test";
   payments_active: boolean;
-  wa_linked: boolean;
+  wa_linked: boolean;         // an ACTIVE WhatsApp session exists
+  wa_number: string | null;   // the hotel's WhatsApp bot number, if any
   wa_session_id: string | null;
   owner: HotelOwner | null;   // the hotel's primary account (earliest staff/admin)
   staff_count: number;        // how many staff/admin accounts the hotel has
@@ -42,7 +43,7 @@ function isSyntheticEmail(email: string | null | undefined): boolean {
 export async function listHotels(): Promise<HotelOverview[]> {
   const [tenantsRes, ownersRes] = await Promise.all([
     db.from("tenants")
-      .select("id,name,slug,is_active,hotel_payment_config(mode,is_active),wa_hotel_sessions(session_id,is_active)")
+      .select("id,name,slug,is_active,hotel_payment_config(mode,is_active),wa_hotel_sessions(session_id,bot_number,is_active)")
       .order("name"),
     db.from("profiles")
       .select("tenant_id,full_name,email,phone,role,created_at")
@@ -71,9 +72,11 @@ export async function listHotels(): Promise<HotelOverview[]> {
 
   return (tenantsRes.data ?? []).map((t: any) => {
     const cfg = Array.isArray(t.hotel_payment_config) ? t.hotel_payment_config[0] : t.hotel_payment_config;
-    const wa = Array.isArray(t.wa_hotel_sessions)
-      ? t.wa_hotel_sessions.find((s: any) => s.is_active) ?? t.wa_hotel_sessions[0]
-      : t.wa_hotel_sessions;
+    const sessions: any[] = Array.isArray(t.wa_hotel_sessions)
+      ? t.wa_hotel_sessions
+      : t.wa_hotel_sessions ? [t.wa_hotel_sessions] : [];
+    const activeWa = sessions.find((s) => s.is_active);
+    const anyWa = activeWa ?? sessions[0];
     const o = byTenant.get(t.id);
     return {
       tenant_id: t.id,
@@ -82,11 +85,56 @@ export async function listHotels(): Promise<HotelOverview[]> {
       is_active: t.is_active,
       mode: cfg?.mode === "live" ? "live" : "test",
       payments_active: cfg?.is_active ?? true,
-      wa_linked: Boolean(wa?.session_id),
-      wa_session_id: wa?.session_id ?? null,
+      wa_linked: Boolean(activeWa),                 // linked only when a session is ACTIVE
+      wa_number: anyWa?.bot_number ?? null,
+      wa_session_id: anyWa?.session_id ?? null,
       owner: o?.owner ?? null,
       staff_count: o?.count ?? 0,
     } as HotelOverview;
+  });
+}
+
+export interface HotelRoomAvailability {
+  tenant_id: string;
+  hotel: string;
+  total: number;
+  booked: number;
+  available: number;
+}
+
+/**
+ * Rooms free vs booked per hotel for a given date (default: today). A room is
+ * "booked" on date D when an active booking overlaps it: check_in <= D < check_out
+ * — the same half-open rule the room board and the WhatsApp booking bot use, so
+ * this matches what the AI already enforces when it takes a reservation.
+ */
+export async function listRoomAvailability(date: string): Promise<HotelRoomAvailability[]> {
+  const [tenantsRes, roomsRes, bookingsRes] = await Promise.all([
+    db.from("tenants").select("id,name").order("name"),
+    db.from("rooms").select("id,tenant_id").eq("is_active", true),
+    db.from("bookings").select("room_id,tenant_id")
+      .in("status", ["pending", "confirmed", "checked_in"])
+      .lte("check_in", date).gt("check_out", date),
+  ]);
+  if (tenantsRes.error) throw tenantsRes.error;
+  if (roomsRes.error) throw roomsRes.error;
+  if (bookingsRes.error) throw bookingsRes.error;
+
+  const totalByTenant = new Map<string, number>();
+  for (const r of (roomsRes.data ?? []) as any[]) {
+    totalByTenant.set(r.tenant_id, (totalByTenant.get(r.tenant_id) ?? 0) + 1);
+  }
+  // Distinct booked rooms per tenant (guard against duplicate rows).
+  const bookedRooms = new Map<string, Set<string>>();
+  for (const b of (bookingsRes.data ?? []) as any[]) {
+    if (!bookedRooms.has(b.tenant_id)) bookedRooms.set(b.tenant_id, new Set());
+    if (b.room_id) bookedRooms.get(b.tenant_id)!.add(b.room_id);
+  }
+
+  return (tenantsRes.data ?? []).map((t: any) => {
+    const total = totalByTenant.get(t.id) ?? 0;
+    const booked = bookedRooms.get(t.id)?.size ?? 0;
+    return { tenant_id: t.id, hotel: t.name, total, booked, available: Math.max(0, total - booked) };
   });
 }
 
