@@ -6,6 +6,13 @@ import { supabase } from "@/lib/supabase";
 // across tables not in the generated types.
 const db = supabase as unknown as { from: (table: string) => any };
 
+export interface HotelOwner {
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  role: string;
+}
+
 export interface HotelOverview {
   tenant_id: string;
   name: string;
@@ -15,20 +22,59 @@ export interface HotelOverview {
   payments_active: boolean;
   wa_linked: boolean;
   wa_session_id: string | null;
+  owner: HotelOwner | null;   // the hotel's primary account (earliest staff/admin)
+  staff_count: number;        // how many staff/admin accounts the hotel has
 }
 
-/** Every hotel with its payment mode + whether a WhatsApp session is linked. */
+/** An email GoStay auto-generates for phone/WA identities (not a real inbox). */
+function isSyntheticEmail(email: string | null | undefined): boolean {
+  return !email || /@wa\.guest\.|@noreply\.ventera/i.test(email);
+}
+
+/**
+ * Every hotel with its payment mode, WhatsApp link, AND its owner account.
+ *
+ * Owner = the earliest-created staff/admin profile of the tenant (the account
+ * that set the hotel up). Fetched in one extra query and merged in, rather than
+ * embedding profiles on tenants (which would drag in every WA-guest customer
+ * profile too). Admin RLS returns staff across all hotels.
+ */
 export async function listHotels(): Promise<HotelOverview[]> {
-  const { data, error } = await db
-    .from("tenants")
-    .select("id,name,slug,is_active,hotel_payment_config(mode,is_active),wa_hotel_sessions(session_id,is_active)")
-    .order("name");
-  if (error) throw error;
-  return (data ?? []).map((t: any) => {
+  const [tenantsRes, ownersRes] = await Promise.all([
+    db.from("tenants")
+      .select("id,name,slug,is_active,hotel_payment_config(mode,is_active),wa_hotel_sessions(session_id,is_active)")
+      .order("name"),
+    db.from("profiles")
+      .select("tenant_id,full_name,email,phone,role,created_at")
+      .in("role", ["staff", "admin"])
+      .order("created_at", { ascending: true }),
+  ]);
+  if (tenantsRes.error) throw tenantsRes.error;
+  if (ownersRes.error) throw ownersRes.error;
+
+  // tenant_id -> { owner (first), count }
+  const byTenant = new Map<string, { owner: HotelOwner; count: number }>();
+  for (const p of (ownersRes.data ?? []) as any[]) {
+    if (!p.tenant_id) continue;
+    const existing = byTenant.get(p.tenant_id);
+    if (existing) { existing.count += 1; continue; }
+    byTenant.set(p.tenant_id, {
+      owner: {
+        full_name: p.full_name ?? null,
+        email: isSyntheticEmail(p.email) ? null : p.email,
+        phone: p.phone ?? null,
+        role: p.role,
+      },
+      count: 1,
+    });
+  }
+
+  return (tenantsRes.data ?? []).map((t: any) => {
     const cfg = Array.isArray(t.hotel_payment_config) ? t.hotel_payment_config[0] : t.hotel_payment_config;
     const wa = Array.isArray(t.wa_hotel_sessions)
       ? t.wa_hotel_sessions.find((s: any) => s.is_active) ?? t.wa_hotel_sessions[0]
       : t.wa_hotel_sessions;
+    const o = byTenant.get(t.id);
     return {
       tenant_id: t.id,
       name: t.name,
@@ -38,6 +84,8 @@ export async function listHotels(): Promise<HotelOverview[]> {
       payments_active: cfg?.is_active ?? true,
       wa_linked: Boolean(wa?.session_id),
       wa_session_id: wa?.session_id ?? null,
+      owner: o?.owner ?? null,
+      staff_count: o?.count ?? 0,
     } as HotelOverview;
   });
 }
