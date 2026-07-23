@@ -18,8 +18,15 @@
 // a thin shell. Provisioning is deferred to the "YA" step and FAILS CLOSED: if
 // the guest cannot be provisioned, no booking is written.
 
-import { extractBookingIntent, type BookingSlots } from "./ai";
+import { extractBookingIntent, detectRoomServiceIntent, type BookingSlots } from "./ai";
 import { getPending, setPending, clearPending } from "./pending";
+import {
+  getInhouseStay,
+  listMenuProducts,
+  createWaRoomServiceOrder,
+  type MenuProduct,
+  type OrderLine,
+} from "./roomservice";
 import {
   findRoomType,
   listRoomTypes,
@@ -157,6 +164,39 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       }
       // Anything else: the guest is changing their mind (new dates/room). Fall
       // through and re-extract, carrying the quote's slots as context.
+    }
+
+    // ── 1b. Room-service: awaiting a YES/NO on a totalled order ──────────────
+    if (pending?.kind === "confirm_room_service") {
+      if (YES.has(word)) {
+        await confirmRoomService(msg, pending.payload, reply, guest);
+        return;
+      }
+      if (NO.has(word)) {
+        await clearPending(tenantId, phoneJid);
+        await reply("Baik, pesanan room service dibatalkan. Ada lagi yang dapat kami bantu?");
+        return;
+      }
+      // Neither: the guest is editing the order — re-parse against the same menu.
+      await collectRoomService(msg, pending.payload, trimmed, reply);
+      return;
+    }
+
+    // ── 1c. Room-service: guest is picking items off the menu ────────────────
+    if (pending?.kind === "rs_collecting") {
+      if (NO.has(word)) {
+        await clearPending(tenantId, phoneJid);
+        await reply("Baik, pesanan room service dibatalkan. Ada lagi yang dapat kami bantu?");
+        return;
+      }
+      await collectRoomService(msg, pending.payload, trimmed, reply);
+      return;
+    }
+
+    // ── 1d. Fresh room-service request (only when nothing else is pending) ───
+    if (!pending && detectRoomServiceIntent(trimmed)) {
+      await startRoomService(msg, reply, guest, brand);
+      return;
     }
 
     // ── 2. Understand the message ───────────────────────────────────────────
@@ -407,4 +447,230 @@ async function confirmBooking(
       `langkah pembayaran melalui chat ini sebentar lagi. Sampai jumpa di *${brand}*!` +
       portal,
   );
+}
+
+// ─── Room service ──────────────────────────────────────────────────────────────
+// The server-side twin of the guest portal's room-service order (usePortalOrder →
+// guestRequestService.createRoomServiceOrder): an in-house guest picks off the
+// hotel's POS menu, confirms, and the order lands as a guest_request for staff and
+// is billed to the room folio. Only guests currently staying (checked_in) qualify.
+
+/**
+ * Open the room-service flow: refuse a guest who isn't in-house, otherwise show
+ * the menu and park an "rs_collecting" pending carrying the menu snapshot (so the
+ * numbering the guest replies to stays stable).
+ */
+async function startRoomService(
+  msg: GuestMessage,
+  reply: (body: string) => Promise<unknown>,
+  guest: { profileId: string; customerId: string },
+  brand: string,
+): Promise<void> {
+  const { tenantId, phoneJid } = msg;
+
+  const stay = await getInhouseStay(tenantId, guest.customerId);
+  if (!stay) {
+    await reply(
+      "Mohon maaf, layanan room service hanya tersedia untuk tamu yang sedang menginap (sudah check-in). " +
+        "Bila Anda ingin melakukan pemesanan kamar, silakan sebutkan tanggal menginap, jumlah tamu, dan tipe kamar yang diinginkan.",
+    );
+    return;
+  }
+
+  const menu = await listMenuProducts(tenantId);
+  if (menu.length === 0) {
+    await reply(
+      "Mohon maaf, menu room service belum tersedia saat ini. Silakan hubungi kami secara langsung.",
+    );
+    return;
+  }
+
+  await setPending(tenantId, phoneJid, "rs_collecting", {
+    bookingId: stay.bookingId,
+    roomId: stay.roomId,
+    roomNumber: stay.roomNumber,
+    menu,
+  });
+  await reply(roomServiceMenuText(brand, menu));
+}
+
+/**
+ * Parse the guest's menu picks against the payload's menu snapshot. Nothing
+ * recognised → re-ask; otherwise total the order and park a "confirm_room_service"
+ * pending awaiting the "YA". Used both while collecting and when the guest edits
+ * an order they were about to confirm.
+ */
+async function collectRoomService(
+  msg: GuestMessage,
+  payload: Record<string, unknown>,
+  text: string,
+  reply: (body: string) => Promise<unknown>,
+): Promise<void> {
+  const { tenantId, phoneJid } = msg;
+  const menu = Array.isArray(payload.menu) ? (payload.menu as MenuProduct[]) : [];
+  if (menu.length === 0) {
+    // Snapshot lost (e.g. the pending expired mid-flow) — restart cleanly.
+    await clearPending(tenantId, phoneJid);
+    await reply(
+      'Mohon maaf, sesi pemesanan telah berakhir. Silakan kirim ulang "room service" untuk memesan kembali.',
+    );
+    return;
+  }
+
+  const items = parseOrderSelection(text, menu);
+  if (items.length === 0) {
+    await reply(
+      "Mohon maaf, kami belum mengenali pilihan Anda. Silakan balas dengan nomor menu, " +
+        "misalnya *1x2, 3* (2 porsi no.1 dan 1 porsi no.3).",
+    );
+    return;
+  }
+
+  const total = items.reduce((s, it) => s + it.price * it.quantity, 0);
+  const count = items.reduce((s, it) => s + it.quantity, 0);
+  await setPending(tenantId, phoneJid, "confirm_room_service", {
+    bookingId: payload.bookingId,
+    roomId: payload.roomId,
+    roomNumber: payload.roomNumber,
+    menu,
+    items,
+    total,
+    count,
+  });
+  await reply(roomServiceSummaryText(payload.roomNumber as string | null, items, total));
+}
+
+/**
+ * The room-service "YA" path: re-verify the guest is still in-house (fail-closed),
+ * write the order as a guest_request (mirroring the portal), clear the pending, and
+ * confirm the folio charge.
+ */
+async function confirmRoomService(
+  msg: GuestMessage,
+  payload: Record<string, unknown>,
+  reply: (body: string) => Promise<unknown>,
+  guest: { profileId: string; customerId: string },
+): Promise<void> {
+  const { tenantId, phoneJid } = msg;
+
+  const items = (payload.items as OrderLine[] | undefined) ?? [];
+  if (items.length === 0) {
+    await clearPending(tenantId, phoneJid);
+    await reply(
+      'Mohon maaf, pesanan Anda tidak ditemukan. Silakan mulai kembali dengan mengirim "room service".',
+    );
+    return;
+  }
+
+  // Re-verify at commit — the stay may have checked out since the quote. Never
+  // write an order without an active stay to bill it to.
+  const stay = await getInhouseStay(tenantId, guest.customerId);
+  if (!stay) {
+    await clearPending(tenantId, phoneJid);
+    await reply(
+      "Mohon maaf, kami tidak menemukan status menginap aktif untuk pesanan ini. Silakan hubungi front desk.",
+    );
+    return;
+  }
+
+  await createWaRoomServiceOrder({
+    tenantId,
+    customerId: guest.customerId,
+    bookingId: stay.bookingId,
+    roomId: stay.roomId,
+    items,
+    createdBy: guest.profileId,
+  });
+
+  await clearPending(tenantId, phoneJid);
+
+  const total = items.reduce((s, it) => s + it.price * it.quantity, 0);
+  await reply(
+    "Terima kasih! Pesanan room service Anda sudah kami terima dan akan segera diproses. " +
+      `Total ${formatIDR(total)} akan ditambahkan ke tagihan kamar (folio) Anda.`,
+  );
+}
+
+/** The numbered menu message an in-house guest replies to with their picks. */
+function roomServiceMenuText(brand: string, menu: MenuProduct[]): string {
+  const header = `*${brand}*\n_Menu Room Service_`;
+  const divider = "──────────────────";
+  const list = menu.map((p, i) => `${i + 1}. *${p.name}* — ${formatIDR(p.price)}`).join("\n");
+  return (
+    `${header}\n${divider}\n` +
+    "Silakan pilih menu dengan membalas nomornya (boleh beberapa sekaligus):\n\n" +
+    `${list}\n${divider}\n` +
+    "Format: *nomor* x *jumlah*.\n" +
+    "_Contoh: 1x2, 3 — artinya 2 porsi no.1 dan 1 porsi no.3._"
+  );
+}
+
+/** The order summary + YA/BATAL prompt shown before the order is written. */
+function roomServiceSummaryText(
+  roomNumber: string | null,
+  items: OrderLine[],
+  total: number,
+): string {
+  const lines = items
+    .map((it) => `${it.quantity}× ${it.name} — ${formatIDR(it.price * it.quantity)}`)
+    .join("\n");
+  const room = roomNumber ? `Kamar: ${roomNumber}\n` : "";
+  return (
+    "*Ringkasan Pesanan Room Service*\n" +
+    room +
+    `${lines}\n` +
+    `Total: ${formatIDR(total)}\n\n` +
+    "Pesanan akan ditagihkan ke folio kamar Anda.\n" +
+    "Balas *YA* untuk konfirmasi, atau *BATAL* untuk membatalkan."
+  );
+}
+
+/**
+ * Resolve a guest's free-text picks against the numbered menu into order lines.
+ *
+ * Accepts, per comma/newline/"dan"-separated segment:
+ *   - "3x2" / "3 * 2"  → menu #3, quantity 2
+ *   - "3"              → menu #3, quantity 1
+ *   - a product name (substring), optionally with a quantity digit ("kopi 2")
+ * Out-of-range numbers and unrecognised text are ignored; repeats of the same
+ * item accumulate. Returns [] when nothing matched, so the caller can re-ask.
+ */
+function parseOrderSelection(text: string, menu: MenuProduct[]): OrderLine[] {
+  const acc = new Map<string, OrderLine>();
+  const add = (item: MenuProduct, qty: number) => {
+    const q = qty > 0 ? Math.trunc(qty) : 1;
+    const existing = acc.get(item.id);
+    if (existing) existing.quantity += q;
+    else acc.set(item.id, { ...item, quantity: q });
+  };
+
+  for (const raw of text.split(/[,\n;+]+|\bdan\b/i)) {
+    const seg = raw.trim();
+    if (!seg) continue;
+
+    // "3x2" / "3 * 2" / "3×2" → item #3, quantity 2.
+    let m = seg.match(/^(\d{1,3})\s*(?:x|\*|×)\s*(\d{1,3})$/i);
+    if (m) {
+      const item = menu[parseInt(m[1], 10) - 1];
+      if (item) add(item, parseInt(m[2], 10));
+      continue;
+    }
+    // Bare "3" → item #3, quantity 1.
+    m = seg.match(/^(\d{1,3})$/);
+    if (m) {
+      const item = menu[parseInt(m[1], 10) - 1];
+      if (item) add(item, 1);
+      continue;
+    }
+    // Name-based: a menu item whose name appears in the segment, with an optional
+    // quantity digit anywhere in it ("nasi goreng 2", "2 kopi").
+    const lower = seg.toLowerCase();
+    const item = menu.find((p) => lower.includes(p.name.toLowerCase()));
+    if (item) {
+      const qm = lower.match(/(\d{1,3})/);
+      add(item, qm ? parseInt(qm[1], 10) : 1);
+    }
+  }
+
+  return [...acc.values()];
 }

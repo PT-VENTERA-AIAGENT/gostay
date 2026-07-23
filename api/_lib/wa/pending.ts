@@ -3,10 +3,13 @@
 // UNIQUE(tenant_id, phone_jid) constraint on wa_pending_actions enforces it — so
 // a guest only ever has a single conversation-in-progress with a hotel.
 //
-// Two kinds live here:
-//   - "collecting"      — slots gathered so far, while we still need more
-//                         (check-in/out, guests) before we can quote.
-//   - "confirm_booking" — a fully-priced quote awaiting the guest's "YA".
+// Kinds that live here:
+//   - "collecting"           — booking slots gathered so far, while we still need
+//                              more (check-in/out, guests) before we can quote.
+//   - "confirm_booking"      — a fully-priced quote awaiting the guest's "YA".
+//   - "rs_collecting"        — an in-house guest is picking room-service items off
+//                              the menu snapshot carried in the payload.
+//   - "confirm_room_service" — a totalled room-service order awaiting the "YA".
 //
 // Service-role only, same raw-PostgREST path as the rest of api/_lib/wa (see
 // client.ts on why not @supabase/supabase-js). Rows carry an expires_at so an
@@ -15,7 +18,7 @@
 import { serviceConfig, serviceGet, serviceHeaders } from "./client";
 
 export interface PendingAction {
-  kind: "collecting" | "confirm_booking";
+  kind: "collecting" | "confirm_booking" | "rs_collecting" | "confirm_room_service";
   payload: Record<string, unknown>;
 }
 

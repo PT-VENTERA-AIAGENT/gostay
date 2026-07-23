@@ -9,11 +9,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // be built inside vi.hoisted() (also hoisted) rather than as plain top-level
 // consts — otherwise the factories run before those consts initialise
 // ("Cannot access 'ai' before initialization").
-const { ai, pending, booking, guest, send, crm, WaRateLimitError } = vi.hoisted(() => {
+const { ai, pending, booking, guest, send, crm, roomservice, WaRateLimitError } = vi.hoisted(() => {
   // A real error class so `instanceof WaRateLimitError` works inside converse.
   class WaRateLimitError extends Error {}
   return {
-    ai: { extractBookingIntent: vi.fn() },
+    ai: { extractBookingIntent: vi.fn(), detectRoomServiceIntent: vi.fn() },
     pending: { getPending: vi.fn(), setPending: vi.fn(), clearPending: vi.fn() },
     booking: {
       findRoomType: vi.fn(),
@@ -28,6 +28,7 @@ const { ai, pending, booking, guest, send, crm, WaRateLimitError } = vi.hoisted(
     guest: { resolveOrProvisionGuest: vi.fn(), WaRateLimitError },
     send: { sendText: vi.fn() },
     crm: { getOrCreateBotProfile: vi.fn(), getOrCreateThread: vi.fn(), logMessage: vi.fn() },
+    roomservice: { getInhouseStay: vi.fn(), listMenuProducts: vi.fn(), createWaRoomServiceOrder: vi.fn() },
     WaRateLimitError,
   };
 });
@@ -38,6 +39,7 @@ vi.mock("./booking", () => booking);
 vi.mock("./guest", () => guest);
 vi.mock("./send", () => send);
 vi.mock("./crm", () => crm);
+vi.mock("./roomservice", () => roomservice);
 
 import { handleGuestMessage } from "./converse";
 
@@ -67,6 +69,11 @@ beforeEach(() => {
   booking.getTenantName.mockResolvedValue("Hotel Uji");
   booking.getTenantSlug.mockResolvedValue("hotel-uji");
   booking.setCustomerName.mockResolvedValue(undefined);
+  // Room service defaults: not a room-service message, no active stay, empty menu.
+  ai.detectRoomServiceIntent.mockReturnValue(false);
+  roomservice.getInhouseStay.mockResolvedValue(null);
+  roomservice.listMenuProducts.mockResolvedValue([]);
+  roomservice.createWaRoomServiceOrder.mockResolvedValue({ id: "gr-1" });
 });
 
 describe("handleGuestMessage — intent routing", () => {
@@ -279,6 +286,146 @@ describe("handleGuestMessage — confirmation", () => {
 
     expect(booking.createWaBooking).not.toHaveBeenCalled();
     expect(repliesText().toLowerCase()).toContain("kesulitan memproses");
+  });
+});
+
+describe("handleGuestMessage — room service", () => {
+  const MENU = [
+    { id: "p-1", name: "Kopi", category: "fnb", price: 25000 },
+    { id: "p-2", name: "Nasi Goreng", category: "fnb", price: 45000 },
+  ];
+
+  it("shows the menu to an in-house guest and parks an rs_collecting pending", async () => {
+    ai.detectRoomServiceIntent.mockReturnValue(true);
+    roomservice.getInhouseStay.mockResolvedValue({ bookingId: "bk-1", roomId: "room-1", roomNumber: "101" });
+    roomservice.listMenuProducts.mockResolvedValue(MENU);
+
+    await handleGuestMessage({ ...BASE, text: "mau pesan makanan" });
+
+    expect(pending.setPending).toHaveBeenCalledWith(
+      "tenant-x", BASE.phoneJid, "rs_collecting",
+      expect.objectContaining({ bookingId: "bk-1", roomId: "room-1", roomNumber: "101", menu: MENU }),
+    );
+    const reply = repliesText();
+    expect(reply.toLowerCase()).toContain("menu room service");
+    expect(reply).toContain("Kopi");
+    expect(reply).toContain("Nasi Goreng");
+    // The intent must never reach the booking extractor.
+    expect(ai.extractBookingIntent).not.toHaveBeenCalled();
+    expect(roomservice.createWaRoomServiceOrder).not.toHaveBeenCalled();
+  });
+
+  it("refuses room service when the guest has no active (checked_in) stay", async () => {
+    ai.detectRoomServiceIntent.mockReturnValue(true);
+    roomservice.getInhouseStay.mockResolvedValue(null);
+
+    await handleGuestMessage({ ...BASE, text: "lapar, mau room service" });
+
+    const reply = repliesText().toLowerCase();
+    expect(reply).toContain("hanya tersedia untuk tamu yang sedang menginap");
+    // Offers to help with a booking instead.
+    expect(reply).toContain("pemesanan kamar");
+    expect(pending.setPending).not.toHaveBeenCalled();
+    expect(roomservice.listMenuProducts).not.toHaveBeenCalled();
+  });
+
+  it("parses picks from the menu snapshot and parks a confirm_room_service quote", async () => {
+    pending.getPending.mockResolvedValue({
+      kind: "rs_collecting",
+      payload: { bookingId: "bk-1", roomId: "room-1", roomNumber: "101", menu: MENU },
+    });
+
+    await handleGuestMessage({ ...BASE, text: "1x2, 2" });
+
+    expect(pending.setPending).toHaveBeenCalledWith(
+      "tenant-x", BASE.phoneJid, "confirm_room_service",
+      expect.objectContaining({
+        bookingId: "bk-1",
+        total: 25000 * 2 + 45000, // two Kopi + one Nasi Goreng
+        items: expect.arrayContaining([
+          expect.objectContaining({ id: "p-1", quantity: 2 }),
+          expect.objectContaining({ id: "p-2", quantity: 1 }),
+        ]),
+      }),
+    );
+    const reply = repliesText();
+    expect(reply).toContain("Ringkasan Pesanan Room Service");
+    expect(reply.toUpperCase()).toContain("YA");
+    expect(roomservice.createWaRoomServiceOrder).not.toHaveBeenCalled();
+  });
+
+  it("re-asks when the guest's picks match nothing on the menu", async () => {
+    pending.getPending.mockResolvedValue({
+      kind: "rs_collecting",
+      payload: { bookingId: "bk-1", roomId: "room-1", roomNumber: "101", menu: MENU },
+    });
+
+    await handleGuestMessage({ ...BASE, text: "99" }); // out of range
+
+    expect(pending.setPending).not.toHaveBeenCalled();
+    expect(repliesText().toLowerCase()).toContain("belum mengenali pilihan");
+  });
+
+  it("YA writes the order (mirroring the portal) and confirms the folio charge", async () => {
+    pending.getPending.mockResolvedValue({
+      kind: "confirm_room_service",
+      payload: {
+        bookingId: "bk-1", roomId: "room-1", roomNumber: "101", menu: MENU,
+        items: [{ id: "p-1", name: "Kopi", category: "fnb", price: 25000, quantity: 2 }],
+        total: 50000, count: 2,
+      },
+    });
+    roomservice.getInhouseStay.mockResolvedValue({ bookingId: "bk-1", roomId: "room-1", roomNumber: "101" });
+
+    await handleGuestMessage({ ...BASE, text: "YA" });
+
+    expect(roomservice.createWaRoomServiceOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: "tenant-x", customerId: "cust-1", bookingId: "bk-1", roomId: "room-1", createdBy: "prof-1",
+        items: expect.arrayContaining([expect.objectContaining({ id: "p-1", quantity: 2 })]),
+      }),
+    );
+    expect(pending.clearPending).toHaveBeenCalled();
+    expect(repliesText().toLowerCase()).toContain("folio");
+  });
+
+  it("BATAL cancels the room-service order and writes nothing", async () => {
+    pending.getPending.mockResolvedValue({
+      kind: "confirm_room_service",
+      payload: { bookingId: "bk-1", roomId: "room-1", roomNumber: "101", items: [{ id: "p-1", name: "Kopi", category: "fnb", price: 25000, quantity: 1 }], total: 25000, count: 1 },
+    });
+
+    await handleGuestMessage({ ...BASE, text: "batal" });
+
+    expect(roomservice.createWaRoomServiceOrder).not.toHaveBeenCalled();
+    expect(pending.clearPending).toHaveBeenCalled();
+    expect(repliesText().toLowerCase()).toContain("dibatalkan");
+  });
+
+  it("YA but the stay ended since the quote → apologises, writes nothing", async () => {
+    pending.getPending.mockResolvedValue({
+      kind: "confirm_room_service",
+      payload: { bookingId: "bk-1", roomId: "room-1", roomNumber: "101", items: [{ id: "p-1", name: "Kopi", category: "fnb", price: 25000, quantity: 1 }], total: 25000, count: 1 },
+    });
+    roomservice.getInhouseStay.mockResolvedValue(null); // checked out meanwhile
+
+    await handleGuestMessage({ ...BASE, text: "ya" });
+
+    expect(roomservice.createWaRoomServiceOrder).not.toHaveBeenCalled();
+    expect(pending.clearPending).toHaveBeenCalled();
+    expect(repliesText().toLowerCase()).toContain("menginap aktif");
+  });
+
+  it("never throws; a mid-flow room-service failure still answers with an apology", async () => {
+    pending.getPending.mockResolvedValue({
+      kind: "confirm_room_service",
+      payload: { bookingId: "bk-1", roomId: "room-1", roomNumber: "101", items: [{ id: "p-1", name: "Kopi", category: "fnb", price: 25000, quantity: 1 }], total: 25000, count: 1 },
+    });
+    roomservice.getInhouseStay.mockResolvedValue({ bookingId: "bk-1", roomId: "room-1", roomNumber: "101" });
+    roomservice.createWaRoomServiceOrder.mockRejectedValue(new Error("insert_failed"));
+
+    await expect(handleGuestMessage({ ...BASE, text: "ya" })).resolves.toBeUndefined();
+    expect(repliesText().toLowerCase()).toContain("kendala");
   });
 });
 
