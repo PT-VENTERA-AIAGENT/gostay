@@ -70,6 +70,7 @@ export const EN: Record<string, string> = {
   "Terputus": "Disconnected",
   "Belum": "Not yet",
   "Pembayaran": "Payment",
+  "Fitur Denah masih tahap pengembangan (early access). Fungsinya bisa berubah.": "The Floor Plan feature is still in development (early access). Its behavior may change.",
   "Ketersediaan Kamar": "Room Availability",
   "Kamar kosong vs terisi per tanggal, di semua hotel. AI WhatsApp memakai aturan ketersediaan yang sama.": "Free vs occupied rooms per date, across all hotels. The WhatsApp AI uses the same availability rule.",
   "Total kamar": "Total rooms",
