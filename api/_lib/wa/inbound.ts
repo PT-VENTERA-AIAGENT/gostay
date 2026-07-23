@@ -7,7 +7,7 @@
 // See plans/whatsapp-ai-booking.md, Fase 0.
 
 import { timingSafeEqual } from "node:crypto";
-import { serviceConfig, serviceGet, serviceInsert } from "./client";
+import { serviceConfig, serviceGet, serviceHeaders, serviceInsert } from "./client";
 
 // ─── Secret verification ─────────────────────────────────────────────────────
 
@@ -45,6 +45,13 @@ export interface ParsedMessage {
   fromMe: boolean;
   /** The sender's WhatsApp display name (pushName), when the gateway sends it. */
   pushName?: string;
+  /**
+   * When WhatsApp says the message was sent, in epoch milliseconds. Undefined
+   * when the gateway omits it. Drives the history-sync guard (see shouldAutoReply):
+   * on a freshly-linked session Baileys replays the guest's whole backlog, and
+   * these carry OLD timestamps — that's how we tell them from a live message.
+   */
+  timestamp?: number;
   /** The original message object, stored verbatim in wa_inbound_messages.raw. */
   raw: unknown;
 }
@@ -58,6 +65,8 @@ interface WAMessageKey {
 interface WAMessage {
   key?: WAMessageKey;
   pushName?: string;
+  /** Baileys sends epoch SECONDS — as a number, a numeric string, or a Long. */
+  messageTimestamp?: number | string | { low?: number };
   message?: {
     conversation?: string;
     extendedTextMessage?: { text?: string };
@@ -121,9 +130,133 @@ export function parseMessages(body: unknown): ParsedMessage[] {
       text,
       fromMe: key.fromMe === true,
       pushName: typeof m?.pushName === "string" ? m.pushName : undefined,
+      timestamp: toEpochMs(m?.messageTimestamp),
       raw: m,
     };
   });
+}
+
+// ─── History-sync guard ──────────────────────────────────────────────────────
+
+/**
+ * Messages older than this (relative to the gateway's receivedAt, or our clock
+ * when it's absent) are treated as backlog and are NEVER auto-answered.
+ *
+ * On a freshly-linked WhatsApp session Baileys replays the guest's whole message
+ * history to the gateway, which forwards it here. Answering that backlog fired
+ * the greeting once per old message — the burst of identical "Asisten Reservasi"
+ * replies that risks a WhatsApp ban. Live messages arrive within seconds of being
+ * sent, so a few-minute window keeps genuine (even slightly delayed) traffic while
+ * silencing history. Overridable via WA_MAX_AUTO_REPLY_AGE_MS for tuning.
+ */
+const DEFAULT_MAX_AUTO_REPLY_AGE_MS = 5 * 60 * 1000;
+
+export function maxAutoReplyAgeMs(): number {
+  const raw = Number(process.env.WA_MAX_AUTO_REPLY_AGE_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MAX_AUTO_REPLY_AGE_MS;
+}
+
+/**
+ * Normalise a Baileys `messageTimestamp` to epoch milliseconds.
+ *
+ * Baileys sends epoch SECONDS as a number, a numeric string, or a protobuf Long
+ * (`{ low, high }` — real timestamps fit in `low`). Values already large enough
+ * to be milliseconds are passed through so a gateway that pre-converts still works.
+ * Returns undefined for anything unparseable.
+ */
+export function toEpochMs(v: unknown): number | undefined {
+  let seconds: number | undefined;
+  if (typeof v === "number" && Number.isFinite(v)) seconds = v;
+  else if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
+    seconds = Number(v);
+  } else if (v && typeof v === "object" && typeof (v as { low?: unknown }).low === "number") {
+    seconds = (v as { low: number }).low;
+  }
+  if (seconds === undefined || seconds <= 0) return undefined;
+  // >1e12 is already milliseconds (seconds since 1970 won't reach that until ~33000 AD).
+  return seconds > 1e12 ? seconds : seconds * 1000;
+}
+
+/**
+ * Should we auto-answer this message, or is it replayed history?
+ *
+ * Compares the message's own send time against the gateway's `receivedAt` (its
+ * forward time), falling back to `nowMs` when receivedAt is absent/unparseable.
+ * A message forwarded live has an age near zero; a backlog message replayed at
+ * link-time is minutes-to-days old.
+ *
+ * Fails OPEN: with no timestamp we answer (never silence a working bot over a
+ * field the gateway might not send). Future-dated messages (clock skew) count as
+ * fresh. `nowMs` is injectable so the route and tests stay deterministic.
+ */
+export function shouldAutoReply(
+  timestamp: number | undefined,
+  receivedAt: string | undefined,
+  nowMs: number,
+): boolean {
+  if (timestamp === undefined) return true; // fail open — see doc comment.
+  const refParsed = receivedAt ? Date.parse(receivedAt) : NaN;
+  const reference = Number.isFinite(refParsed) ? refParsed : nowMs;
+  const age = reference - timestamp;
+  if (age <= 0) return true; // sent now or (skew) in the future.
+  return age <= maxAutoReplyAgeMs();
+}
+
+// ─── Per-number reply throttle ───────────────────────────────────────────────
+
+/**
+ * Second line of defence behind the history-sync guard: cap how many auto-replies
+ * one number can pull in a short window. If a backlog ever slips past the freshness
+ * check (e.g. a gateway that strips messageTimestamp), this bounds the blast radius
+ * to a handful of replies instead of a full-history spam burst — the thing that
+ * risks a WhatsApp ban. Generous enough that a real guest typing quickly is never
+ * throttled. Both overridable via env for tuning without a redeploy.
+ */
+const DEFAULT_REPLY_MAX = 8;
+const DEFAULT_REPLY_WINDOW = "1 minute";
+
+function replyMax(): number {
+  const raw = Number(process.env.WA_REPLY_MAX);
+  return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_REPLY_MAX;
+}
+
+function replyWindow(): string {
+  const raw = process.env.WA_REPLY_WINDOW;
+  return typeof raw === "string" && raw.trim() !== "" ? raw : DEFAULT_REPLY_WINDOW;
+}
+
+/**
+ * True if we're still under this number's reply budget (and records the reply).
+ *
+ * Reuses the check_wa_rate_limit RPC but under a `reply:` namespace so it keeps a
+ * SEPARATE counter from guest provisioning (which keys on the bare JID) — a chatty
+ * booking must not eat into the once-per-guest provisioning budget, or vice-versa.
+ *
+ * FAILS OPEN: an unconfigured service or a limiter error returns true. This is a
+ * safety net, not a gate — never wedge a working bot because the throttle hiccuped
+ * (the freshness guard is the primary protection). Errors are logged by the caller.
+ */
+export async function checkReplyRateLimit(phoneJid: string): Promise<boolean> {
+  const { url, serviceKey } = serviceConfig();
+  if (!url || !serviceKey) return true;
+
+  let res: Response;
+  try {
+    res = await fetch(`${url}/rest/v1/rpc/check_wa_rate_limit`, {
+      method: "POST",
+      headers: serviceHeaders(serviceKey),
+      body: JSON.stringify({
+        p_phone: `reply:${phoneJid}`,
+        p_max: replyMax(),
+        p_window: replyWindow(),
+      }),
+    });
+  } catch {
+    return true; // network error → fail open.
+  }
+  if (!res.ok) return true; // limiter error → fail open.
+  // A scalar-returning RPC comes back as a bare JSON boolean.
+  return (await res.json().catch(() => true)) === true;
 }
 
 // ─── Tenant resolution ───────────────────────────────────────────────────────

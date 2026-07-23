@@ -18,6 +18,8 @@ import {
   sessionIdOf,
   receivedAtOf,
   isDirectChat,
+  shouldAutoReply,
+  checkReplyRateLimit,
 } from "../_lib/wa/inbound";
 import { handleGuestMessage } from "../_lib/wa/converse";
 
@@ -78,9 +80,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       if (seen === "duplicate") continue;
 
+      // History-sync guard: a freshly-linked session replays the guest's whole
+      // backlog. We RECORD those (above, for idempotency/audit) but must NOT
+      // auto-answer them — replying to old messages spams the greeting and risks
+      // a WhatsApp ban. Only messages that arrived in real time get a reply.
+      if (!shouldAutoReply(msg.timestamp, receivedAt, Date.now())) continue;
+
       // Tenant comes ONLY from the sessionId (destination), never the sender.
       const tenantId = await resolveTenant(sessionId);
       if (!tenantId) continue; // unknown/inactive session → stay silent (anti-spam)
+
+      // Second anti-spam layer: cap replies per number in a short window. If a
+      // backlog ever slips past the freshness guard, this bounds it to a few
+      // replies instead of a ban-inducing burst. Fails open — never wedges the bot.
+      if (!(await checkReplyRateLimit(msg.phoneJid))) continue;
 
       // Hand the message to the booking conversation (Fase 5). It runs the whole
       // state machine — intent → collect → quote → confirm → provision + book —
