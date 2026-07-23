@@ -17,7 +17,10 @@ export function useSetHotelMode() {
   return useMutation({
     mutationFn: (v: { tenantId: string; mode: "live" | "test"; by: string }) =>
       setHotelMode(v.tenantId, v.mode, v.by),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminPaymentKeys.list() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: adminPaymentKeys.list() });
+      qc.invalidateQueries({ queryKey: ["platform"] }); // keep the platform console in sync
+    },
   });
 }
 
@@ -26,6 +29,9 @@ export function useSetHotelPaymentsActive() {
   return useMutation({
     mutationFn: (v: { tenantId: string; active: boolean; by: string }) =>
       setHotelPaymentsActive(v.tenantId, v.active, v.by),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminPaymentKeys.list() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: adminPaymentKeys.list() });
+      qc.invalidateQueries({ queryKey: ["platform"] }); // keep the platform console in sync
+    },
   });
 }

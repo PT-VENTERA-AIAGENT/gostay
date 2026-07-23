@@ -32,7 +32,11 @@ import UserManagement from "./pages/UserManagement";
 import AddHotel from "./pages/admin/AddHotel";
 import CreateHotel from "./pages/CreateHotel";
 import LeadList from "./pages/admin/LeadList";
-import PaymentControl from "./pages/admin/PaymentControl";
+import PlatformLayout from "./components/layout/PlatformLayout";
+import PlatformOverview from "./pages/platform/Overview";
+import PlatformHotels from "./pages/platform/Hotels";
+import PlatformReservations from "./pages/platform/Reservations";
+import PlatformGuestRequests from "./pages/platform/GuestRequests";
 import LeadDetail from "./pages/admin/LeadDetail";
 import CampaignsPage from "./pages/admin/Campaigns";
 import CRM from "./pages/CRM";
@@ -146,46 +150,6 @@ const App = () => (
                 }
               />
               <Route
-                path="/admin/add-hotel"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AddHotel />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/leads"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <LeadList />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/payments"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <PaymentControl />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/leads/:id"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <LeadDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/campaigns"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <CampaignsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/requests"
                 element={
                   <ProtectedRoute allowedRoles={["admin", "staff"]}>
@@ -234,6 +198,28 @@ const App = () => (
                 }
               />
             </Route>
+
+            {/* Ventera Platform console — super-admin only, cross-hotel. A
+                SEPARATE shell (PlatformLayout) so it never mixes with a single
+                hotel's dashboard. */}
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <PlatformLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/platform" element={<PlatformOverview />} />
+              <Route path="/platform/hotels" element={<PlatformHotels />} />
+              <Route path="/platform/reservations" element={<PlatformReservations />} />
+              <Route path="/platform/requests" element={<PlatformGuestRequests />} />
+              <Route path="/admin/add-hotel" element={<AddHotel />} />
+              <Route path="/admin/leads" element={<LeadList />} />
+              <Route path="/admin/leads/:id" element={<LeadDetail />} />
+              <Route path="/admin/campaigns" element={<CampaignsPage />} />
+            </Route>
+            {/* Old payment-control path now lives in the platform console */}
+            <Route path="/admin/payments" element={<Navigate to="/platform/hotels" replace />} />
 
             {/* Customer Portal — public (no auth required to browse) */}
             <Route path="/portal" element={<PortalLayout />}>
