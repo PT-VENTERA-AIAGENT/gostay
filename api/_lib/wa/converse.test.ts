@@ -13,12 +13,14 @@ const { ai, pending, booking, guest, send, crm, roomservice, WaRateLimitError } 
   // A real error class so `instanceof WaRateLimitError` works inside converse.
   class WaRateLimitError extends Error {}
   return {
-    ai: { extractBookingIntent: vi.fn(), detectRoomServiceIntent: vi.fn() },
+    ai: { extractBookingIntent: vi.fn(), detectRoomServiceIntent: vi.fn(), detectRoomNumberQuery: vi.fn() },
     pending: { getPending: vi.fn(), setPending: vi.fn(), clearPending: vi.fn() },
     booking: {
       findRoomType: vi.fn(),
       listRoomTypes: vi.fn(),
       getAvailableRoomsSrv: vi.fn(),
+      getRoomByNumberSrv: vi.fn(),
+      getRoomConflictSrv: vi.fn(),
       computeTotal: vi.fn(),
       createWaBooking: vi.fn(),
       getTenantName: vi.fn(),
@@ -71,6 +73,10 @@ beforeEach(() => {
   booking.setCustomerName.mockResolvedValue(undefined);
   // Room service defaults: not a room-service message, no active stay, empty menu.
   ai.detectRoomServiceIntent.mockReturnValue(false);
+  // Not a specific-room-number question by default.
+  ai.detectRoomNumberQuery.mockReturnValue(null);
+  booking.getRoomByNumberSrv.mockResolvedValue(null);
+  booking.getRoomConflictSrv.mockResolvedValue(null);
   roomservice.getInhouseStay.mockResolvedValue(null);
   roomservice.listMenuProducts.mockResolvedValue([]);
   roomservice.createWaRoomServiceOrder.mockResolvedValue({ id: "gr-1" });
@@ -143,6 +149,48 @@ describe("handleGuestMessage — intent routing", () => {
     // the menu is shown so the guest can pick the type in the same reply
     expect(reply).toContain("Deluxe");
     expect(reply).toContain("Suite");
+  });
+});
+
+describe("handleGuestMessage — specific room-number question", () => {
+  it("tells the guest a room is BOOKED for the asked window", async () => {
+    ai.detectRoomNumberQuery.mockReturnValue({ roomNumber: "201", checkIn: "2026-07-25", checkOut: null });
+    booking.getRoomByNumberSrv.mockResolvedValue({ id: "room-201", number: "201", typeName: "Deluxe" });
+    booking.getRoomConflictSrv.mockResolvedValue({ check_in: "2026-07-24", check_out: "2026-07-27", status: "confirmed" });
+
+    await handleGuestMessage({ ...BASE, text: "apakah kamar 201 tersedia 25 juli?" });
+
+    const reply = repliesText().toLowerCase();
+    expect(reply).toContain("201");
+    expect(reply).toContain("terpesan"); // booked
+    // Never leaks the occupying guest's actual dates.
+    expect(reply).not.toContain("2026-07-24");
+    // Handled here — never entered the booking-extraction flow.
+    expect(ai.extractBookingIntent).not.toHaveBeenCalled();
+    expect(pending.setPending).not.toHaveBeenCalled();
+  });
+
+  it("tells the guest a room is AVAILABLE when free", async () => {
+    ai.detectRoomNumberQuery.mockReturnValue({ roomNumber: "12", checkIn: null, checkOut: null });
+    booking.getRoomByNumberSrv.mockResolvedValue({ id: "room-12", number: "12", typeName: "Suite" });
+    booking.getRoomConflictSrv.mockResolvedValue(null);
+
+    await handleGuestMessage({ ...BASE, text: "kamar 12 kosong ga?" });
+
+    const reply = repliesText().toLowerCase();
+    expect(reply).toContain("12");
+    expect(reply).toContain("tersedia"); // available
+    expect(booking.getRoomConflictSrv).toHaveBeenCalled();
+  });
+
+  it("says not found for a room number the hotel doesn't have", async () => {
+    ai.detectRoomNumberQuery.mockReturnValue({ roomNumber: "999", checkIn: null, checkOut: null });
+    booking.getRoomByNumberSrv.mockResolvedValue(null);
+
+    await handleGuestMessage({ ...BASE, text: "kamar 999 tersedia?" });
+
+    expect(repliesText().toLowerCase()).toContain("tidak menemukan");
+    expect(booking.getRoomConflictSrv).not.toHaveBeenCalled();
   });
 });
 

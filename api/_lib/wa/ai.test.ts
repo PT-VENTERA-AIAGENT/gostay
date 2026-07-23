@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
-import { extractBookingIntent, type BookingIntent } from "./ai";
+import { extractBookingIntent, detectRoomNumberQuery, type BookingIntent } from "./ai";
 
 // The fallback assumes the running year when a phrase omits one ("20-22 juli").
 const YEAR = new Date().getFullYear();
@@ -217,5 +217,37 @@ describe("extractBookingIntent — deterministic fallback (no OPENAI_API_KEY)", 
     expect((await extractBookingIntent("atas nama Budi Santoso")).guest_name).toBe("Budi Santoso");
     expect((await extractBookingIntent("deluxe a/n Andi")).guest_name).toBe("Andi");
     expect((await extractBookingIntent("2 orang deluxe")).guest_name).toBeNull();
+  });
+});
+
+describe("detectRoomNumberQuery — specific room-number questions", () => {
+  const YEAR2 = new Date().getFullYear();
+
+  it("detects a room number with an availability cue", () => {
+    expect(detectRoomNumberQuery("apakah kamar 201 tersedia?")).toMatchObject({ roomNumber: "201" });
+    expect(detectRoomNumberQuery("no 12 kosong ga?")).toMatchObject({ roomNumber: "12" });
+    expect(detectRoomNumberQuery("room 305 available")).toMatchObject({ roomNumber: "305" });
+    expect(detectRoomNumberQuery("kamar 8 udah dibook belum")).toMatchObject({ roomNumber: "8" });
+  });
+
+  it("pulls dates when the guest gives them", () => {
+    expect(detectRoomNumberQuery("kamar 201 tersedia 25 juli?")).toMatchObject({
+      roomNumber: "201", checkIn: `${YEAR2}-07-25`,
+    });
+    expect(detectRoomNumberQuery("no 7 kosong 20-22 agustus?")).toMatchObject({
+      roomNumber: "7", checkIn: `${YEAR2}-08-20`, checkOut: `${YEAR2}-08-22`,
+    });
+  });
+
+  it("does NOT fire on a normal booking phrase (guest/night counts)", () => {
+    expect(detectRoomNumberQuery("mau booking kamar untuk 2 orang")).toBeNull();
+    expect(detectRoomNumberQuery("kamar 2 orang deluxe")).toBeNull(); // "2 orang" is a guest count
+    expect(detectRoomNumberQuery("nginap 3 malam")).toBeNull();
+    expect(detectRoomNumberQuery("mau kamar deluxe 25 juli")).toBeNull(); // no room number
+  });
+
+  it("requires an availability cue or a question mark", () => {
+    expect(detectRoomNumberQuery("kamar 201 atas nama Budi")).toBeNull(); // booking, not a status question
+    expect(detectRoomNumberQuery("kamar 201?")).toMatchObject({ roomNumber: "201" });
   });
 });

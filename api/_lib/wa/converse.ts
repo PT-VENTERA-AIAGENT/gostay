@@ -18,7 +18,7 @@
 // a thin shell. Provisioning is deferred to the "YA" step and FAILS CLOSED: if
 // the guest cannot be provisioned, no booking is written.
 
-import { extractBookingIntent, detectRoomServiceIntent, type BookingSlots } from "./ai";
+import { extractBookingIntent, detectRoomServiceIntent, detectRoomNumberQuery, type BookingSlots, type RoomNumberQuery } from "./ai";
 import { getPending, setPending, clearPending } from "./pending";
 import {
   getInhouseStay,
@@ -31,6 +31,8 @@ import {
   findRoomType,
   listRoomTypes,
   getAvailableRoomsSrv,
+  getRoomByNumberSrv,
+  getRoomConflictSrv,
   computeTotal,
   createWaBooking,
   getTenantName,
@@ -234,6 +236,17 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     if (!pending && detectRoomServiceIntent(trimmed)) {
       await startRoomService(msg, reply, guest, brand);
       return;
+    }
+
+    // ── 1e. "Is room 201 available?" — a specific room-number question ───────
+    // Answered from live bookings so the guest gets the true booked/free status
+    // of that exact room. Only when nothing else is mid-flow.
+    if (!pending) {
+      const roomQuery = detectRoomNumberQuery(trimmed);
+      if (roomQuery) {
+        await answerRoomNumberQuery(msg, roomQuery, reply, brand);
+        return;
+      }
     }
 
     // ── 2. Understand the message ───────────────────────────────────────────
@@ -492,6 +505,64 @@ async function confirmBooking(
       `langkah pembayaran melalui chat ini sebentar lagi. Sampai jumpa di *${brand}*!` +
       portal,
   );
+}
+
+/** Add whole days to a YYYY-MM-DD date (UTC midnight, DST-safe). */
+function addDaysIso(iso: string, days: number): string {
+  const t = new Date(iso + "T00:00:00Z").getTime() + days * 24 * 60 * 60 * 1000;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+/**
+ * Answer a "kamar 201 available?" question from live booking data.
+ *
+ * Uses the guest's dates when given, else checks today (a single night). Reports
+ * only booked/free for that window — never the occupying guest or their dates,
+ * matching the availability RPC's privacy stance. Booking itself stays by room
+ * TYPE, so a free room is steered back into the normal booking flow.
+ */
+async function answerRoomNumberQuery(
+  msg: GuestMessage,
+  q: RoomNumberQuery,
+  reply: (body: string) => Promise<unknown>,
+  brand: string,
+): Promise<void> {
+  const { tenantId } = msg;
+
+  const room = await getRoomByNumberSrv(tenantId, q.roomNumber);
+  if (!room) {
+    await reply(
+      `Mohon maaf, kami tidak menemukan kamar nomor *${q.roomNumber}* di *${brand}*. ` +
+        "Silakan sebutkan tanggal menginap, jumlah tamu, dan tipe kamar — kami bantu carikan yang tersedia.",
+    );
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const checkIn = q.checkIn ?? today;
+  // No explicit checkout → treat as a single night from the check-in date.
+  let checkOut = q.checkOut ?? addDaysIso(checkIn, 1);
+  if (!(checkOut > checkIn)) checkOut = addDaysIso(checkIn, 1);
+
+  const forWhen = q.checkIn
+    ? q.checkOut
+      ? `untuk ${checkIn} s/d ${checkOut}`
+      : `untuk ${checkIn}`
+    : "hari ini";
+  const typeLabel = room.typeName ? ` (${room.typeName})` : "";
+
+  const conflict = await getRoomConflictSrv(tenantId, room.id, checkIn, checkOut);
+  if (conflict) {
+    await reply(
+      `Kamar *${room.number}*${typeLabel} sedang *terpesan* ${forWhen}. ` +
+        "Mau kami carikan kamar lain yang kosong, atau coba tanggal lain?",
+    );
+  } else {
+    await reply(
+      `Kamar *${room.number}*${typeLabel} *masih tersedia* ${forWhen}. ✅\n\n` +
+        "Untuk memesan, kirim tanggal menginap, jumlah tamu, dan atas nama siapa — nanti kami siapkan.",
+    );
+  }
 }
 
 // ─── Room service ──────────────────────────────────────────────────────────────

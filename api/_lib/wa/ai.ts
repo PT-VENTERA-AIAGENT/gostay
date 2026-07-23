@@ -135,6 +135,44 @@ export function detectRoomServiceIntent(text: string): boolean {
   return ROOM_SERVICE_HINTS.some((h) => lower.includes(h));
 }
 
+// ── Specific-room availability question (deterministic, no model) ───────────────
+
+// Words that mark the guest ASKING about a room's status, so a bare "kamar 201"
+// inside a booking request ("kamar 201 atas nama Budi") doesn't trip this.
+const AVAILABILITY_HINTS = [
+  "tersedia", "available", "kosong", "booked", "dibook", "di book", "terbook",
+  "terisi", "dipesan", "sudah ada yang", "udah dibook", "udah di book",
+  "ready", "free", "status", "occupied", "penuh", "bisa dipesan", "masih ada",
+];
+
+export interface RoomNumberQuery {
+  roomNumber: string;
+  checkIn: string | null;
+  checkOut: string | null;
+}
+
+/**
+ * Detect a question about a SPECIFIC room number, e.g. "apakah kamar 201
+ * tersedia?", "no 12 kosong tanggal 25?". Returns the room number plus any dates
+ * the guest mentioned, or null when the message isn't such a question.
+ *
+ * Deterministic and synchronous. Guards against false positives from the normal
+ * booking flow: the digits must attach to a room word (kamar/no/nomor/room/unit)
+ * and NOT be a guest count / night count ("kamar 2 orang", "2 malam"), and the
+ * message must carry an availability cue or a question mark.
+ */
+export function detectRoomNumberQuery(text: string): RoomNumberQuery | null {
+  const lower = (text ?? "").toLowerCase();
+  const m = lower.match(
+    /(?:kamar|kmr|nomor|no\.?|room|unit)\s*#?\s*(\d{1,4})(?!\s*(?:orang|tamu|pax|malam|hari|night|nights|dewasa|org|guest|guests|bulan|jam|ribu|rb|k\b))/,
+  );
+  if (!m) return null;
+  const hasCue = lower.includes("?") || AVAILABILITY_HINTS.some((h) => lower.includes(h));
+  if (!hasCue) return null;
+  const { check_in, check_out } = extractDates(lower);
+  return { roomNumber: m[1], checkIn: check_in, checkOut: check_out };
+}
+
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
 function systemPrompt(known: BookingSlots): string {

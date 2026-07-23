@@ -161,6 +161,63 @@ export async function getAvailableRoomsSrv(
   return rooms.filter((r) => !busy.has(r.id));
 }
 
+// ─── Specific room lookup (per-number availability question) ────────────────────
+
+export interface RoomByNumber {
+  id: string;
+  number: string;
+  typeName: string | null;
+}
+
+/**
+ * Find one room by its number within a tenant (e.g. the guest asked "kamar 201").
+ * Returns the room's id, number and its room-type name, or null when the hotel
+ * has no such room. tenant_id is explicit — the service role sees every hotel.
+ */
+export async function getRoomByNumberSrv(
+  tenantId: string,
+  roomNumber: string,
+): Promise<RoomByNumber | null> {
+  const res = await serviceGet(
+    `rooms?tenant_id=eq.${encodeURIComponent(tenantId)}` +
+      `&number=eq.${encodeURIComponent(roomNumber)}` +
+      `&select=id,number,room_types(name)&limit=1`,
+  );
+  if (!res.ok) throw new Error(`wa_room_by_number_failed_${res.status}`);
+  const rows = (await res.json()) as Array<{
+    id: string; number: string; room_types?: { name?: string } | null;
+  }>;
+  const r = rows[0];
+  if (!r) return null;
+  return { id: r.id, number: r.number, typeName: r.room_types?.name ?? null };
+}
+
+/**
+ * The active booking that occupies a specific room over [checkIn, checkOut), or
+ * null when the room is free for that window. Same half-open overlap + held-by
+ * pending/confirmed/checked_in rule as getAvailableRoomsSrv. Returns only the
+ * window/status, never who — the same privacy stance as the availability RPC.
+ */
+export async function getRoomConflictSrv(
+  tenantId: string,
+  roomId: string,
+  checkIn: string,
+  checkOut: string,
+): Promise<{ check_in: string; check_out: string; status: string } | null> {
+  if (!(new Date(checkOut).getTime() > new Date(checkIn).getTime())) return null;
+  const res = await serviceGet(
+    `bookings?tenant_id=eq.${encodeURIComponent(tenantId)}` +
+      `&room_id=eq.${encodeURIComponent(roomId)}` +
+      `&status=in.(pending,confirmed,checked_in)` +
+      `&check_in=lt.${encodeURIComponent(checkOut)}` +
+      `&check_out=gt.${encodeURIComponent(checkIn)}` +
+      `&select=check_in,check_out,status&order=check_in.asc&limit=1`,
+  );
+  if (!res.ok) throw new Error(`wa_room_conflict_failed_${res.status}`);
+  const rows = (await res.json()) as Array<{ check_in: string; check_out: string; status: string }>;
+  return rows[0] ?? null;
+}
+
 // ─── Pricing ───────────────────────────────────────────────────────────────────
 
 /**
