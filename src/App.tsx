@@ -18,6 +18,7 @@ import Index from "./pages/Index";
 import Bookings from "./pages/Bookings";
 import BookingDetail from "./pages/BookingDetail";
 import Pos from "./pages/Pos";
+import Saldo from "./pages/Saldo";
 import NewBooking from "./pages/NewBooking";
 import Rooms from "./pages/Rooms";
 import RoomTypes from "./pages/RoomTypes";
@@ -31,6 +32,7 @@ import UserManagement from "./pages/UserManagement";
 import AddHotel from "./pages/admin/AddHotel";
 import CreateHotel from "./pages/CreateHotel";
 import LeadList from "./pages/admin/LeadList";
+import PaymentControl from "./pages/admin/PaymentControl";
 import LeadDetail from "./pages/admin/LeadDetail";
 import CampaignsPage from "./pages/admin/Campaigns";
 import CRM from "./pages/CRM";
@@ -160,6 +162,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/admin/payments"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <PaymentControl />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/admin/leads/:id"
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
@@ -196,6 +206,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "staff"]}>
                     <CRM />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/saldo"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <Saldo />
                   </ProtectedRoute>
                 }
               />

@@ -129,9 +129,9 @@ export default function Chat() {
                   onClick={() => selectThread(thread.id)}
                   className={cn("w-full text-left px-4 py-3 border-b border-border hover:bg-muted/50 transition-colors", selectedThreadId === thread.id && "bg-muted")}
                 >
-                  <div className="flex items-start justify-between mb-1">
-                    <span className="text-sm font-semibold text-foreground">{thread.customers?.full_name}</span>
-                    <span className="text-xs text-muted-foreground">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span className="text-sm font-semibold text-foreground truncate min-w-0" title={thread.customers?.full_name ?? undefined}>{thread.customers?.full_name}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">
                       {thread.last_message ? new Date(thread.last_message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                     </span>
                   </div>
@@ -157,15 +157,15 @@ export default function Chat() {
           ) : (
             <>
               <div className="px-4 md:px-6 py-3 border-b border-border bg-card flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <button className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted" onClick={() => setShowChat(false)}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <button className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted shrink-0" onClick={() => setShowChat(false)}>
                     <ArrowLeft className="w-4 h-4" />
                   </button>
-                  <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                     <User className="w-4 h-4 text-primary" />
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{selectedThread.customers?.full_name}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate" title={selectedThread.customers?.full_name ?? undefined}>{selectedThread.customers?.full_name}</p>
                     <p className="text-xs text-muted-foreground capitalize">{selectedThread.status}</p>
                   </div>
                 </div>
@@ -257,11 +257,13 @@ export default function Chat() {
 
         {/* Guest info sidebar */}
         {selectedThread && (
-          <div className="w-64 border-l border-border bg-card p-4 shrink-0 hidden xl:block">
+          <div className="w-64 border-l border-border bg-card p-4 shrink-0 hidden xl:block overflow-y-auto">
             <div className="text-center mb-4">
               <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-2"><User className="w-7 h-7 text-primary" /></div>
-              <p className="font-semibold text-foreground">{selectedThread.customers?.full_name}</p>
-              <p className="text-xs text-muted-foreground">{selectedThread.customers?.email}</p>
+              <p className="font-semibold text-foreground break-words" title={selectedThread.customers?.full_name ?? undefined}>{selectedThread.customers?.full_name}</p>
+              {selectedThread.customers?.email && (
+                <p className="text-xs text-muted-foreground break-all mt-0.5" title={selectedThread.customers.email}>{selectedThread.customers.email}</p>
+              )}
             </div>
             <div className="space-y-3 text-sm">
               <div><span className="text-muted-foreground text-xs">{t("Status")}</span><p className="font-medium text-foreground capitalize">{selectedThread.status}</p></div>

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
   CalendarDays, DollarSign, Star,
-  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store, Building2, Target
+  Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store, Building2, Target, Wallet, CreditCard
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ const navItems = [
   { icon: Store, label: "Kasir (POS)", path: "/pos" },
   { icon: CalendarDays, label: "Kalender", path: "/bookings?view=calendar" },
   { icon: DollarSign, label: "Keuangan", path: "/analytics" },
+  { icon: Wallet, label: "Saldo", path: "/saldo" },
 ];
 
 const bottomItems = [
@@ -36,6 +37,7 @@ const bottomItems = [
 
 const adminItems = [
   { icon: Target, label: "Lead Gen", path: "/admin/leads" },
+  { icon: CreditCard, label: "Kontrol Pembayaran", path: "/admin/payments" },
 ];
 
 export default function AppSidebar() {
@@ -90,8 +92,11 @@ export default function AppSidebar() {
     <motion.aside
       animate={{ width: collapsed ? 64 : 224 }}
       transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-      className="hidden md:flex flex-col sticky top-0 h-screen self-start bg-card border-r border-sidebar-border px-2 py-6 shrink-0 overflow-y-auto"
+      className="hidden md:flex flex-col sticky top-0 h-screen self-start bg-card border-r border-sidebar-border px-2 py-6 shrink-0"
     >
+      {/* Inner scroll container so the collapse toggle (which sticks out past the
+          aside's right edge) is never clipped by the scroll area's overflow. */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
       <div className={cn("flex items-center gap-2 px-2 mb-8", collapsed && "justify-center")}>
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden">
           {tenant?.logo_url ? (
@@ -227,11 +232,14 @@ export default function AppSidebar() {
           ))}
         </div>
       )}
+      </div>
 
       {/* Collapse toggle */}
       <button
         onClick={toggleCollapsed}
-        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors shadow-sm z-10"
+        title={collapsed ? t("Perluas sidebar") : t("Ciutkan sidebar")}
+        aria-label={collapsed ? t("Perluas sidebar") : t("Ciutkan sidebar")}
+        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shadow-sm z-20"
       >
         {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
       </button>
