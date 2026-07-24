@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { Wallet, Search, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Wallet, Loader2 } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { tr } from "@/lib/i18n";
 import { usePlatformBalances } from "@/hooks/usePlatform";
-
-function formatIDR(n: number) { return "Rp" + Math.round(n).toLocaleString("id-ID"); }
+import { PageHeader, StatCard, Table, Th, Td, EmptyState, SearchBox, formatIDR } from "@/components/platform/widgets";
 
 export default function PlatformBalances() {
   const { data: rows = [], isLoading } = usePlatformBalances();
@@ -26,69 +26,52 @@ export default function PlatformBalances() {
 
   return (
     <PageTransition>
-      <div className="p-4 md:p-6">
-        <div className="mb-5">
-          <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-primary" /> {tr("Saldo Semua Hotel")}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {tr("Saldo berjalan tiap hotel dan penarikan yang masih menunggu diproses.")}
-          </p>
+      <PageHeader
+        icon={<Wallet className="w-5 h-5" />}
+        title={tr("Saldo Semua Hotel")}
+        description={tr("Saldo berjalan tiap hotel dan penarikan yang masih menunggu diproses.")}
+        action={<SearchBox value={q} onChange={setQ} placeholder={tr("Cari hotel...")} />}
+      />
+
+      <div className="p-4 md:p-6 space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+          <StatCard label={tr("Total saldo hotel")} value={formatIDR(totals.balance)} />
+          <StatCard label={tr("Menunggu penarikan")} value={formatIDR(totals.pending)} />
+          <StatCard label={tr("Total masuk (akumulatif)")} value={formatIDR(totals.lifetime)} />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-          {[
-            { label: tr("Total saldo hotel"), value: totals.balance },
-            { label: tr("Menunggu penarikan"), value: totals.pending },
-            { label: tr("Total masuk (akumulatif)"), value: totals.lifetime },
-          ].map((c) => (
-            <div key={c.label} className="bg-card rounded-xl border border-border p-4">
-              <p className="text-xs text-muted-foreground">{c.label}</p>
-              <p className="text-lg font-bold text-foreground mt-1">{formatIDR(c.value)}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 max-w-sm mb-4">
-          <Search className="w-4 h-4 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Cari hotel...")}
-            className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
-        </div>
-
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-            ) : visible.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-16">{tr("Tidak ada hotel")}</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                    <th className="px-4 py-3 font-medium">{tr("Hotel")}</th>
-                    <th className="px-4 py-3 font-medium text-right">{tr("Saldo")}</th>
-                    <th className="px-4 py-3 font-medium text-right">{tr("Menunggu penarikan")}</th>
-                    <th className="px-4 py-3 font-medium text-right">{tr("Total masuk")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((r) => (
-                    <tr key={r.tenant_id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 font-medium text-foreground">{r.hotel}</td>
-                      <td className="px-4 py-3 text-right text-foreground whitespace-nowrap">{formatIDR(r.balance)}</td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        {r.pending_payout > 0
-                          ? <span className="text-warning font-medium">{formatIDR(r.pending_payout)}</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground whitespace-nowrap">{formatIDR(r.lifetime_in)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : visible.length === 0 ? (
+          <EmptyState message={tr("Tidak ada hotel")} />
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <Th>{tr("Hotel")}</Th>
+                <Th className="text-right">{tr("Saldo")}</Th>
+                <Th className="text-right">{tr("Menunggu penarikan")}</Th>
+                <Th className="text-right">{tr("Total masuk")}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((r) => (
+                <tr key={r.tenant_id} className="hover:bg-muted/30">
+                  <Td>
+                    <Link to={`/platform/hotels/${r.tenant_id}`} className="font-medium text-foreground hover:text-primary">{r.hotel}</Link>
+                  </Td>
+                  <Td className="text-right tabular-nums">{formatIDR(r.balance)}</Td>
+                  <Td className="text-right">
+                    {r.pending_payout > 0
+                      ? <span className="text-warning font-medium">{formatIDR(r.pending_payout)}</span>
+                      : <span className="text-muted-foreground">—</span>}
+                  </Td>
+                  <Td className="text-right text-muted-foreground tabular-nums">{formatIDR(r.lifetime_in)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
       </div>
     </PageTransition>
   );

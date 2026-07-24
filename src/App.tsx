@@ -35,6 +35,7 @@ import LeadList from "./pages/admin/LeadList";
 import PlatformLayout from "./components/layout/PlatformLayout";
 import PlatformOverview from "./pages/platform/Overview";
 import PlatformHotels from "./pages/platform/Hotels";
+import PlatformHotelDetail from "./pages/platform/HotelDetail";
 import PlatformRoomAvailability from "./pages/platform/RoomAvailability";
 import PlatformReservations from "./pages/platform/Reservations";
 import PlatformGuestRequests from "./pages/platform/GuestRequests";
@@ -215,6 +216,7 @@ const App = () => (
             >
               <Route path="/platform" element={<PlatformOverview />} />
               <Route path="/platform/hotels" element={<PlatformHotels />} />
+              <Route path="/platform/hotels/:id" element={<PlatformHotelDetail />} />
               <Route path="/platform/rooms" element={<PlatformRoomAvailability />} />
               <Route path="/platform/reservations" element={<PlatformReservations />} />
               <Route path="/platform/calendar" element={<PlatformCalendar />} />
