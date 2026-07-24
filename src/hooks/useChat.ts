@@ -12,6 +12,7 @@ import {
   getMessages,
   sendMessage,
   markMessagesRead,
+  resetWaChat,
   subscribeToThread,
   subscribeToThreadList,
   unsubscribeChannel,
@@ -110,6 +111,12 @@ export function useUpdateThreadStatus() {
     }) => updateThreadStatus(id, status),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ["chat", "threads"] }),
+  });
+}
+
+export function useResetWaChat() {
+  return useMutation({
+    mutationFn: (threadId: string) => resetWaChat(threadId),
   });
 }
 

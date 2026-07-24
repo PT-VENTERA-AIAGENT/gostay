@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getSession } from "@/lib/sso";
 import type {
   ChatThread,
   ChatThreadInsert,
@@ -211,6 +212,35 @@ export async function markMessagesRead(threadId: string, userId: string): Promis
     .neq("sender_id", userId)
     .eq("is_read", false);
   if (error) throw error;
+}
+
+/**
+ * Clears the WhatsApp automation state for a staff-selected conversation.
+ * The server keeps the authorization and tenant checks; the browser only
+ * supplies the thread id, so a staff member cannot reset another hotel's
+ * number by editing a phone number in devtools.
+ */
+export async function resetWaChat(threadId: string): Promise<{ phoneJids: string[]; resetCount: number }> {
+  const token = getSession()?.supabase_token;
+  const response = await fetch("/api/wa/reset-chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ threadId }),
+  });
+
+  const body = (await response.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    phoneJids?: string[];
+    resetCount?: number;
+  };
+  if (!response.ok || body.ok !== true) {
+    throw new Error(body.error ?? `Server membalas ${response.status}.`);
+  }
+  return { phoneJids: body.phoneJids ?? [], resetCount: body.resetCount ?? 0 };
 }
 
 // ─── Realtime ─────────────────────────────────────────────────────────────────

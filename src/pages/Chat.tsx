@@ -5,7 +5,7 @@ import { Search, Send, Paperclip, CheckCheck, MoreVertical, Phone, User, ArrowLe
 import { motion } from "framer-motion";
 import PageTransition, { staggerItem } from "@/components/shared/PageTransition";
 import { ChatAttachment } from "@/components/shared/ChatAttachment";
-import { useChatThreads, useChatMessages, useSendMessage, useMarkMessagesRead, useUpdateThreadStatus } from "@/hooks/useChat";
+import { useChatThreads, useChatMessages, useSendMessage, useMarkMessagesRead, useUpdateThreadStatus, useResetWaChat } from "@/hooks/useChat";
 import { uploadChatAttachment } from "@/services/chatService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,7 @@ export default function Chat() {
   const sendMessage = useSendMessage();
   const markRead = useMarkMessagesRead();
   const updateStatus = useUpdateThreadStatus();
+  const resetWaChat = useResetWaChat();
 
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
 
@@ -98,6 +99,26 @@ export default function Chat() {
     updateStatus.mutate({
       id: selectedThread.id,
       status: selectedThread.status === "active" ? "resolved" : "active",
+    });
+  }
+
+  function resetChat() {
+    if (!selectedThread || resetWaChat.isPending) return;
+    if (!window.confirm("Reset chat ini? Cooldown dan state booking sementara akan dihapus. Riwayat chat, tamu, dan booking tetap aman.")) return;
+    resetWaChat.mutate(selectedThread.id, {
+      onSuccess: ({ resetCount }) => {
+        toast({
+          title: tr("Chat berhasil direset"),
+          description: resetCount > 0
+            ? tr("Nomor ini bisa menerima balasan otomatis lagi sekarang.")
+            : tr("State chat direset; nomor WhatsApp belum terhubung ke identitas tamu."),
+        });
+      },
+      onError: (error) => toast({
+        title: tr("Gagal mereset chat"),
+        description: error instanceof Error ? error.message : tr("Terjadi kesalahan. Coba lagi."),
+        variant: "destructive",
+      }),
     });
   }
 
@@ -182,6 +203,9 @@ export default function Chat() {
                           ? <><CheckCircle className="w-4 h-4 mr-2" /> Tandai selesai</>
                           : <><RotateCcw className="w-4 h-4 mr-2" /> Buka lagi</>}
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={resetChat} disabled={resetWaChat.isPending}>
+                        <RotateCcw className="w-4 h-4 mr-2" /> Reset chat
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -263,6 +287,14 @@ export default function Chat() {
             </div>
             <button onClick={toggleThreadStatus} className="w-full mt-4 px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
               {selectedThread.status === "resolved" ? t("Reopen Thread") : t("Resolve Thread")}
+            </button>
+            <button
+              onClick={resetChat}
+              disabled={resetWaChat.isPending}
+              className="w-full mt-2 px-3 py-2 rounded-lg border border-primary/30 text-sm font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {resetWaChat.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+              Reset Chat
             </button>
           </div>
         )}
