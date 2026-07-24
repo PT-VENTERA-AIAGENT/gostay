@@ -64,7 +64,7 @@ export function PromoPopup() {
     const msg = encodeURIComponent(
       "Halo, saya mau tanya soal sistem booking hotel GoStay.",
     );
-    window.open(`https://wa.me/6281318000263?text=${msg}`, "_blank");
+    window.open(`https://wa.me/628138053323?text=${msg}`, "_blank");
     handleClose();
   };
 

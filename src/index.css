@@ -1,4 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* Rubik powers the marketing landing headings only (font-display). It is a free
+   geometric sans with softly rounded corners and weights up to 900 — the closest
+   Google Fonts match to All Around Gothic. Plus Jakarta Sans keeps body/UI. */
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
