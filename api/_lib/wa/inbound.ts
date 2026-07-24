@@ -51,6 +51,8 @@ export interface ParsedMessage {
   fromMe: boolean;
   /** The sender's WhatsApp display name (pushName), when the gateway sends it. */
   pushName?: string;
+  /** Gateway category; `peer` messages are device-sync protocol traffic. */
+  category?: string;
   /**
    * When WhatsApp says the message was sent, in epoch milliseconds. Undefined
    * when the gateway omits it. Drives the history-sync guard (see shouldAutoReply):
@@ -72,6 +74,8 @@ interface WAMessageKey {
 interface WAMessage {
   key?: WAMessageKey;
   pushName?: string;
+  category?: string;
+  messageStubType?: number;
   /** Baileys sends epoch SECONDS — as a number, a numeric string, or a Long. */
   messageTimestamp?: number | string | { low?: number };
   message?: {
@@ -145,10 +149,27 @@ export function parseMessages(body: unknown): ParsedMessage[] {
       text,
       fromMe: key.fromMe === true,
       pushName: typeof m?.pushName === "string" ? m.pushName : undefined,
+      category: typeof m?.category === "string" ? m.category : undefined,
       timestamp: toEpochMs(m?.messageTimestamp),
       raw: m,
     };
   });
+}
+
+/**
+ * Only text messages from a real chat can start a booking conversation.
+ *
+ * Baileys may emit placeholder/decryption stubs (`messageStubType` with no
+ * `message`) and peer-device protocol traffic with `fromMe: false`. If these
+ * pass through, guest provisioning creates empty CRM threads (often one for
+ * the guest and another for the bot number) even though no guest text exists.
+ * We leave those events to the gateway's retry mechanism and wait for the real
+ * message payload instead.
+ */
+export function isReplyableMessage(
+  msg: Pick<ParsedMessage, "text" | "category">,
+): boolean {
+  return msg.category !== "peer" && msg.text.trim().length > 0;
 }
 
 // ─── History-sync guard ──────────────────────────────────────────────────────

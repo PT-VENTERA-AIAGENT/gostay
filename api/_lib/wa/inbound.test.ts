@@ -12,6 +12,7 @@ import {
   shouldAutoReply,
   checkReplyRateLimit,
   checkGreetCooldown,
+  isReplyableMessage,
 } from "./inbound";
 
 const SECRET = "wa-webhook-secret-value-1234567890";
@@ -208,6 +209,26 @@ describe("parseMessages", () => {
       messages: [{ key: { remoteJid: "628a@s.whatsapp.net", id: "MID1" } }],
     });
     expect(parsed[0].timestamp).toBeUndefined();
+  });
+
+  it("does not treat placeholder or peer events as guest messages", () => {
+    const parsed = parseMessages({
+      messages: [
+        {
+          key: { remoteJid: "194368828919899@lid", id: "STUB1" },
+          pushName: "alvin",
+          messageStubType: 2,
+        },
+        {
+          key: { remoteJid: "6285194994005@s.whatsapp.net", id: "PEER1" },
+          category: "peer",
+          message: { protocolMessage: { type: 4 } },
+        },
+      ],
+    });
+
+    expect(isReplyableMessage(parsed[0])).toBe(false);
+    expect(isReplyableMessage(parsed[1])).toBe(false);
   });
 });
 

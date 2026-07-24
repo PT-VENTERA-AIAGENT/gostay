@@ -18,6 +18,7 @@ import {
   sessionIdOf,
   receivedAtOf,
   isDirectChat,
+  isReplyableMessage,
   shouldAutoReply,
   checkReplyRateLimit,
 } from "../_lib/wa/inbound";
@@ -65,6 +66,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (msg.fromMe) continue;
       // A message with no id or sender is unusable (and cannot be deduped).
       if (!msg.waMessageId || !msg.phoneJid) continue;
+      // Ignore peer/protocol and placeholder events. They have no guest text;
+      // provisioning them would create empty conversations in the inbox.
+      if (!isReplyableMessage(msg)) continue;
       // Only ever answer one-to-one guest chats. Group/broadcast/channel JIDs
       // are dropped here — answering them spams every member ("kok spam grup").
       // Dropped before recordInbound so group traffic leaves no inbound rows.
