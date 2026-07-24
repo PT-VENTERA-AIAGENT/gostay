@@ -2,37 +2,37 @@
 import { describe, it, expect } from "vitest";
 import { feeSplit, round2 } from "./fee";
 
-describe("feeSplit — Ventera 5% platform fee on hotel reservation income", () => {
-  it("splits a round Rp 1.000.000 reservation into 5% fee / 95% net", () => {
-    const s = feeSplit(1_000_000, 500);
+describe("feeSplit — Ventera 7% platform fee on hotel reservation income", () => {
+  it("splits a round Rp 1.000.000 reservation into 7% fee / 93% net", () => {
+    const s = feeSplit(1_000_000, 700);
     expect(s.gross).toBe(1_000_000);
-    expect(s.fee).toBe(50_000);   // 5%
-    expect(s.net).toBe(950_000);  // 95% → credited to the hotel
+    expect(s.fee).toBe(70_000);   // 7%
+    expect(s.net).toBe(930_000);  // 93% → credited to the hotel
     expect(s.fee + s.net).toBe(s.gross); // conservation: no cent lost
   });
 
-  it("defaults to 5% when no rate is given", () => {
-    expect(feeSplit(2_000_000)).toEqual({ gross: 2_000_000, fee: 100_000, net: 1_900_000, feeBps: 500 });
+  it("defaults to 7% when no rate is given", () => {
+    expect(feeSplit(2_000_000)).toEqual({ gross: 2_000_000, fee: 140_000, net: 1_860_000, feeBps: 700 });
   });
 
   it.each([
-    [500_000, 25_000, 475_000],
-    [750_000, 37_500, 712_500],
-    [1_250_000, 62_500, 1_187_500],
-    [349_999, 17_499.95, 332_499.05],
-    [1, 0.05, 0.95],
+    [500_000, 35_000, 465_000],
+    [750_000, 52_500, 697_500],
+    [1_250_000, 87_500, 1_162_500],
+    [349_999, 24_499.93, 325_499.07],
+    [1, 0.07, 0.93],
   ])("gross %d → fee %d, net %d (and fee+net === gross)", (gross, fee, net) => {
-    const s = feeSplit(gross, 500);
+    const s = feeSplit(gross, 700);
     expect(s.fee).toBe(fee);
     expect(s.net).toBe(net);
     expect(round2(s.fee + s.net)).toBe(gross);
   });
 
   it("never lets rounding create or destroy money (net is derived from fee)", () => {
-    // 333.333 * 5% = 16.66665 → fee rounds to 16.67, so net must be 333.33 - 16.67
-    const s = feeSplit(333.33, 500);
-    expect(s.fee).toBe(16.67);
-    expect(s.net).toBe(316.66);
+    // 333.33 * 7% = 23.3331 → fee rounds to 23.33, so net must be 333.33 - 23.33
+    const s = feeSplit(333.33, 700);
+    expect(s.fee).toBe(23.33);
+    expect(s.net).toBe(310.00);
     expect(round2(s.fee + s.net)).toBe(333.33);
   });
 
@@ -50,20 +50,20 @@ describe("feeSplit — Ventera 5% platform fee on hotel reservation income", () 
     const reservations = [1_000_000, 500_000, 750_000, 2_400_000, 320_000];
     const totals = reservations.reduce(
       (acc, amt) => {
-        const s = feeSplit(amt, 500);
+        const s = feeSplit(amt, 700);
         return { gross: acc.gross + s.gross, fee: acc.fee + s.fee, net: acc.net + s.net };
       },
       { gross: 0, fee: 0, net: 0 },
     );
     expect(totals.gross).toBe(4_970_000);
-    expect(totals.fee).toBe(248_500);   // 5% of 4.97M
-    expect(totals.net).toBe(4_721_500); // what the hotel can withdraw
+    expect(totals.fee).toBe(347_900);   // 7% of 4.97M
+    expect(totals.net).toBe(4_622_100); // what the hotel can withdraw
     expect(totals.fee + totals.net).toBe(totals.gross);
   });
 
   it("rejects invalid input", () => {
-    expect(() => feeSplit(-1, 500)).toThrow();
-    expect(() => feeSplit(NaN, 500)).toThrow();
+    expect(() => feeSplit(-1, 700)).toThrow();
+    expect(() => feeSplit(NaN, 700)).toThrow();
     expect(() => feeSplit(1000, -1)).toThrow();
     expect(() => feeSplit(1000, 10001)).toThrow();
     expect(() => feeSplit(1000, 5.5)).toThrow();

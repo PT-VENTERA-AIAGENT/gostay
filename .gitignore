@@ -29,6 +29,9 @@ coverage
 playwright-report
 test-results
 blob-report
+e2e/report
+e2e/__artifacts__
+e2e/__fixtures__
 
 # Deploy
 .vercel
