@@ -97,6 +97,25 @@ describe("handleGuestMessage — intent routing", () => {
     expect(booking.findRoomType).not.toHaveBeenCalled();
   });
 
+  it("sends a LID guest reply to its PN alternate", async () => {
+    ai.extractBookingIntent.mockResolvedValue({
+      intent: "chat", check_in: null, check_out: null, guests: null, room_type_hint: null, confidence: 0.9,
+    });
+
+    await handleGuestMessage({
+      ...BASE,
+      phoneJid: "68917397594209@lid",
+      replyJid: "6285641504066@s.whatsapp.net",
+      text: "halo",
+    });
+
+    expect(send.sendText).toHaveBeenCalledWith(
+      BASE.sessionId,
+      "6285641504066@s.whatsapp.net",
+      expect.any(String),
+    );
+  });
+
   it("stays SILENT for a non-greeting, non-booking message (anti-loop)", async () => {
     ai.extractBookingIntent.mockResolvedValue({
       intent: "chat", check_in: null, check_out: null, guests: null, room_type_hint: null, confidence: 0.9,

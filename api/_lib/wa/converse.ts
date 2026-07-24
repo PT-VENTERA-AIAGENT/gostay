@@ -51,6 +51,8 @@ export interface GuestMessage {
   tenantId: string;
   sessionId: string;
   phoneJid: string;
+  /** PN alternate for outbound delivery when phoneJid is a WhatsApp LID. */
+  replyJid?: string;
   text: string;
   displayName?: string;
 }
@@ -148,9 +150,22 @@ function knownFromPending(
  * webhook can always 200 the gateway.
  */
 export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
-  const { tenantId, sessionId, phoneJid, text, displayName } = msg;
+  const { tenantId, sessionId, phoneJid, replyJid, text, displayName } = msg;
+  const outboundJid = replyJid ?? phoneJid;
+  const deliver = async (body: string) => {
+    const result = await sendText(sessionId, outboundJid, body);
+    if (!result.ok) {
+      console.error("[wa/converse] outbound reply failed:", {
+        sessionId,
+        guestJid: phoneJid,
+        outboundJid,
+        error: result.error,
+      });
+    }
+    return result;
+  };
   // Before we have a thread, replies go out unlogged (e.g. provisioning failed).
-  const rawReply = (body: string) => sendText(sessionId, phoneJid, body);
+  const rawReply = (body: string) => deliver(body);
 
   try {
     const trimmed = (text ?? "").trim();
@@ -184,7 +199,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     await logMessage(tenantId, threadId, guest.profileId, trimmed, true); // inbound
     const reply = async (body: string) => {
       await logMessage(tenantId, threadId, botId, body, false); // outbound
-      return sendText(sessionId, phoneJid, body);
+      return deliver(body);
     };
 
     const word = trimmed.toLowerCase();

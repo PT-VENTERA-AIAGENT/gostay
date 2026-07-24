@@ -153,6 +153,26 @@ describe("parseMessages", () => {
     });
   });
 
+  it("keeps the LID for identity but exposes remoteJidAlt for replies", () => {
+    const parsed = parseMessages({
+      messages: [
+        {
+          key: {
+            remoteJid: "68917397594209@lid",
+            remoteJidAlt: "6285641504066@s.whatsapp.net",
+            id: "LID1",
+          },
+          message: { conversation: "halo" },
+        },
+      ],
+    });
+
+    expect(parsed[0]).toMatchObject({
+      phoneJid: "68917397594209@lid",
+      replyJid: "6285641504066@s.whatsapp.net",
+    });
+  });
+
   it("extracts text from extendedTextMessage", () => {
     expect(parseMessages(body)[1].text).toBe("kamar deluxe");
   });

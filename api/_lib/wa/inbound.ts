@@ -39,6 +39,12 @@ export interface ParsedMessage {
   waMessageId: string;
   /** Sender JID, e.g. "628123...@s.whatsapp.net". Empty when absent. */
   phoneJid: string;
+  /**
+   * JID to use for outbound replies when the inbound chat is LID-addressed.
+   * WhatsApp includes the sender's phone-number JID as `remoteJidAlt`; keep
+   * the LID as the stable guest identity but send to this PN when available.
+   */
+  replyJid?: string;
   /** Extracted text; "" for non-text or empty messages. */
   text: string;
   /** True for our own outbound echo — callers MUST skip these (feedback loop). */
@@ -58,6 +64,7 @@ export interface ParsedMessage {
 
 interface WAMessageKey {
   remoteJid?: string;
+  remoteJidAlt?: string;
   fromMe?: boolean;
   id?: string;
 }
@@ -122,11 +129,19 @@ export function parseMessages(body: unknown): ParsedMessage[] {
 
   return messages.map((m) => {
     const key = m?.key ?? {};
+    const phoneJid = typeof key.remoteJid === "string" ? key.remoteJid : "";
+    const alternateJid = typeof key.remoteJidAlt === "string" ? key.remoteJidAlt : "";
     const text =
       m?.message?.conversation ?? m?.message?.extendedTextMessage?.text ?? "";
     return {
       waMessageId: typeof key.id === "string" ? key.id : "",
-      phoneJid: typeof key.remoteJid === "string" ? key.remoteJid : "",
+      phoneJid,
+      // LID is ideal for identity/session state, but the PN alternate is the
+      // most interoperable target for Baileys' outbound send API.
+      replyJid:
+        phoneJid.toLowerCase().endsWith("@lid") && isDirectChat(alternateJid)
+          ? alternateJid
+          : undefined,
       text,
       fromMe: key.fromMe === true,
       pushName: typeof m?.pushName === "string" ? m.pushName : undefined,

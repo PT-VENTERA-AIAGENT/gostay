@@ -103,6 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         tenantId,
         sessionId,
         phoneJid: msg.phoneJid,
+        replyJid: msg.replyJid,
         text: msg.text,
         displayName: msg.pushName,
       });
