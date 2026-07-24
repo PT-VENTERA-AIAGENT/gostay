@@ -37,10 +37,18 @@ export async function getOrCreateBotProfile(tenantId: string): Promise<string> {
   return id;
 }
 
-/** Reuse the customer's newest active thread, else open one. */
+/**
+ * Reuse the customer's newest active thread IN THIS TENANT, else open one.
+ *
+ * The tenant filter is not redundant: this runs service-role, so RLS is not
+ * there to catch a customer_id that belongs elsewhere. Without it a guest who
+ * had chatted another hotel got that hotel's thread back, and the conversation
+ * was logged into a thread this hotel's staff cannot even see.
+ */
 export async function getOrCreateThread(tenantId: string, customerId: string): Promise<string> {
   const found = await serviceGet(
     `chat_threads?customer_id=eq.${encodeURIComponent(customerId)}&status=eq.active` +
+      `&tenant_id=eq.${encodeURIComponent(tenantId)}` +
       `&order=updated_at.desc&limit=1&select=id`,
   );
   if (found.ok) {

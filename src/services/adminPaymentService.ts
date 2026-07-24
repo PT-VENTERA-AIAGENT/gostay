@@ -1,9 +1,12 @@
-import { supabase } from "@/lib/supabase";
+import { platformDb } from "@/lib/supabase";
 
-// Ventera super-admin control over each hotel's payment environment. Only the
-// admin role can read all tenants + write hotel_payment_config (enforced by RLS
-// in migration 032). Untyped cast: these tables aren't in the generated types.
-const db = supabase as unknown as { from: (table: string) => any };
+// Ventera super-admin control over each hotel's payment environment. Reads every
+// tenant and writes hotel_payment_config, so it runs on the platform-console
+// client: since 035 those policies need `platform_admin_scope()` — the operator
+// allowlist AND the `x-platform-scope` header only `platformDb` sends. A hotel's
+// own staff still read their own row through the plain client.
+// Untyped cast: these tables aren't in the generated types.
+const db = platformDb as unknown as { from: (table: string) => any };
 
 export interface HotelPaymentRow {
   tenant_id: string;

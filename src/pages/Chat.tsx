@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useT, tr } from "@/lib/i18n";
-import { Search, Send, Paperclip, CheckCheck, MoreVertical, Phone, User, ArrowLeft, Loader2, CheckCircle, RotateCcw, Paperclip as PaperclipIcon } from "lucide-react";
+import { Search, Send, Paperclip, CheckCheck, MoreVertical, Phone, User, ArrowLeft, Loader2, CheckCircle, RotateCcw } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerItem } from "@/components/shared/PageTransition";
+import { ChatAttachment } from "@/components/shared/ChatAttachment";
 import { useChatThreads, useChatMessages, useSendMessage, useMarkMessagesRead, useUpdateThreadStatus } from "@/hooks/useChat";
 import { uploadChatAttachment } from "@/services/chatService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -209,15 +210,7 @@ export default function Chat() {
                       >
                         <div className={cn("max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2.5", isStaff ? "bg-primary text-primary-foreground rounded-br-md" : "bg-card border border-border text-foreground rounded-bl-md")}>
                           {msg.attachment_url && (
-                            /\.(png|jpe?g|gif|webp|avif)$/i.test(msg.attachment_url) ? (
-                              <a href={msg.attachment_url} target="_blank" rel="noreferrer">
-                                <img src={msg.attachment_url} alt={msg.content} className="rounded-lg max-h-48 mb-1.5 border border-black/5" />
-                              </a>
-                            ) : (
-                              <a href={msg.attachment_url} target="_blank" rel="noreferrer" className={cn("flex items-center gap-1.5 text-sm underline mb-1", isStaff ? "text-primary-foreground" : "text-primary")}>
-                                <PaperclipIcon className="w-3.5 h-3.5" /> {msg.content}
-                              </a>
-                            )
+                            <ChatAttachment value={msg.attachment_url} name={msg.content} onLight={isStaff} />
                           )}
                           {!msg.attachment_url && <p className="text-sm">{msg.content}</p>}
                           <div className={cn("flex items-center gap-1 mt-1", isStaff ? "justify-end" : "")}>

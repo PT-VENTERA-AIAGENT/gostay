@@ -138,8 +138,17 @@ export async function getMessages(threadId: string): Promise<ChatMessage[]> {
 
 /**
  * Uploads a chat attachment to the `chat-attachments` bucket and returns its
- * public URL, ready to store in chat_messages.attachment_url. The path carries a
- * random prefix so it is not enumerable.
+ * OBJECT PATH, to store in chat_messages.attachment_url.
+ *
+ * It used to return a public CDN URL. The bucket was public and its read policy
+ * was `bucket_id = 'chat-attachments'` with no `to` clause, so anyone — signed
+ * out included — could list every thread's folder and fetch the files (verified
+ * against the live project). 034 makes the bucket private and scopes read to the
+ * thread's participants; the path is resolved to a short-lived signed URL at
+ * render time by signedAttachmentUrl().
+ *
+ * The leading `{threadId}/` segment is what the storage policy reads to decide
+ * who may see the file, so it must stay the first path segment.
  */
 export async function uploadChatAttachment(threadId: string, file: File): Promise<string> {
   const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -147,7 +156,32 @@ export async function uploadChatAttachment(threadId: string, file: File): Promis
   const path = `${threadId}/${rand}-${safe}`;
   const { error } = await supabase.storage.from("chat-attachments").upload(path, file, { upsert: false });
   if (error) throw error;
-  return supabase.storage.from("chat-attachments").getPublicUrl(path).data.publicUrl;
+  return path;
+}
+
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+/**
+ * A signed URL for an attachment, from either storage form:
+ *   - the object path we store now ("{threadId}/{uuid}-name.png");
+ *   - a full /storage/v1/object/public/chat-attachments/… URL, which is what
+ *     rows written before 034 carry. Those stopped resolving the moment the
+ *     bucket went private, so the path is recovered from the URL and re-signed.
+ * Returns null when the caller may not read it (the policy denies) or the object
+ * is gone — the UI then shows the file name without a link rather than a broken
+ * image.
+ */
+export async function signedAttachmentUrl(pathOrUrl: string): Promise<string | null> {
+  const marker = "/chat-attachments/";
+  const idx = pathOrUrl.indexOf(marker);
+  const path = idx >= 0 ? pathOrUrl.slice(idx + marker.length) : pathOrUrl;
+  if (!path) return null;
+
+  const { data, error } = await supabase.storage
+    .from("chat-attachments")
+    .createSignedUrl(decodeURIComponent(path), SIGNED_URL_TTL_SECONDS);
+  if (error) return null;
+  return data?.signedUrl ?? null;
 }
 
 export async function sendMessage(

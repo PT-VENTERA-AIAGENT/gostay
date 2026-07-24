@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, BedDouble, CalendarCheck, ConciergeBell, Target, Megaphone, ArrowLeft } from "lucide-react";
+import { LayoutDashboard, Building2, BedDouble, CalendarCheck, CalendarRange, ConciergeBell, MessageSquare, Wallet, Target, Megaphone, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -11,6 +11,9 @@ const items = [
   { icon: Building2, label: "Hotel", path: "/platform/hotels" },
   { icon: BedDouble, label: "Ketersediaan Kamar", path: "/platform/rooms" },
   { icon: CalendarCheck, label: "Reservasi", path: "/platform/reservations" },
+  { icon: CalendarRange, label: "Kalender Hunian", path: "/platform/calendar" },
+  { icon: MessageSquare, label: "Pesan", path: "/platform/messages" },
+  { icon: Wallet, label: "Saldo Hotel", path: "/platform/balances" },
   { icon: ConciergeBell, label: "Permintaan Tamu", path: "/platform/requests" },
   { icon: Target, label: "Lead Gen", path: "/admin/leads" },
   { icon: Megaphone, label: "Kampanye", path: "/admin/campaigns" },

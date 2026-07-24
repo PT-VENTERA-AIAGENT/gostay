@@ -1,10 +1,15 @@
-import { supabase } from "@/lib/supabase";
+import { platformDb } from "@/lib/supabase";
 
-// Cross-hotel data for the Ventera platform console. Every read here relies on
-// the admin platform-wide RLS policies (migration 018 + 033): an admin sees all
-// hotels, a non-admin sees nothing extra. Untyped cast — these shapes join
-// across tables not in the generated types.
-const db = supabase as unknown as { from: (table: string) => any };
+// Cross-hotel data for the Ventera platform console.
+//
+// Deliberately on `platformDb`, not the app-wide `supabase` client: only this
+// client sends `x-platform-scope: all`, and only with that header do the
+// platform policies (035) open up beyond one tenant. The hotel-facing pages
+// share the plain client and therefore stay tenant-scoped even when the viewer
+// is a Ventera operator — the separation the console needs to be its own world.
+//
+// Untyped cast — these shapes join across tables not in the generated types.
+const db = platformDb as unknown as { from: (table: string) => any };
 
 export interface HotelOwner {
   full_name: string | null;
@@ -173,6 +178,201 @@ export async function listAllReservations(limit = 100): Promise<PlatformBooking[
     total_amount: Number(b.total_amount),
     created_at: b.created_at,
   }));
+}
+
+// ─── Pesan (lintas hotel) ─────────────────────────────────────────────────────
+
+export interface PlatformThread {
+  id: string;
+  tenant_id: string;
+  hotel: string;
+  guest: string;
+  guest_profile_id: string | null;
+  phone: string | null;
+  status: string;
+  updated_at: string;
+  last_message: string | null;
+  unread: number;
+}
+
+export interface PlatformMessage {
+  id: string;
+  thread_id: string;
+  sender_id: string;
+  content: string;
+  attachment_url: string | null;
+  created_at: string;
+}
+
+/**
+ * Every hotel's conversations, newest first.
+ *
+ * The console reads this instead of the hotel Pesan page doing it implicitly:
+ * that page is now tenant-scoped for everyone (035), so all-hotel chat lives
+ * here — labelled with the hotel it belongs to, which the mixed inbox never was.
+ */
+export async function listAllThreads(limit = 200): Promise<PlatformThread[]> {
+  const { data, error } = await db
+    .from("chat_threads")
+    .select("id,tenant_id,status,updated_at,tenants(name),customers(full_name,phone,profile_id)")
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+
+  const rows = (data ?? []) as any[];
+  if (rows.length === 0) return [];
+
+  // One extra query for the preview line + unread count, rather than an embed
+  // per thread (the embed cannot be ordered-and-limited per parent row here).
+  const ids = rows.map((t) => t.id);
+  const { data: msgs } = await db
+    .from("chat_messages")
+    .select("thread_id,content,created_at,is_read,sender_id")
+    .in("thread_id", ids)
+    .order("created_at", { ascending: false });
+
+  const latest = new Map<string, string>();
+  const unread = new Map<string, number>();
+  for (const m of (msgs ?? []) as any[]) {
+    if (!latest.has(m.thread_id)) latest.set(m.thread_id, m.content);
+    if (!m.is_read) unread.set(m.thread_id, (unread.get(m.thread_id) ?? 0) + 1);
+  }
+
+  return rows.map((t) => ({
+    id: t.id,
+    tenant_id: t.tenant_id,
+    hotel: t.tenants?.name ?? "—",
+    guest: t.customers?.full_name ?? "—",
+    guest_profile_id: t.customers?.profile_id ?? null,
+    phone: t.customers?.phone ?? null,
+    status: t.status,
+    updated_at: t.updated_at,
+    last_message: latest.get(t.id) ?? null,
+    unread: unread.get(t.id) ?? 0,
+  }));
+}
+
+/** The full transcript of one thread. Read-only: the console never replies. */
+export async function listThreadMessages(threadId: string): Promise<PlatformMessage[]> {
+  const { data, error } = await db
+    .from("chat_messages")
+    .select("id,thread_id,sender_id,content,attachment_url,created_at")
+    .eq("thread_id", threadId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as PlatformMessage[];
+}
+
+// ─── Saldo (lintas hotel) ─────────────────────────────────────────────────────
+
+export interface PlatformBalance {
+  tenant_id: string;
+  hotel: string;
+  balance: number;
+  pending_payout: number;
+  lifetime_in: number;
+}
+
+/**
+ * Every hotel's wallet. hotel_balance holds the running figures; payouts still
+ * awaiting processing are summed separately so the console can see what Ventera
+ * owes before anyone asks.
+ */
+export async function listAllBalances(): Promise<PlatformBalance[]> {
+  const [tenantsRes, balRes, payoutRes] = await Promise.all([
+    db.from("tenants").select("id,name").order("name"),
+    db.from("hotel_balance").select("tenant_id,balance,lifetime_in"),
+    db.from("payouts").select("tenant_id,amount,status"),
+  ]);
+  if (tenantsRes.error) throw tenantsRes.error;
+  if (balRes.error) throw balRes.error;
+
+  const byTenant = new Map<string, any>();
+  for (const b of (balRes.data ?? []) as any[]) byTenant.set(b.tenant_id, b);
+  const pending = new Map<string, number>();
+  for (const p of (payoutRes.data ?? []) as any[]) {
+    if (p.status !== "pending" && p.status !== "requested") continue;
+    pending.set(p.tenant_id, (pending.get(p.tenant_id) ?? 0) + Number(p.amount ?? 0));
+  }
+
+  return (tenantsRes.data ?? []).map((t: any) => ({
+    tenant_id: t.id,
+    hotel: t.name,
+    balance: Number(byTenant.get(t.id)?.balance ?? 0),
+    lifetime_in: Number(byTenant.get(t.id)?.lifetime_in ?? 0),
+    pending_payout: pending.get(t.id) ?? 0,
+  }));
+}
+
+// ─── Kalender hunian (lintas hotel) ───────────────────────────────────────────
+
+export interface PlatformCalendarDay {
+  date: string;
+  /** tenant_id → rooms occupied that night. */
+  byHotel: Record<string, number>;
+}
+
+export interface PlatformCalendar {
+  hotels: Array<{ tenant_id: string; name: string; rooms: number }>;
+  days: PlatformCalendarDay[];
+}
+
+/**
+ * Occupancy per hotel per night over a window, in one pass.
+ *
+ * A booking occupies a room on every night in [check_in, check_out) — the same
+ * half-open rule as the room board and the WhatsApp bot, so the calendar cannot
+ * disagree with what the AI quotes. `days` is expanded client-side from the
+ * bookings that overlap the window, which is one query instead of one per day.
+ */
+export async function getPlatformCalendar(from: string, days: number): Promise<PlatformCalendar> {
+  const start = new Date(from + "T00:00:00Z");
+  const end = new Date(start.getTime() + days * 86400000);
+  const endIso = end.toISOString().slice(0, 10);
+
+  const [tenantsRes, roomsRes, bookingsRes] = await Promise.all([
+    db.from("tenants").select("id,name").order("name"),
+    db.from("rooms").select("id,tenant_id").eq("is_active", true),
+    db.from("bookings").select("room_id,tenant_id,check_in,check_out")
+      .in("status", ["pending", "confirmed", "checked_in"])
+      .lt("check_in", endIso)
+      .gt("check_out", from),
+  ]);
+  if (tenantsRes.error) throw tenantsRes.error;
+  if (roomsRes.error) throw roomsRes.error;
+  if (bookingsRes.error) throw bookingsRes.error;
+
+  const roomCount = new Map<string, number>();
+  for (const r of (roomsRes.data ?? []) as any[]) {
+    roomCount.set(r.tenant_id, (roomCount.get(r.tenant_id) ?? 0) + 1);
+  }
+
+  const dayList: PlatformCalendarDay[] = [];
+  for (let i = 0; i < days; i++) {
+    dayList.push({ date: new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10), byHotel: {} });
+  }
+  // Distinct rooms per (day, tenant): two bookings on one room must count once.
+  const seen = new Map<string, Set<string>>();
+  for (const b of (bookingsRes.data ?? []) as any[]) {
+    for (const d of dayList) {
+      if (!(b.check_in <= d.date && b.check_out > d.date)) continue;
+      const key = `${d.date}|${b.tenant_id}`;
+      if (!seen.has(key)) seen.set(key, new Set());
+      if (b.room_id) seen.get(key)!.add(b.room_id);
+    }
+  }
+  for (const d of dayList) {
+    for (const t of (tenantsRes.data ?? []) as any[]) {
+      d.byHotel[t.id] = seen.get(`${d.date}|${t.id}`)?.size ?? 0;
+    }
+  }
+
+  return {
+    hotels: (tenantsRes.data ?? []).map((t: any) => ({
+      tenant_id: t.id, name: t.name, rooms: roomCount.get(t.id) ?? 0,
+    })),
+    days: dayList,
+  };
 }
 
 export interface PlatformRequest {

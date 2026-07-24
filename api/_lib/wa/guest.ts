@@ -212,11 +212,21 @@ async function getOrCreateCustomer(
   phone: string,
   email: string,
 ): Promise<string> {
+  // Scoped to the tenant, not just the profile. The same phone is ONE profile
+  // across every hotel (profileIdFor derives it from the Ventera subject), so a
+  // profile-only lookup handed hotel B the customer row hotel A owns — 016's
+  // "the same number may be a guest at more than one hotel" broken in one query.
+  // Everything downstream inherits that row's tenant: the thread, the booking's
+  // customer_id, and setCustomerName, which would rewrite hotel A's CRM entry
+  // with the name a guest gave hotel B.
+  //
   // limit(1) ordered oldest-first, mirroring getOrCreateOwnCustomer: if a
-  // profile somehow has more than one customer row, take the oldest rather than
-  // erroring.
+  // profile somehow has more than one customer row in this tenant, take the
+  // oldest rather than erroring.
   const lookup = await serviceGet(
-    `customers?profile_id=eq.${encodeURIComponent(profileId)}&select=id&order=created_at.asc&limit=1`,
+    `customers?profile_id=eq.${encodeURIComponent(profileId)}` +
+      `&tenant_id=eq.${encodeURIComponent(tenantId)}` +
+      `&select=id&order=created_at.asc&limit=1`,
   );
   if (!lookup.ok) throw new WaProvisionError(`customer_lookup_${lookup.status}`);
   const rows = (await lookup.json()) as Array<{ id: string }>;

@@ -42,16 +42,27 @@ const {data:bkB}=await svc.from('bookings').insert({tenant_id:B,room_id:rm.id,cu
 console.log('Tenant B siap: Rival Hotel, kamar "101" (sama nomornya dgn tenant A — bukti unique per-tenant jalan)\n');
 
 // 3 roles: admin = Ventera (platform-wide) · staff = hotel (tenant-scoped) · customer = guest.
-const admin=as(mint(adminId));                                 // admin = Ventera (platform)
+// Sejak 035, seorang operator platform punya DUA klien: `admin` (klien aplikasi
+// hotel biasa — tenant-scoped seperti staf) dan `adminScoped` (klien konsol
+// platform, mengirim x-platform-scope: all — barulah lintas hotel). Daftar putih
+// operator ada di platform_admins; seed di sini supaya adminId dikenali.
+const admin=as(mint(adminId));                                 // admin di halaman staf (TANPA scope)
+const adminScoped=createClient(URL,ANON,{global:{headers:{Authorization:`Bearer ${mint(adminId)}`,'x-platform-scope':'all'}}}); // admin di konsol platform
 const staffA=as(mint(staffAId));                               // staff hotel A
 const staffB=as(mint(rivalId));                                // staff hotel B
+await svc.from('platform_admins').upsert({profile_id:adminId,note:'cross_tenant test'});
 let pass=0,fail=0;
 const t=(name,ok,detail='')=>{ok?pass++:fail++; console.log(`  ${ok?'✓':'✗ GAGAL'} ${name}${detail?' — '+detail:''}`);};
 
-console.log('Admin Ventera (platform) HARUS bisa lihat SEMUA hotel:');
+console.log('Admin Ventera DI KONSOL PLATFORM (dengan scope) HARUS lihat SEMUA hotel:');
 for(const tbl of ['bookings','customers','rooms','room_types']){
+  const {data}=await adminScoped.from(tbl).select('*').eq('tenant_id',B);
+  t(`admin (konsol) lihat ${tbl} hotel B`, (data??[]).length>0, `${(data??[]).length} baris`);
+}
+console.log('Admin Ventera DI HALAMAN STAF (tanpa scope) HARUS seperti staf — tidak lihat hotel lain:');
+for(const tbl of ['bookings','chat_messages','customers','rooms']){
   const {data}=await admin.from(tbl).select('*').eq('tenant_id',B);
-  t(`admin lihat ${tbl} hotel B`, (data??[]).length>0, `${(data??[]).length} baris`);
+  t(`admin (halaman staf) ✗ ${tbl} hotel B`, (data??[]).length===0, `${(data??[]).length} baris`);
 }
 console.log('\nStaff hotel A TIDAK boleh lihat hotel B:');
 for(const tbl of ['bookings','customers','chat_threads','call_logs','analytics_cache','rooms','room_types','reviews']){
@@ -110,6 +121,71 @@ for(const tbl of ['wa_hotel_sessions','wa_guest_identities','wa_pending_actions'
  t('Admin menyisipkan wa_guest_identities', Boolean(error), error?.code||'DIIZINKAN!');}
 {const {error}=await anonC.from('wa_pending_actions').insert({tenant_id:B,phone_jid:'hack@s.whatsapp.net',kind:'collecting',payload:{}});
  t('Anon menyisipkan wa_pending_actions', Boolean(error), error?.code||'DIIZINKAN!');}
+
+// ── Pesan + lampiran (034). Tabelnya sudah tenant-scoped sejak 011, tapi
+// storage.objects tidak punya kolom tenant: policy lama hanya mengecek
+// bucket_id, tanpa klausa `to`, sehingga ANON pun bisa list() seluruh folder
+// thread dan mengunduh lampiran chat hotel manapun lewat URL publik.
+// ── Dua dunia (035): operator platform hanya lintas-hotel di KONSOL platform.
+// Klien aplikasi hotel tidak pernah mengirim x-platform-scope, jadi seorang
+// operator yang membuka halaman staf membaca seperti staf biasa — inilah yang
+// dulu bikin inbox "hotel saya" berisi percakapan semua hotel.
+console.log('\nPemisahan konsol platform vs halaman hotel:');
+{const {data}=await admin.from('bookings').select('*').eq('tenant_id',B);
+ t('Admin TANPA scope ✗ booking hotel lain (halaman staf)', (data??[]).length===0, `${(data??[]).length} baris`);}
+{const {data}=await adminScoped.from('bookings').select('*').eq('tenant_id',B);
+ t('Admin DENGAN scope ✓ booking semua hotel (konsol)', (data??[]).length>0, `${(data??[]).length} baris`);}
+// Header saja tidak memberi apa pun: staf yang mengirimnya tetap staf.
+const staffAScoped=createClient(URL,ANON,{global:{headers:{Authorization:`Bearer ${mint(staffAId)}`,'x-platform-scope':'all'}}});
+{const {data}=await staffAScoped.from('bookings').select('*').eq('tenant_id',B);
+ t('Staff yang memalsukan header tetap ✗ hotel lain', (data??[]).length===0, `${(data??[]).length} baris`);}
+// Daftar putihnya sendiri tak terjangkau dari aplikasi.
+{const {data}=await admin.from('platform_admins').select('*');
+ t('platform_admins tak terbaca authenticated', (data??[]).length===0, `${(data??[]).length} baris`);}
+{const {error}=await admin.from('platform_admins').insert({profile_id:staffAId});
+ t('Admin tak bisa menambah operator platform dari aplikasi', Boolean(error), error?.code||'DIIZINKAN!');}
+
+console.log('\nPesan & lampiran chat:');
+const {data:thB}=await svc.from('chat_threads').insert({tenant_id:B,customer_id:cu.id,status:'active'}).select().single();
+const {data:msgB}=await svc.from('chat_messages').insert({tenant_id:B,thread_id:thB.id,sender_id:rivalId,content:'rahasia hotel B'}).select().single();
+
+{const {data}=await staffA.from('chat_messages').select('*').eq('tenant_id',B);
+ t('Staff A ✗ isi pesan hotel B', (data??[]).length===0, `${(data??[]).length} baris`);}
+{const {data}=await admin.from('chat_messages').select('*').eq('tenant_id',B);
+ t('Admin di halaman Pesan hotel ✗ pesan hotel lain', (data??[]).length===0, `${(data??[]).length} baris`);}
+{const {data}=await adminScoped.from('chat_messages').select('*').eq('tenant_id',B);
+ t('Admin di konsol platform ✓ pesan semua hotel', (data??[]).length>0, `${(data??[]).length} baris`);}
+{const {data}=await staffA.from('chat_threads').select('*').eq('id',thB.id);
+ t('Staff A ✗ thread hotel B', (data??[]).length===0, `${(data??[]).length} baris`);}
+{const {data}=await staffB.from('chat_messages').select('*').eq('id',msgB.id);
+ t('Staff B ✓ pesan hotel sendiri', (data??[]).length===1, `${(data??[]).length} baris`);}
+
+// Lampiran: path-nya "{thread_id}/{uuid}-nama", dan policy 034 memetakan segmen
+// pertama itu ke tenant pemilik thread.
+const attPath=`${thB.id}/${randomUUID()}-rahasia.txt`;
+await svc.storage.from('chat-attachments').upload(attPath, new Blob(['isi rahasia']), {contentType:'text/plain'});
+{const {data,error}=await anonC.storage.from('chat-attachments').list('',{limit:100});
+ t('Anon ✗ list bucket lampiran', Boolean(error)||(data??[]).length===0, error?'ditolak':`${(data??[]).length} folder terlihat`);}
+{const pub=anonC.storage.from('chat-attachments').getPublicUrl(attPath).data.publicUrl;
+ const r=await fetch(pub);
+ t('Anon ✗ unduh lampiran via URL publik', !r.ok, `HTTP ${r.status}`);}
+{const {data,error}=await staffA.storage.from('chat-attachments').createSignedUrl(attPath,60);
+ t('Staff A ✗ tanda-tangani lampiran hotel B', Boolean(error)||!data, error?.message||'DIIZINKAN!');}
+{const {data,error}=await staffB.storage.from('chat-attachments').createSignedUrl(attPath,60);
+ const r=data?.signedUrl?await fetch(data.signedUrl):null;
+ t('Staff B ✓ buka lampiran hotel sendiri', Boolean(r?.ok), error?.message||`HTTP ${r?.status}`);}
+// Unggah ke folder thread milik hotel lain harus ditolak.
+{const {error}=await staffA.storage.from('chat-attachments').upload(`${thB.id}/${randomUUID()}-sisip.txt`, new Blob(['x']));
+ t('Staff A ✗ unggah ke thread hotel B', Boolean(error), error?.message||'DIIZINKAN!');}
+
+// Foto kamar: baca publik (brosur portal), tapi tulis/hapus hanya untuk hotel
+// pemilik room_type — sebelum 034 semua staff bisa menghapus foto hotel lain.
+{const {error}=await staffA.storage.from('room-photos').upload(`${rt.id}/${randomUUID()}-x.png`, new Blob(['x']));
+ t('Staff A ✗ unggah foto ke tipe kamar hotel B', Boolean(error), error?.message||'DIIZINKAN!');}
+
+await svc.storage.from('chat-attachments').remove([attPath]);
+await svc.from('chat_messages').delete().eq('id',msgB.id);
+await svc.from('chat_threads').delete().eq('id',thB.id);
 
 // Clean up the seeded WA rows (wa_inbound_messages is not tenant-scoped, so it
 // won't cascade with tenant B — delete all by id explicitly, cascade-agnostic).
