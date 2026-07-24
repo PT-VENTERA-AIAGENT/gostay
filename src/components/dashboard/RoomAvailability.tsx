@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { BedDouble } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { staggerItem } from "@/components/shared/PageTransition";
 import { useAnimatedCounter } from "@/hooks/use-animated-counter";
@@ -29,7 +30,7 @@ export default function RoomAvailability({ rooms }: { rooms: RoomWithType[] }) {
       variants={staggerItem}
       initial="hidden"
       animate="show"
-      className="bg-card rounded-xl p-5 border border-border card-hover"
+      className="bg-card rounded-xl p-5 border border-border card-hover h-full flex flex-col"
     >
       <div className="flex items-center justify-between gap-3 mb-5">
         <h3 className="font-semibold text-foreground min-w-0 truncate">{t("Room Availability")}</h3>
@@ -37,9 +38,17 @@ export default function RoomAvailability({ rooms }: { rooms: RoomWithType[] }) {
       </div>
 
       {total === 0 ? (
-        <p className="text-xs text-muted-foreground py-8 text-center">{t("No rooms configured yet.")}</p>
+        // Center the empty state in the card's full height so the whitespace
+        // reads as intentional — the card stretches to match the taller Revenue
+        // chart beside it, and a top-aligned one-liner left an ugly gap below.
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 py-6 text-center">
+          <div className="w-11 h-11 rounded-full bg-muted flex items-center justify-center">
+            <BedDouble className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground">{t("No rooms configured yet.")}</p>
+        </div>
       ) : (
-        <>
+        <div className="flex-1 flex flex-col justify-center">
           <div className="flex rounded-lg overflow-hidden h-8 mb-5 bg-muted">
             {segments.map((r) => (
               <motion.div
@@ -63,7 +72,7 @@ export default function RoomAvailability({ rooms }: { rooms: RoomWithType[] }) {
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </motion.div>
   );
