@@ -55,7 +55,10 @@ export default function FloorPlanViewer({
   const svgRef = useRef<SVGSVGElement>(null);
   const panRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const movedRef = useRef(false);
-  const fittedRef = useRef(false);
+  // Once the user pans/zooms we stop auto-fitting so we don't fight their view.
+  // Until then, every size change (window/monitor resize, tab switch) re-fits, so
+  // the plan stays centered and correctly scaled at any screen dimension.
+  const interactedRef = useRef(false);
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
@@ -75,10 +78,9 @@ export default function FloorPlanViewer({
   }, [plan, size]);
 
   useEffect(() => {
-    if (!fittedRef.current && size.w > 0) {
-      fittedRef.current = true;
-      fitView();
-    }
+    // Re-fit whenever the container size or the plan changes — but never after
+    // the user has taken control of the view (interactedRef).
+    if (size.w > 0 && !interactedRef.current) fitView();
   }, [size, fitView]);
 
   function onPointerDown(e: React.PointerEvent) {
@@ -89,7 +91,10 @@ export default function FloorPlanViewer({
   function onPointerMove(e: React.PointerEvent) {
     const p = panRef.current;
     if (!p) return;
-    if (Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y) > 3) movedRef.current = true;
+    if (Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y) > 3) {
+      movedRef.current = true;
+      interactedRef.current = true; // user took over the view — stop auto-fit
+    }
     setTx(p.tx + (e.clientX - p.x));
     setTy(p.ty + (e.clientY - p.y));
   }
@@ -103,6 +108,7 @@ export default function FloorPlanViewer({
     if (!movedRef.current) setSelectedId(null);
   }
   function onWheel(e: React.WheelEvent) {
+    interactedRef.current = true;
     const rect = svgRef.current!.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const planX = (mx - tx) / zoom, planY = (my - ty) / zoom;
@@ -122,14 +128,30 @@ export default function FloorPlanViewer({
 
   const strokeW = 1 / zoom;
 
+  // No plan yet → show ONLY a centered empty state that fills the container.
+  // Rendering the (empty) pannable canvas here was the bug: the white plan rect
+  // could be dragged away from the fixed "belum tersedia" overlay, and on a wide
+  // monitor the two drifted apart. A plain centered box is stable at any size.
+  if (plan.elements.length === 0) {
+    return (
+      <div className="w-full h-full rounded-xl border border-border overflow-hidden bg-[#fafaf9] dark:bg-neutral-900 flex items-center justify-center text-center px-6">
+        <div>
+          <MapPin className="w-9 h-9 text-muted-foreground/40 mx-auto mb-2" />
+          <p className="text-sm font-medium text-foreground">Denah belum tersedia</p>
+          <p className="text-xs text-muted-foreground">Hotel ini belum membuat denah lokasi.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-full rounded-xl border border-border overflow-hidden bg-[#fafaf9] dark:bg-neutral-900">
       {/* Zoom controls */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-card/90 backdrop-blur rounded-lg border border-border p-1 shadow-sm">
-        <button onClick={() => setZoom((z) => Math.max(0.15, z / 1.15))} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Perkecil"><ZoomOut className="w-4 h-4" /></button>
+        <button onClick={() => { interactedRef.current = true; setZoom((z) => Math.max(0.15, z / 1.15)); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Perkecil"><ZoomOut className="w-4 h-4" /></button>
         <span className="text-xs text-muted-foreground tabular-nums w-9 text-center">{Math.round(zoom * 100)}%</span>
-        <button onClick={() => setZoom((z) => Math.min(4, z * 1.15))} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Perbesar"><ZoomIn className="w-4 h-4" /></button>
-        <button onClick={fitView} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Paskan ke layar"><Maximize className="w-4 h-4" /></button>
+        <button onClick={() => { interactedRef.current = true; setZoom((z) => Math.min(4, z * 1.15)); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Perbesar"><ZoomIn className="w-4 h-4" /></button>
+        <button onClick={() => { interactedRef.current = false; fitView(); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Paskan ke layar"><Maximize className="w-4 h-4" /></button>
       </div>
 
       {/* Legend */}
@@ -175,16 +197,6 @@ export default function FloorPlanViewer({
           </g>
         </svg>
       </div>
-
-      {plan.elements.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center px-6">
-            <MapPin className="w-9 h-9 text-muted-foreground/40 mx-auto mb-2" />
-            <p className="text-sm font-medium text-foreground">Denah belum tersedia</p>
-            <p className="text-xs text-muted-foreground">Hotel ini belum membuat denah lokasi.</p>
-          </div>
-        </div>
-      )}
 
       {/* Detail card for the selected element */}
       {selected && (
