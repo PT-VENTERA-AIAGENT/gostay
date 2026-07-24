@@ -268,20 +268,24 @@ export async function listThreadMessages(threadId: string): Promise<PlatformMess
 export interface PlatformBalance {
   tenant_id: string;
   hotel: string;
-  balance: number;
-  pending_payout: number;
-  lifetime_in: number;
+  balance: number;         // hotel_balance.available (net, withdrawable)
+  pending_payout: number;  // payouts still 'pending'
+  lifetime_in: number;     // hotel_balance.lifetime_gross (total reservation income)
 }
 
 /**
  * Every hotel's wallet. hotel_balance holds the running figures; payouts still
  * awaiting processing are summed separately so the console can see what Ventera
  * owes before anyone asks.
+ *
+ * Columns are `available` and `lifetime_gross` (see 031) — NOT `balance`/
+ * `lifetime_in`, which do not exist and made this query error out. The public
+ * PlatformBalance shape keeps the friendlier names, mapped here.
  */
 export async function listAllBalances(): Promise<PlatformBalance[]> {
   const [tenantsRes, balRes, payoutRes] = await Promise.all([
     db.from("tenants").select("id,name").order("name"),
-    db.from("hotel_balance").select("tenant_id,balance,lifetime_in"),
+    db.from("hotel_balance").select("tenant_id,available,lifetime_gross"),
     db.from("payouts").select("tenant_id,amount,status"),
   ]);
   if (tenantsRes.error) throw tenantsRes.error;
@@ -291,15 +295,15 @@ export async function listAllBalances(): Promise<PlatformBalance[]> {
   for (const b of (balRes.data ?? []) as any[]) byTenant.set(b.tenant_id, b);
   const pending = new Map<string, number>();
   for (const p of (payoutRes.data ?? []) as any[]) {
-    if (p.status !== "pending" && p.status !== "requested") continue;
+    if (p.status !== "pending") continue;
     pending.set(p.tenant_id, (pending.get(p.tenant_id) ?? 0) + Number(p.amount ?? 0));
   }
 
   return (tenantsRes.data ?? []).map((t: any) => ({
     tenant_id: t.id,
     hotel: t.name,
-    balance: Number(byTenant.get(t.id)?.balance ?? 0),
-    lifetime_in: Number(byTenant.get(t.id)?.lifetime_in ?? 0),
+    balance: Number(byTenant.get(t.id)?.available ?? 0),
+    lifetime_in: Number(byTenant.get(t.id)?.lifetime_gross ?? 0),
     pending_payout: pending.get(t.id) ?? 0,
   }));
 }
@@ -404,4 +408,131 @@ export async function listAllGuestRequests(limit = 100): Promise<PlatformRequest
     room: r.rooms?.number ?? null,
     created_at: r.created_at,
   }));
+}
+
+// ─── Detail satu hotel (drill-down konsol) ────────────────────────────────────
+
+export interface HotelDetail {
+  tenant_id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  mode: "live" | "test";
+  payments_active: boolean;
+  wa_linked: boolean;
+  wa_number: string | null;
+  owner: HotelOwner | null;
+  staff_count: number;
+  // Angka operasional
+  rooms_total: number;
+  rooms_occupied_today: number;
+  bookings_total: number;
+  customers_total: number;
+  // Dompet
+  balance: number;
+  lifetime_in: number;
+  pending_payout: number;
+  // Aktivitas terbaru (di hotel ini)
+  recent_reservations: PlatformBooking[];
+  recent_threads: PlatformThread[];
+}
+
+/**
+ * Everything the console shows for ONE hotel, in a single aggregate — stats,
+ * wallet, and recent reservations/conversations — so the drill-down page is one
+ * query round rather than a dozen. Scoped by tenant_id; runs on platformDb, so
+ * the platform policies (035) open it beyond the operator's own hotel.
+ */
+export async function getHotelDetail(tenantId: string): Promise<HotelDetail | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const [
+    tenantRes, cfgRes, waRes, ownersRes, balRes, payoutRes,
+    roomsRes, occRes, bookingsCountRes, customersCountRes,
+    recentBkRes, threadsRes,
+  ] = await Promise.all([
+    db.from("tenants").select("id,name,slug,is_active").eq("id", tenantId).maybeSingle(),
+    db.from("hotel_payment_config").select("mode,is_active").eq("tenant_id", tenantId).maybeSingle(),
+    db.from("wa_hotel_sessions").select("bot_number,is_active").eq("tenant_id", tenantId),
+    db.from("profiles").select("full_name,email,phone,role,created_at").eq("tenant_id", tenantId)
+      .in("role", ["staff", "admin"]).order("created_at", { ascending: true }),
+    db.from("hotel_balance").select("available,lifetime_gross").eq("tenant_id", tenantId).maybeSingle(),
+    db.from("payouts").select("amount,status").eq("tenant_id", tenantId),
+    db.from("rooms").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("is_active", true),
+    db.from("bookings").select("room_id").eq("tenant_id", tenantId)
+      .in("status", ["pending", "confirmed", "checked_in"]).lte("check_in", today).gt("check_out", today),
+    db.from("bookings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    db.from("customers").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    db.from("bookings")
+      .select("id,reference,check_in,check_out,status,payment_status,total_amount,created_at,customers(full_name),rooms(number)")
+      .eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(8),
+    db.from("chat_threads")
+      .select("id,status,updated_at,customers(full_name,phone,profile_id)")
+      .eq("tenant_id", tenantId).order("updated_at", { ascending: false }).limit(6),
+  ]);
+  if (tenantRes.error) throw tenantRes.error;
+  const t = tenantRes.data as any;
+  if (!t) return null;
+
+  const cfg = cfgRes.data as any;
+  const sessions = (waRes.data ?? []) as any[];
+  const activeWa = sessions.find((s) => s.is_active) ?? sessions[0];
+  const owners = (ownersRes.data ?? []) as any[];
+  const firstOwner = owners[0];
+  const bal = balRes.data as any;
+  const pending = ((payoutRes.data ?? []) as any[])
+    .filter((p) => p.status === "pending")
+    .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+  const occupied = new Set(((occRes.data ?? []) as any[]).map((b) => b.room_id).filter(Boolean)).size;
+
+  return {
+    tenant_id: t.id,
+    name: t.name,
+    slug: t.slug,
+    is_active: t.is_active,
+    mode: cfg?.mode === "live" ? "live" : "test",
+    payments_active: cfg?.is_active ?? true,
+    wa_linked: Boolean(sessions.find((s) => s.is_active)),
+    wa_number: activeWa?.bot_number ?? null,
+    owner: firstOwner
+      ? {
+          full_name: firstOwner.full_name ?? null,
+          email: isSyntheticEmail(firstOwner.email) ? null : firstOwner.email,
+          phone: firstOwner.phone ?? null,
+          role: firstOwner.role,
+        }
+      : null,
+    staff_count: owners.length,
+    rooms_total: roomsRes.count ?? 0,
+    rooms_occupied_today: occupied,
+    bookings_total: bookingsCountRes.count ?? 0,
+    customers_total: customersCountRes.count ?? 0,
+    balance: Number(bal?.available ?? 0),
+    lifetime_in: Number(bal?.lifetime_gross ?? 0),
+    pending_payout: pending,
+    recent_reservations: ((recentBkRes.data ?? []) as any[]).map((b) => ({
+      id: b.id,
+      reference: b.reference,
+      hotel: t.name,
+      guest: b.customers?.full_name ?? "—",
+      room: b.rooms?.number ?? null,
+      check_in: b.check_in,
+      check_out: b.check_out,
+      status: b.status,
+      payment_status: b.payment_status,
+      total_amount: Number(b.total_amount),
+      created_at: b.created_at,
+    })),
+    recent_threads: ((threadsRes.data ?? []) as any[]).map((th) => ({
+      id: th.id,
+      tenant_id: t.id,
+      hotel: t.name,
+      guest: th.customers?.full_name ?? "—",
+      guest_profile_id: th.customers?.profile_id ?? null,
+      phone: th.customers?.phone ?? null,
+      status: th.status,
+      updated_at: th.updated_at,
+      last_message: null,
+      unread: 0,
+    })),
+  };
 }

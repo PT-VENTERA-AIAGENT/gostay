@@ -1,10 +1,17 @@
 import { Link } from "react-router-dom";
-import { Building2, Radio, CalendarCheck, ConciergeBell, MessageCircle, ArrowRight, BedDouble } from "lucide-react";
+import {
+  Building2, Radio, CalendarCheck, ConciergeBell, MessageCircle, BedDouble, Wallet,
+} from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { tr } from "@/lib/i18n";
-import { usePlatformHotels, usePlatformReservations, usePlatformGuestRequests, usePlatformRoomAvailability } from "@/hooks/usePlatform";
+import {
+  usePlatformHotels, usePlatformReservations, usePlatformGuestRequests,
+  usePlatformRoomAvailability, usePlatformBalances,
+} from "@/hooks/usePlatform";
+import {
+  PageHeader, StatCard, Table, Th, Td, EmptyState, StatusBadge, formatIDR,
+} from "@/components/platform/widgets";
 
-function formatIDR(n: number) { return "Rp" + Math.round(n).toLocaleString("id-ID"); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 export default function PlatformOverview() {
@@ -12,8 +19,11 @@ export default function PlatformOverview() {
   const { data: reservations = [] } = usePlatformReservations();
   const { data: requests = [] } = usePlatformGuestRequests();
   const { data: availability = [] } = usePlatformRoomAvailability(todayISO());
+  const { data: balances = [] } = usePlatformBalances();
 
   const liveHotels = hotels.filter((h) => h.mode === "live" && h.payments_active).length;
+  const testHotels = hotels.filter((h) => h.mode !== "live" && h.payments_active).length;
+  const offHotels = hotels.filter((h) => !h.payments_active).length;
   const waLinked = hotels.filter((h) => h.wa_linked).length;
   const openReq = requests.filter((r) => r.status === "open" || r.status === "in_progress").length;
   const revToday = reservations
@@ -21,37 +31,103 @@ export default function PlatformOverview() {
     .reduce((s, r) => s + r.total_amount, 0);
   const roomsAvail = availability.reduce((s, r) => s + r.available, 0);
   const roomsTotal = availability.reduce((s, r) => s + r.total, 0);
+  const totalBalance = balances.reduce((s, b) => s + b.balance, 0);
+  const pendingPayout = balances.reduce((s, b) => s + b.pending_payout, 0);
 
-  const cards = [
-    { icon: Building2, label: tr("Hotel"), value: `${hotels.length}`, sub: `${liveHotels} Live`, to: "/platform/hotels" },
-    { icon: BedDouble, label: tr("Kamar tersedia hari ini"), value: `${roomsAvail}/${roomsTotal}`, sub: tr("Tersedia"), to: "/platform/rooms" },
-    { icon: MessageCircle, label: tr("WhatsApp tertaut"), value: `${waLinked}/${hotels.length}`, sub: tr("hotel"), to: "/platform/hotels" },
-    { icon: CalendarCheck, label: tr("Reservasi (terbaru)"), value: `${reservations.length}`, sub: `${formatIDR(revToday)} ${tr("hari ini")}`, to: "/platform/reservations" },
-    { icon: ConciergeBell, label: tr("Permintaan tamu aktif"), value: `${openReq}`, sub: tr("perlu ditangani"), to: "/platform/requests" },
+  const recentReservations = reservations.slice(0, 6);
+  const recentRequests = requests.slice(0, 6);
+
+  const dist = [
+    { label: "Live", value: liveHotels, tone: "text-success" },
+    { label: "Test", value: testHotels, tone: "text-warning" },
+    { label: "Off", value: offHotels, tone: "text-muted-foreground" },
   ];
 
   return (
     <PageTransition>
-      <div className="p-4 md:p-6">
-        <div className="mb-5">
-          <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-            <Radio className="w-6 h-6 text-primary" /> {tr("Ringkasan Platform")}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">{tr("Pantauan lintas hotel untuk super admin Ventera.")}</p>
+      <PageHeader
+        icon={<Radio className="w-5 h-5" />}
+        title={tr("Ringkasan Platform")}
+        description={tr("Pantauan lintas hotel untuk super admin Ventera.")}
+      />
+
+      <div className="space-y-6 p-4 md:p-6">
+        {/* KPI utama */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <StatCard label={tr("Hotel")} value={hotels.length} sub={`${liveHotels} Live`} to="/platform/hotels" icon={<Building2 className="w-4 h-4" />} />
+          <StatCard label={tr("Kamar tersedia hari ini")} value={`${roomsAvail}/${roomsTotal}`} to="/platform/rooms" icon={<BedDouble className="w-4 h-4" />} />
+          <StatCard label={tr("WhatsApp tertaut")} value={`${waLinked}/${hotels.length}`} sub={tr("hotel")} to="/platform/hotels" icon={<MessageCircle className="w-4 h-4" />} />
+          <StatCard label={tr("Saldo semua hotel")} value={formatIDR(totalBalance)} sub={pendingPayout > 0 ? `${formatIDR(pendingPayout)} ${tr("menunggu penarikan")}` : undefined} to="/platform/balances" icon={<Wallet className="w-4 h-4" />} />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 md:gap-4">
-          {cards.map((c) => (
-            <Link key={c.label} to={c.to}
-              className="bg-card rounded-xl border border-border p-4 hover:border-primary/40 transition-colors group">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <c.icon className="w-4 h-4" /> <span className="text-xs">{c.label}</span>
-                <ArrowRight className="w-3.5 h-3.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* KPI sekunder */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+          <StatCard label={tr("Reservasi (terbaru)")} value={reservations.length} sub={`${formatIDR(revToday)} ${tr("hari ini")}`} to="/platform/reservations" icon={<CalendarCheck className="w-4 h-4" />} />
+          <StatCard label={tr("Permintaan tamu aktif")} value={openReq} sub={tr("perlu ditangani")} to="/platform/requests" icon={<ConciergeBell className="w-4 h-4" />} />
+          <StatCard label={tr("Kalender hunian")} value={`${roomsTotal - roomsAvail}/${roomsTotal}`} sub={tr("terisi malam ini")} to="/platform/calendar" icon={<BedDouble className="w-4 h-4" />} />
+        </div>
+
+        {/* Distribusi mode pembayaran */}
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-foreground">{tr("Distribusi Mode Pembayaran")}</h2>
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
+            {dist.map((d) => (
+              <div key={d.label} className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
+                <span className={`text-sm font-medium ${d.tone}`}>{d.label}</span>
+                <span className="text-2xl font-bold tabular-nums text-foreground">{d.value}</span>
               </div>
-              <p className="text-2xl font-bold text-foreground">{c.value}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{c.sub}</p>
-            </Link>
-          ))}
+            ))}
+          </div>
+        </div>
+
+        {/* Aktivitas terbaru */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">{tr("Reservasi Terbaru")}</h2>
+              <Link to="/platform/reservations" className="text-xs font-medium text-primary hover:underline">{tr("Lihat semua")}</Link>
+            </div>
+            {recentReservations.length === 0 ? (
+              <EmptyState message={tr("Belum ada reservasi")} />
+            ) : (
+              <Table>
+                <thead><tr><Th>{tr("Hotel")}</Th><Th>{tr("Tamu")}</Th><Th className="text-right">{tr("Total")}</Th><Th>Status</Th></tr></thead>
+                <tbody>
+                  {recentReservations.map((r) => (
+                    <tr key={r.id} className="hover:bg-muted/30">
+                      <Td className="font-medium text-foreground">{r.hotel}</Td>
+                      <Td>{r.guest}</Td>
+                      <Td className="text-right tabular-nums">{formatIDR(r.total_amount)}</Td>
+                      <Td><StatusBadge status={r.status} /></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">{tr("Permintaan Tamu Terbaru")}</h2>
+              <Link to="/platform/requests" className="text-xs font-medium text-primary hover:underline">{tr("Lihat semua")}</Link>
+            </div>
+            {recentRequests.length === 0 ? (
+              <EmptyState message={tr("Belum ada permintaan")} />
+            ) : (
+              <Table>
+                <thead><tr><Th>{tr("Hotel")}</Th><Th>{tr("Permintaan")}</Th><Th>Status</Th></tr></thead>
+                <tbody>
+                  {recentRequests.map((r) => (
+                    <tr key={r.id} className="hover:bg-muted/30">
+                      <Td className="font-medium text-foreground">{r.hotel}</Td>
+                      <Td className="max-w-[180px] truncate">{r.title}</Td>
+                      <Td><StatusBadge status={r.status} /></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </div>
         </div>
       </div>
     </PageTransition>

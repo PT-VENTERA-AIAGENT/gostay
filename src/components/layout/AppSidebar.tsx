@@ -3,7 +3,7 @@ import {
   CalendarDays, DollarSign, Star,
   Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store, Building2, Wallet, Radio
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useIsPlatformAdmin } from "@/hooks/usePlatform";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,7 +37,7 @@ const bottomItems = [
 
 export default function AppSidebar() {
   const t = useT();
-  const { role } = useAuth();
+  const { data: isPlatformAdmin } = useIsPlatformAdmin();
   const { pathname, search } = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar-collapsed") === "true");
 
@@ -191,21 +191,23 @@ export default function AppSidebar() {
         ))}
       </div>
 
-      {/* Super admin: a single link OUT to the separate Ventera platform console
-          (cross-hotel). The platform tools no longer live in this hotel sidebar. */}
-      {role === "admin" && (
+      {/* Platform operator: a single link OUT to the separate Ventera console
+          (cross-hotel monitoring). Gated on the platform_admins allowlist (035),
+          not just role — so this is the "switch to superadmin mode" entry, the
+          counterpart of the console's "Mode Staf Hotel" back-link. */}
+      {isPlatformAdmin && (
         <div className="mt-2 pt-2 border-t border-sidebar-border">
           <motion.div whileHover={{ x: collapsed ? 0 : 2 }} whileTap={{ scale: 0.97 }}>
             <Link
               to="/platform"
-              title={collapsed ? t("Console Platform") : undefined}
+              title={collapsed ? t("Konsol Platform") : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg text-sm font-semibold transition-colors bg-slate-900 text-slate-100 hover:bg-slate-800",
                 collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
               )}
             >
               <Radio className="w-5 h-5 shrink-0" />
-              {!collapsed && <span className="overflow-hidden whitespace-nowrap">{t("Console Platform")}</span>}
+              {!collapsed && <span className="overflow-hidden whitespace-nowrap">{t("Konsol Platform")}</span>}
             </Link>
           </motion.div>
         </div>

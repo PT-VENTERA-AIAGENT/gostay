@@ -1,8 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   listHotels, listAllReservations, listAllGuestRequests, listRoomAvailability,
   listAllThreads, listThreadMessages, listAllBalances, getPlatformCalendar,
+  getHotelDetail,
 } from "@/services/platformService";
+
+/**
+ * Is the signed-in user a Ventera platform operator?
+ *
+ * Authority since 035 is the `platform_admins` allowlist, not `profiles.role`.
+ * The RPC is_platform_admin() answers it (SECURITY DEFINER — the table itself is
+ * sealed). Used to show the "Konsol Platform" switch and gate the console UI, so
+ * a role that is 'admin' but not on the allowlist won't see an empty console.
+ * Fails closed: any error → not an operator.
+ */
+export function useIsPlatformAdmin() {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ["is-platform-admin", session?.profile_id ?? "anon"],
+    enabled: !!session,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase.rpc("is_platform_admin");
+      if (error) return false;
+      return data === true;
+    },
+  });
+}
 
 export const platformKeys = {
   all: ["platform"] as const,
@@ -14,6 +40,7 @@ export const platformKeys = {
   thread: (id: string) => ["platform", "thread", id] as const,
   balances: () => ["platform", "balances"] as const,
   calendar: (from: string, days: number) => ["platform", "calendar", from, days] as const,
+  hotel: (id: string) => ["platform", "hotel", id] as const,
 };
 
 export function usePlatformHotels() {
@@ -44,6 +71,13 @@ export function usePlatformBalances() {
 }
 export function usePlatformCalendar(from: string, days: number) {
   return useQuery({ queryKey: platformKeys.calendar(from, days), queryFn: () => getPlatformCalendar(from, days) });
+}
+export function usePlatformHotelDetail(tenantId: string | undefined) {
+  return useQuery({
+    queryKey: platformKeys.hotel(tenantId ?? "none"),
+    queryFn: () => getHotelDetail(tenantId as string),
+    enabled: Boolean(tenantId),
+  });
 }
 
 // Payment mutations are shared with the older admin hook.
