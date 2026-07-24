@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import handler from "./reset-chat";
-import { mintSupabaseToken } from "../_lib/identity";
+import handler from "../api/wa/reset-chat";
+import { mintSupabaseToken } from "../api/_lib/identity";
 
 const THREAD = "11111111-1111-4111-8111-111111111111";
 const CUSTOMER = "22222222-2222-4222-8222-222222222222";
