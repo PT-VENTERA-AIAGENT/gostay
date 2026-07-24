@@ -157,7 +157,10 @@ export default function PlatformHotelDetail() {
                 <tbody>
                   {hotel.recent_reservations.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/30">
-                      <Td className="font-medium text-foreground">{r.guest}{r.room ? <span className="text-muted-foreground"> · {r.room}</span> : null}</Td>
+                      <Td className="font-medium text-foreground">
+                        {r.guest}
+                        {r.room ? <span className="text-muted-foreground"> · {r.room}{r.room_type ? ` ${r.room_type}` : ""}</span> : null}
+                      </Td>
                       <Td className="text-muted-foreground">{fmtDate(r.check_in)}–{fmtDate(r.check_out)}</Td>
                       <Td className="text-right tabular-nums">{formatIDR(r.total_amount)}</Td>
                       <Td><StatusBadge status={r.status} /></Td>

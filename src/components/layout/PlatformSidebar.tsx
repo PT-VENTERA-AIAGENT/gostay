@@ -26,14 +26,9 @@ export default function PlatformSidebar() {
 
   return (
     <aside className="hidden md:flex flex-col sticky top-0 h-screen self-start w-60 shrink-0 bg-slate-900 text-slate-100 px-3 py-6 overflow-y-auto">
-      <div className="flex items-center gap-2 px-2 mb-8">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">V</span>
-        </div>
-        <div className="leading-tight">
-          <p className="text-sm font-bold tracking-tight">Platform Ventera</p>
-          <p className="text-[11px] text-slate-400">Super Admin</p>
-        </div>
+      <div className="px-2 mb-8 leading-tight">
+        <p className="text-sm font-bold tracking-tight">Platform Ventera</p>
+        <p className="text-[11px] text-slate-400">Super Admin</p>
       </div>
 
       <nav className="flex-1 flex flex-col gap-1">

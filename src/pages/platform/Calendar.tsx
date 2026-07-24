@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { Fragment, useState } from "react";
 import { CalendarRange, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
 import { tr } from "@/lib/i18n";
-import { usePlatformCalendar } from "@/hooks/usePlatform";
+import { usePlatformRoomCalendar } from "@/hooks/usePlatform";
+import { PageHeader } from "@/components/platform/widgets";
 
 const WINDOW_DAYS = 14;
 
@@ -15,52 +16,42 @@ function dayLabel(iso: string) {
   return { dow: d.toLocaleDateString("id-ID", { weekday: "short", timeZone: "UTC" }), num: d.getUTCDate() };
 }
 
-/** Warna sel mengikuti tingkat hunian, bukan angka mentah — pola penuh/kosong
- *  antar hotel harus terbaca sekali lihat. */
-function occupancyTone(pct: number) {
-  if (pct >= 0.9) return "bg-destructive/20 text-destructive";
-  if (pct >= 0.6) return "bg-warning/20 text-warning";
-  if (pct > 0) return "bg-success/15 text-success";
-  return "text-muted-foreground";
-}
-
 export default function PlatformCalendar() {
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
-  const { data, isLoading } = usePlatformCalendar(from, WINDOW_DAYS);
+  const { data, isLoading } = usePlatformRoomCalendar(from, WINDOW_DAYS);
 
   const hotels = data?.hotels ?? [];
   const days = data?.days ?? [];
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const occupied = data?.occupied ?? new Set<string>();
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <PageTransition>
+      <PageHeader
+        icon={<CalendarRange className="w-5 h-5" />}
+        title={tr("Kalender Hunian")}
+        description={tr("Status tiap kamar (nomor & tipe) per malam, seluruh hotel. Hijau = kosong, oranye = terisi.")}
+        action={
+          <div className="flex items-center gap-2">
+            <button onClick={() => setFrom(addDays(from, -WINDOW_DAYS))}
+              className="p-2 rounded-lg border border-border hover:bg-muted transition-colors" aria-label={tr("Mundur")}>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground" />
+            <button onClick={() => setFrom(addDays(from, WINDOW_DAYS))}
+              className="p-2 rounded-lg border border-border hover:bg-muted transition-colors" aria-label={tr("Maju")}>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button onClick={() => setFrom(today)}
+              className="px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted transition-colors">
+              {tr("Hari ini")}
+            </button>
+          </div>
+        }
+      />
+
       <div className="p-4 md:p-6">
-        <div className="mb-5">
-          <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-            <CalendarRange className="w-6 h-6 text-primary" /> {tr("Kalender Hunian")}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {tr("Kamar terisi per malam, seluruh hotel. Angka = kamar terisi dari total kamar aktif.")}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 mb-4">
-          <button onClick={() => setFrom(addDays(from, -WINDOW_DAYS))}
-            className="p-2 rounded-lg border border-border hover:bg-muted transition-colors" aria-label={tr("Mundur")}>
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground" />
-          <button onClick={() => setFrom(addDays(from, WINDOW_DAYS))}
-            className="p-2 rounded-lg border border-border hover:bg-muted transition-colors" aria-label={tr("Maju")}>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <button onClick={() => setFrom(today)}
-            className="px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted transition-colors">
-            {tr("Hari ini")}
-          </button>
-        </div>
-
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
             {isLoading ? (
@@ -71,11 +62,11 @@ export default function PlatformCalendar() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="text-xs text-muted-foreground border-b border-border">
-                    <th className="px-4 py-3 font-medium text-left sticky left-0 bg-card z-10">{tr("Hotel")}</th>
+                    <th className="px-4 py-3 font-medium text-left sticky left-0 bg-card z-10 min-w-[160px]">{tr("Kamar")}</th>
                     {days.map((d) => {
-                      const l = dayLabel(d.date);
+                      const l = dayLabel(d);
                       return (
-                        <th key={d.date} className={cn("px-2 py-2 font-medium text-center min-w-[46px]", d.date === today && "bg-primary/10 text-primary")}>
+                        <th key={d} className={cn("px-1 py-2 font-medium text-center min-w-[42px]", d === today && "bg-primary/10 text-primary")}>
                           <span className="block">{l.dow}</span>
                           <span className="block text-sm text-foreground">{l.num}</span>
                         </th>
@@ -85,31 +76,53 @@ export default function PlatformCalendar() {
                 </thead>
                 <tbody>
                   {hotels.map((h) => (
-                    <tr key={h.tenant_id} className="border-b border-border/60 last:border-0">
-                      <td className="px-4 py-3 sticky left-0 bg-card z-10">
-                        <span className="font-medium text-foreground">{h.name}</span>
-                        <span className="block text-xs text-muted-foreground">{h.rooms} {tr("kamar")}</span>
-                      </td>
-                      {days.map((d) => {
-                        const used = d.byHotel[h.tenant_id] ?? 0;
-                        const pct = h.rooms > 0 ? used / h.rooms : 0;
-                        return (
-                          <td key={d.date} className="px-1 py-2 text-center">
-                            <span className={cn(
-                              "inline-block min-w-[34px] rounded-md px-1.5 py-1 text-xs font-medium",
-                              occupancyTone(pct),
-                            )}>
-                              {h.rooms > 0 ? `${used}/${h.rooms}` : "—"}
-                            </span>
+                    <Fragment key={h.tenant_id}>
+                      {/* Baris judul hotel */}
+                      <tr className="bg-muted/40 border-b border-border">
+                        <td className="px-4 py-2 sticky left-0 bg-muted/40 z-10 font-semibold text-foreground" colSpan={days.length + 1}>
+                          {h.name} <span className="text-xs font-normal text-muted-foreground">· {h.rooms.length} {tr("kamar")}</span>
+                        </td>
+                      </tr>
+                      {h.rooms.length === 0 ? (
+                        <tr className="border-b border-border/60">
+                          <td className="px-4 py-2 sticky left-0 bg-card z-10 text-xs text-muted-foreground" colSpan={days.length + 1}>
+                            {tr("Belum ada kamar")}
                           </td>
-                        );
-                      })}
-                    </tr>
+                        </tr>
+                      ) : (
+                        h.rooms.map((room) => (
+                          <tr key={room.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20">
+                            <td className="px-4 py-2 sticky left-0 bg-card z-10">
+                              <span className="font-medium text-foreground">{room.number}</span>
+                              {room.type && <span className="block text-xs text-muted-foreground">{room.type}</span>}
+                            </td>
+                            {days.map((d) => {
+                              const busy = occupied.has(`${room.id}|${d}`);
+                              return (
+                                <td key={d} className="px-1 py-1.5 text-center">
+                                  <span className={cn(
+                                    "inline-block w-6 h-6 rounded-md",
+                                    busy ? "bg-warning/25" : "bg-success/15",
+                                    d === today && "ring-1 ring-primary/40",
+                                  )} title={busy ? tr("Terisi") : tr("Kosong")} />
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
             )}
           </div>
+        </div>
+
+        {/* Legenda */}
+        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-success/15 inline-block" /> {tr("Kosong")}</span>
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-warning/25 inline-block" /> {tr("Terisi")}</span>
         </div>
       </div>
     </PageTransition>

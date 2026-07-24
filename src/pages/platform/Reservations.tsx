@@ -63,6 +63,7 @@ export default function PlatformReservations() {
                 <Th>{tr("Hotel")}</Th>
                 <Th>Ref</Th>
                 <Th>{tr("Tamu")}</Th>
+                <Th>{tr("Kamar")}</Th>
                 <Th>{tr("Menginap")}</Th>
                 <Th>Status</Th>
                 <Th className="text-right">{tr("Total")}</Th>
@@ -78,7 +79,14 @@ export default function PlatformReservations() {
                       {id ? <Link to={`/platform/hotels/${id}`} className="hover:text-primary">{r.hotel}</Link> : r.hotel}
                     </Td>
                     <Td><code className="text-xs text-muted-foreground">{r.reference}</code></Td>
-                    <Td>{r.guest}{r.room ? <span className="text-muted-foreground"> · {r.room}</span> : null}</Td>
+                    <Td>{r.guest}</Td>
+                    <Td>
+                      {r.room ? (
+                        <span className="text-foreground">{r.room}{r.room_type ? <span className="text-muted-foreground"> · {r.room_type}</span> : null}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </Td>
                     <Td className="text-muted-foreground">{fmtDate(r.check_in)} – {fmtDate(r.check_out)}</Td>
                     <Td><StatusBadge status={r.status} /></Td>
                     <Td className="text-right tabular-nums">{formatIDR(r.total_amount)}</Td>

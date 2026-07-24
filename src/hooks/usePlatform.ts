@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   listHotels, listAllReservations, listAllGuestRequests, listRoomAvailability,
   listAllThreads, listThreadMessages, listAllBalances, getPlatformCalendar,
-  getHotelDetail,
+  getHotelDetail, getPlatformRoomBoard, getPlatformRoomCalendar,
 } from "@/services/platformService";
 
 /**
@@ -40,6 +40,8 @@ export const platformKeys = {
   thread: (id: string) => ["platform", "thread", id] as const,
   balances: () => ["platform", "balances"] as const,
   calendar: (from: string, days: number) => ["platform", "calendar", from, days] as const,
+  roomBoard: (date: string) => ["platform", "room-board", date] as const,
+  roomCalendar: (from: string, days: number) => ["platform", "room-calendar", from, days] as const,
   hotel: (id: string) => ["platform", "hotel", id] as const,
 };
 
@@ -71,6 +73,12 @@ export function usePlatformBalances() {
 }
 export function usePlatformCalendar(from: string, days: number) {
   return useQuery({ queryKey: platformKeys.calendar(from, days), queryFn: () => getPlatformCalendar(from, days) });
+}
+export function usePlatformRoomBoard(date: string) {
+  return useQuery({ queryKey: platformKeys.roomBoard(date), queryFn: () => getPlatformRoomBoard(date) });
+}
+export function usePlatformRoomCalendar(from: string, days: number) {
+  return useQuery({ queryKey: platformKeys.roomCalendar(from, days), queryFn: () => getPlatformRoomCalendar(from, days) });
 }
 export function usePlatformHotelDetail(tenantId: string | undefined) {
   return useQuery({
