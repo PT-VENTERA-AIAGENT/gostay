@@ -475,7 +475,7 @@ async function confirmBooking(
   // Record who the reservation is under (the name the guest gave), so CRM and the
   // folio show it instead of the WhatsApp push-name. Best-effort — never block the
   // booking on this.
-  if (guestName) await setCustomerName(guest.customerId, guestName).catch(() => {});
+  if (guestName) await setCustomerName(tenantId, guest.customerId, guestName).catch(() => {});
 
   const booking = await createWaBooking({
     tenantId,

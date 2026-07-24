@@ -38,6 +38,9 @@ import PlatformHotels from "./pages/platform/Hotels";
 import PlatformRoomAvailability from "./pages/platform/RoomAvailability";
 import PlatformReservations from "./pages/platform/Reservations";
 import PlatformGuestRequests from "./pages/platform/GuestRequests";
+import PlatformMessages from "./pages/platform/Messages";
+import PlatformBalances from "./pages/platform/Balances";
+import PlatformCalendar from "./pages/platform/Calendar";
 import LeadDetail from "./pages/admin/LeadDetail";
 import CampaignsPage from "./pages/admin/Campaigns";
 import CRM from "./pages/CRM";
@@ -214,6 +217,9 @@ const App = () => (
               <Route path="/platform/hotels" element={<PlatformHotels />} />
               <Route path="/platform/rooms" element={<PlatformRoomAvailability />} />
               <Route path="/platform/reservations" element={<PlatformReservations />} />
+              <Route path="/platform/calendar" element={<PlatformCalendar />} />
+              <Route path="/platform/messages" element={<PlatformMessages />} />
+              <Route path="/platform/balances" element={<PlatformBalances />} />
               <Route path="/platform/requests" element={<PlatformGuestRequests />} />
               <Route path="/admin/add-hotel" element={<AddHotel />} />
               <Route path="/admin/leads" element={<LeadList />} />

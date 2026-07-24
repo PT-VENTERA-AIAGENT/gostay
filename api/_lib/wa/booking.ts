@@ -69,11 +69,19 @@ export async function findRoomType(
  * rather than the WhatsApp push-name. Best-effort: a failure is swallowed by the
  * caller so it can never block a booking that is otherwise valid.
  */
-export async function setCustomerName(customerId: string, name: string): Promise<void> {
+export async function setCustomerName(
+  tenantId: string,
+  customerId: string,
+  name: string,
+): Promise<void> {
   const trimmed = name.trim();
   if (!trimmed) return;
+  // tenant_id is in the filter as a belt-and-braces guard: this runs service-role,
+  // so nothing else stops a customer_id that belongs to another hotel from being
+  // renamed by a conversation with this one. Matching zero rows is the safe
+  // failure mode — the caller already swallows a no-op.
   await serviceUpdate(
-    `customers?id=eq.${encodeURIComponent(customerId)}`,
+    `customers?id=eq.${encodeURIComponent(customerId)}&tenant_id=eq.${encodeURIComponent(tenantId)}`,
     { full_name: trimmed },
   );
 }

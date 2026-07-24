@@ -306,7 +306,8 @@ describe("handleGuestMessage — confirmation", () => {
     );
     expect(pending.clearPending).toHaveBeenCalled();
     expect(repliesText()).toContain("GS-0001");
-    expect(booking.setCustomerName).toHaveBeenCalledWith("cust-1", "Budi"); // records the booking name
+    // records the booking name, scoped to the hotel that owns the conversation
+    expect(booking.setCustomerName).toHaveBeenCalledWith("tenant-x", "cust-1", "Budi");
   });
 
   it("BATAL clears the pending and books nothing", async () => {

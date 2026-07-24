@@ -175,6 +175,13 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: 8080,
+      // Fail instead of drifting to 8081. redirect_uri is built from
+      // window.location.origin (src/lib/sso.ts), and Ventera only accepts the
+      // exact URIs registered for the `gostay` client — which are on 8080. So a
+      // silent port fallback turns every login into `invalid_redirect_uri`, with
+      // nothing in this project to point at. Better to refuse to start and say
+      // the port is taken.
+      strictPort: true,
       hmr: {
         overlay: false,
       },

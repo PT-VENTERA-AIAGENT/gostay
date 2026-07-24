@@ -4,6 +4,7 @@ import { Send, Paperclip, ArrowLeft, CheckCheck, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageTransition from "@/components/shared/PageTransition";
+import { ChatAttachment } from "@/components/shared/ChatAttachment";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import { useT } from "@/lib/i18n";
@@ -241,15 +242,7 @@ export default function PortalChat() {
                       : "bg-muted text-foreground rounded-bl-md"
                   )}>
                     {msg.attachment_url && (
-                      /\.(png|jpe?g|gif|webp|avif)$/i.test(msg.attachment_url) ? (
-                        <a href={msg.attachment_url} target="_blank" rel="noreferrer">
-                          <img src={msg.attachment_url} alt={msg.content} className="rounded-lg max-h-48 mb-1.5 border border-black/5" />
-                        </a>
-                      ) : (
-                        <a href={msg.attachment_url} target="_blank" rel="noreferrer" className={cn("flex items-center gap-1.5 text-sm underline mb-1", isMine ? "text-primary-foreground" : "text-primary")}>
-                          <Paperclip className="w-3.5 h-3.5" /> {msg.content}
-                        </a>
-                      )
+                      <ChatAttachment value={msg.attachment_url} name={msg.content} onLight={isMine} />
                     )}
                     {!msg.attachment_url && <p className="text-sm whitespace-pre-line">{msg.content}</p>}
                     <div className={cn("flex items-center gap-1 mt-1", isMine ? "justify-end" : "")}>

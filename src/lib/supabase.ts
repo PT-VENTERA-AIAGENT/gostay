@@ -47,3 +47,22 @@ export const supabase = createClient<Database>(effectiveUrl, effectiveAnonKey, {
   // after this module is first imported, and again after each fresh login.
   accessToken: async () => getSession()?.supabase_token ?? null,
 });
+
+/**
+ * The client for the Ventera platform console — and ONLY for it.
+ *
+ * Cross-hotel reads are gated by `platform_admin_scope()` (035), which is
+ * `is_platform_admin() AND` this `x-platform-scope: all` header. `supabase`
+ * above never sends it, so every hotel-facing page is tenant-scoped for
+ * everyone, an operator included: opening Pesan or Reservasi shows their own
+ * hotel, not all of them. That mixing is what made two accounts show an
+ * identical inbox.
+ *
+ * The header cannot grant anything — the policies AND it with the allowlist —
+ * it only decides which world a request belongs to. Use `platformDb` in
+ * platformService.ts; use `supabase` everywhere else.
+ */
+export const platformDb = createClient<Database>(effectiveUrl, effectiveAnonKey, {
+  global: { headers: { "x-platform-scope": "all" } },
+  accessToken: async () => getSession()?.supabase_token ?? null,
+});
