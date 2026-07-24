@@ -17,7 +17,14 @@ function fakeIdToken(claims: Record<string, unknown>): string {
 /** Stands in for both the SSO issuer and Supabase's PostgREST. */
 interface MockState {
   tokenRequests: Array<Record<string, string>>;
-  profileRows: Array<{ id: string; role: string; is_active?: boolean; email?: string; full_name?: string }>;
+  profileRows: Array<{
+    id: string;
+    role: string;
+    is_active?: boolean;
+    email?: string;
+    full_name?: string;
+    tenant_id?: string | null;
+  }>;
   inserts: Array<Record<string, unknown>>;
   patches: Array<Record<string, unknown>>;
   realm: string | undefined;
@@ -216,6 +223,9 @@ describe("exchangeCode — Supabase identity bridge", () => {
   it("creates a web profile as customer by default", async () => {
     await call();
     expect(state.inserts[0].role).toBe("customer");
+    // Main-app login is prospective-owner onboarding. Explicit NULL prevents
+    // the database's single-hotel default from attaching it to that hotel.
+    expect(state.inserts[0].tenant_id).toBeNull();
   });
 
   it("files a new guest under the hotel from their portal link (?hotel slug)", async () => {
@@ -225,6 +235,7 @@ describe("exchangeCode — Supabase identity bridge", () => {
       code_verifier: "verifier-123",
       origin: ORIGIN,
       tenantSlug: "kopi-rintik",
+      signupContext: "guest",
     });
     expect(r.status).toBe(200);
     expect(state.inserts[0].tenant_id).toBe(state.tenantId);
@@ -239,11 +250,33 @@ describe("exchangeCode — Supabase identity bridge", () => {
       code_verifier: "verifier-123",
       origin: ORIGIN,
       tenantSlug: "does-not-exist",
+      signupContext: "guest",
     });
     expect(r.status).toBe(200);
     // Falls through to the deployment default (TENANT_SLUG unset here) → no
     // tenant_id sent, so the column default applies rather than a hard failure.
     expect(state.inserts[0]).not.toHaveProperty("tenant_id");
+  });
+
+  it("ignores stale/default hotel hints during owner onboarding", async () => {
+    state.tenantId = "11111111-1111-4111-8111-111111111111";
+    const previous = process.env.TENANT_SLUG;
+    process.env.TENANT_SLUG = "gostay";
+    try {
+      const r = await exchangeCode({
+        code: "auth-code",
+        code_verifier: "verifier-123",
+        origin: ORIGIN,
+        tenantSlug: "gostay",
+        signupContext: "owner",
+      });
+      expect(r.status).toBe(200);
+      expect(state.inserts[0].tenant_id).toBeNull();
+      expect(r.body.tenant_id).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.TENANT_SLUG;
+      else process.env.TENANT_SLUG = previous;
+    }
   });
 
   it("honours SSO_SIGNUP_ROLE override", async () => {
@@ -304,9 +337,15 @@ describe("exchangeCode — Supabase identity bridge", () => {
   });
 
   it("reports the stored role, which is what RLS enforces", async () => {
-    state.profileRows = [{ id: profileIdFor(SSO_SUB), role: "staff", is_active: true }];
+    state.profileRows = [{
+      id: profileIdFor(SSO_SUB),
+      role: "staff",
+      is_active: true,
+      tenant_id: "11111111-1111-4111-8111-111111111111",
+    }];
     const r = await call();
     expect(r.body.role).toBe("staff");
+    expect(r.body.tenant_id).toBe("11111111-1111-4111-8111-111111111111");
   });
 
   it("refuses to mint a token for a deactivated user", async () => {

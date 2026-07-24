@@ -23,6 +23,15 @@ export interface ProvisionInput {
    * than failing sign-in. Never confers anything but the 'customer' default.
    */
   tenantSlug?: string;
+  /**
+   * Why this browser is signing in for the first time.
+   *
+   * `owner` is the main GoStay application entrance: the new profile must stay
+   * tenant-less until /create-hotel creates a fresh tenant and promotes it to
+   * staff. `guest` is a hotel's public portal entrance and may attach the new
+   * customer to the explicitly selected hotel.
+   */
+  signupContext?: "owner" | "guest";
 }
 
 export interface ProvisionResult {
@@ -32,6 +41,8 @@ export interface ProvisionResult {
   role: AppRole | null;
   /** False when an admin has deactivated this user. */
   isActive: boolean;
+  /** The profile's authoritative hotel membership; null means prospective owner. */
+  tenantId: string | null;
   error?: string;
 }
 
@@ -64,12 +75,10 @@ const VALID_ROLES: AppRole[] = ["admin", "staff", "customer"];
  *
  * Defaults to 'customer' — the least-privilege, tenant-safe answer. A hotel's
  * staff are NOT born here: per the role model (PRD §2.1–2.2), staff belong to a
- * specific hotel and are created either by Ventera's onboarding wizard or, in
- * the target self-serve flow (PRD §2.2 path 1), by spinning up a NEW tenant and
- * making the signer its owner. Until that self-serve flow exists, minting a
- * stranger straight into the single existing tenant as 'staff' would hand them
- * another hotel's dashboard and guest data — a cross-tenant leak. So a plain web
- * signup lands as a portal-only 'customer'.
+ * specific hotel and are created either by Ventera's onboarding wizard or by
+ * /create-hotel spinning up a NEW tenant and making the signer its owner.
+ * Minting a stranger straight into an existing tenant as 'staff' would hand
+ * them another hotel's dashboard and guest data — a cross-tenant leak.
  *
  * FIXED server-side default, never derived from the SSO token (realm included),
  * so a caller cannot steer it. Only applies at creation; afterwards role is
@@ -137,6 +146,7 @@ export async function provisionProfile(input: ProvisionInput): Promise<Provision
       created: false,
       role: null,
       isActive: false,
+      tenantId: null,
       error: `network_error: ${(e as Error).message}`,
     };
   }
@@ -171,6 +181,7 @@ export async function provisionProfileWithTenant(input: ProvisionWithTenantInput
       created: false,
       role: null,
       isActive: false,
+      tenantId: null,
       error: `network_error: ${(e as Error).message}`,
     };
   }
@@ -181,6 +192,14 @@ async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
     input,
     async ({ url, headers }) => {
       // Resolve the tenant only when creating the row.
+      //
+      // The main application login is the hotel-owner entrance. It must
+      // explicitly write NULL even on a single-hotel deployment; omitting the
+      // column would invoke default_tenant() and silently turn the new owner
+      // into that hotel's guest.
+      if (input.signupContext === "owner") {
+        return { ok: true, tenantId: null };
+      }
       //
       // A guest's portal link (input.tenantSlug) wins when it names a real,
       // active hotel — that is how a WhatsApp guest signing up on hotel X's
@@ -203,9 +222,8 @@ async function runProvision(input: ProvisionInput): Promise<ProvisionResult> {
       // tenant while one exists, else NULL — a tenant-less prospective owner).
       return { ok: true, tenantId: envTenant ?? undefined };
     },
-    // Web sign-in is the staff entrance; a new web profile is created as staff
-    // (or whatever SSO_SIGNUP_ROLE overrides to). The WhatsApp path below passes
-    // no role, so a guest keeps the 'customer' column default.
+    // A new profile remains customer until a tenant exists. /create-hotel
+    // atomically creates that tenant and promotes an owner to staff.
     webSignupRole(),
   );
 }
@@ -221,7 +239,7 @@ interface ProfileFields {
 }
 
 /** Where a new profile row is filed, resolved lazily so a returning login skips it. */
-type TenantResolution = { ok: true; tenantId: string | undefined } | { ok: false; error: string };
+type TenantResolution = { ok: true; tenantId: string | null | undefined } | { ok: false; error: string };
 
 /**
  * The shared service-role lookup-then-insert/patch for a profiles row.
@@ -240,7 +258,14 @@ async function upsertProfile(
 ): Promise<ProvisionResult> {
   const { url, serviceKey } = config();
   if (!url || !serviceKey) {
-    return { ok: false, created: false, role: null, isActive: false, error: "provisioning_not_configured" };
+    return {
+      ok: false,
+      created: false,
+      role: null,
+      isActive: false,
+      tenantId: null,
+      error: "provisioning_not_configured",
+    };
   }
 
   const headers = {
@@ -250,14 +275,26 @@ async function upsertProfile(
   };
 
   const existing = await fetch(
-    `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(input.profileId)}&select=id,role,is_active`,
+    `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(input.profileId)}&select=id,role,is_active,tenant_id`,
     { headers },
   );
   if (!existing.ok) {
-    return { ok: false, created: false, role: null, isActive: false, error: `lookup_failed_${existing.status}` };
+    return {
+      ok: false,
+      created: false,
+      role: null,
+      isActive: false,
+      tenantId: null,
+      error: `lookup_failed_${existing.status}`,
+    };
   }
 
-  const rows = (await existing.json()) as Array<{ id: string; role: AppRole; is_active: boolean }>;
+  const rows = (await existing.json()) as Array<{
+    id: string;
+    role: AppRole;
+    is_active: boolean;
+    tenant_id: string | null;
+  }>;
 
   if (rows.length > 0) {
     // The row is already there. Refresh the contact fields, but never touch
@@ -281,22 +318,35 @@ async function upsertProfile(
       return {
         ok: true, created: false,
         role: rows[0].role, isActive: rows[0].is_active !== false,
+        tenantId: rows[0].tenant_id ?? null,
         error: `update_failed_${patch.status}`,
       };
     }
-    return { ok: true, created: false, role: rows[0].role, isActive: rows[0].is_active !== false };
+    return {
+      ok: true,
+      created: false,
+      role: rows[0].role,
+      isActive: rows[0].is_active !== false,
+      tenantId: rows[0].tenant_id ?? null,
+    };
   }
 
   const tenant = await resolveTenant({ url, headers });
   if (!tenant.ok) {
-    return { ok: false, created: false, role: null, isActive: false, error: tenant.error };
+    return {
+      ok: false,
+      created: false,
+      role: null,
+      isActive: false,
+      tenantId: null,
+      error: tenant.error,
+    };
   }
 
-  // `role` is set only for the web sign-in (staff entrance); the WhatsApp path
-  // leaves it absent so the column default ('customer') gives a guest the least
-  // privilege. Either way this is a fixed server-side value — never taken from
-  // the SSO token — so the token cannot influence authorization, and an admin
-  // can still re-decide the role afterwards through the database.
+  // The role is a fixed server-side value — never taken from the SSO token —
+  // so the token cannot influence authorization. A self-serve owner is promoted
+  // later, atomically with tenant creation; the WhatsApp path leaves this absent
+  // so the column's customer default applies.
   const insert = await fetch(`${url}/rest/v1/profiles`, {
     method: "POST",
     headers: { ...headers, Prefer: "return=representation" },
@@ -307,20 +357,33 @@ async function upsertProfile(
       full_name: input.fullName,
       last_seen_at: input.now,
       ...(newProfileRole ? { role: newProfileRole } : {}),
-      // Omitted when the resolver returns undefined (single-hotel web install),
-      // so the column default applies; sent explicitly otherwise.
-      ...(tenant.tenantId ? { tenant_id: tenant.tenantId } : {}),
+      // undefined keeps the deployment default for legacy/guest flows. null is
+      // deliberately sent for owner onboarding so default_tenant() cannot file
+      // the prospective owner under an existing hotel.
+      ...(tenant.tenantId !== undefined ? { tenant_id: tenant.tenantId } : {}),
     }),
   });
 
   if (!insert.ok) {
-    return { ok: false, created: false, role: null, isActive: false, error: `insert_failed_${insert.status}` };
+    return {
+      ok: false,
+      created: false,
+      role: null,
+      isActive: false,
+      tenantId: null,
+      error: `insert_failed_${insert.status}`,
+    };
   }
 
-  const created = (await insert.json()) as Array<{ role: AppRole; is_active: boolean }>;
+  const created = (await insert.json()) as Array<{
+    role: AppRole;
+    is_active: boolean;
+    tenant_id: string | null;
+  }>;
   return {
     ok: true, created: true,
     role: created[0]?.role ?? null,
     isActive: created[0]?.is_active !== false,
+    tenantId: created[0]?.tenant_id ?? tenant.tenantId ?? null,
   };
 }
