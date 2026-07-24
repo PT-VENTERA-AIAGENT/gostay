@@ -152,6 +152,8 @@ describe("phoneDigits", () => {
 describe("resolveOrProvisionGuest", () => {
   it("(a) returns the stored ids for a known number without calling Ventera", async () => {
     state.identityRows = [{ id: "idn-1", sso_sub: SSO_SUB, profile_id: "prof-1", customer_id: "cust-1" }];
+    state.profileRows = [{ id: "prof-1", role: "customer", is_active: true }];
+    state.customerRows = [{ id: "cust-1" }];
 
     const out = await resolveOrProvisionGuest(PHONE_JID, TENANT, "Budi");
 
@@ -162,6 +164,22 @@ describe("resolveOrProvisionGuest", () => {
     expect(state.profileInserts).toHaveLength(0);
     expect(state.customerInserts).toHaveLength(0);
     expect(state.identityInserts).toHaveLength(0);
+  });
+
+  it("repairs an orphan identity without creating a duplicate SSO account", async () => {
+    state.identityRows = [{ id: "idn-orphan", sso_sub: SSO_SUB, profile_id: "prof-missing", customer_id: "cust-missing" }];
+
+    const out = await resolveOrProvisionGuest(PHONE_JID, TENANT, "Budi");
+
+    expect(out.ssoSub).toBe(SSO_SUB);
+    expect(state.venteraCalls).toHaveLength(0);
+    expect(state.profileInserts).toHaveLength(1);
+    expect(state.customerInserts).toHaveLength(1);
+    expect(state.identityPatches[0]).toMatchObject({
+      sso_sub: SSO_SUB,
+      profile_id: profileIdFor(SSO_SUB),
+      customer_id: "cust-new-1",
+    });
   });
 
   it("(b) provisions a new guest: Ventera + profile + customer + identity", async () => {

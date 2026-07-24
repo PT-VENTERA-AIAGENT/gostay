@@ -100,17 +100,26 @@ export async function resolveOrProvisionGuest(
   //    no rate-limit consult, no Ventera call, no duplicate profile/customer.
   const existing = await lookupIdentity(tenantId, phoneJid);
   if (existing && existing.profile_id && existing.customer_id) {
-    return {
-      profileId: existing.profile_id,
-      customerId: existing.customer_id,
-      ssoSub: existing.sso_sub ?? "",
-    };
+    // An interrupted cleanup can leave the identity row pointing at deleted
+    // profile/customer rows. Validate both references before short-circuiting;
+    // otherwise CRM thread creation fails and the guest receives a generic
+    // WhatsApp apology instead of being repaired automatically.
+    if (await identityReferencesExist(tenantId, existing)) {
+      return {
+        profileId: existing.profile_id,
+        customerId: existing.customer_id,
+        ssoSub: existing.sso_sub ?? "",
+      };
+    }
   }
 
-  // 2. New (or half-provisioned) number: throttle before the expensive steps so
-  //    a flood can't mint accounts.
-  const allowed = await checkRateLimit(phoneJid);
-  if (!allowed) throw new WaRateLimitError();
+  // 2. New (or incomplete) number: throttle before minting a new identity. If
+  //    an incomplete row already has an SSO subject, reuse it while repairing
+  //    the missing child rows instead of creating another account.
+  let sub = existing?.sso_sub?.trim() ?? "";
+  if (!sub) {
+    const allowed = await checkRateLimit(phoneJid);
+    if (!allowed) throw new WaRateLimitError();
 
   // 3. Identity for this guest. Prefer a real Ventera SSO account (a returning
   //    guest is then the same person on web + WA). But a guest may present a
@@ -119,12 +128,12 @@ export async function resolveOrProvisionGuest(
   //    a local, WA-scoped subject keyed on the JID; profiles.id derives from it
   //    deterministically either way. A local guest simply can't log into the web
   //    portal with it (they interact over WhatsApp), which is fine.
-  let sub: string;
-  try {
-    sub = await provisionVentera(digits, displayName);
-  } catch (e) {
-    console.error(`[wa/guest] Ventera provision → local fallback: ${(e as Error).message}`);
-    sub = `wa:${phoneJid}`;
+    try {
+      sub = await provisionVentera(digits, displayName);
+    } catch (e) {
+      console.error(`[wa/guest] Ventera provision → local fallback: ${(e as Error).message}`);
+      sub = `wa:${phoneJid}`;
+    }
   }
 
   // 4. profileId is derived from the SSO subject, exactly as the web flow does
@@ -163,6 +172,30 @@ async function lookupIdentity(tenantId: string, phoneJid: string): Promise<Ident
   if (!res.ok) throw new WaProvisionError(`identity_lookup_${res.status}`);
   const rows = (await res.json()) as IdentityRow[];
   return rows[0] ?? null;
+}
+
+async function identityReferencesExist(
+  tenantId: string,
+  identity: IdentityRow,
+): Promise<boolean> {
+  if (!identity.profile_id || !identity.customer_id) return false;
+
+  const [profile, customer] = await Promise.all([
+    serviceGet(
+      `profiles?id=eq.${encodeURIComponent(identity.profile_id)}` +
+        `&tenant_id=eq.${encodeURIComponent(tenantId)}&select=id&limit=1`,
+    ),
+    serviceGet(
+      `customers?id=eq.${encodeURIComponent(identity.customer_id)}` +
+        `&tenant_id=eq.${encodeURIComponent(tenantId)}&select=id&limit=1`,
+    ),
+  ]);
+  if (!profile.ok) throw new WaProvisionError(`profile_reference_lookup_${profile.status}`);
+  if (!customer.ok) throw new WaProvisionError(`customer_reference_lookup_${customer.status}`);
+
+  const profileRows = (await profile.json()) as unknown[];
+  const customerRows = (await customer.json()) as unknown[];
+  return profileRows.length > 0 && customerRows.length > 0;
 }
 
 async function checkRateLimit(phoneJid: string): Promise<boolean> {
