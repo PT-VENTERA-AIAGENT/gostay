@@ -44,7 +44,7 @@ export default function Login() {
     if (session) {
       // Honour a real returnTo, otherwise their role's home rather than "/",
       // which is the marketing page.
-      navigate(from !== "/" ? from : roleHome(role), { replace: true });
+      navigate(from !== "/" ? from : roleHome(role, session.tenant_id), { replace: true });
       return;
     }
 

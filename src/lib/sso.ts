@@ -76,6 +76,19 @@ export interface SsoSession {
   role?: SsoRole | null;
   /** profiles.id — a uuid derived from the SSO subject. */
   profile_id?: string | null;
+  /** Authoritative profiles.tenant_id; null means this user still needs a hotel. */
+  tenant_id?: string | null;
+}
+
+export type SignupContext = "owner" | "guest";
+
+/**
+ * Only public-portal deep links are guest sign-ins. The app's normal /login
+ * entrance is owner onboarding and must ignore any stale hotel slug remembered
+ * from an earlier portal visit.
+ */
+export function signupContextFor(returnTo: string): SignupContext {
+  return returnTo === "/portal" || returnTo.startsWith("/portal/") ? "guest" : "owner";
 }
 
 export async function startLogin(returnTo = "/") {
@@ -114,18 +127,20 @@ export async function handleCallback(
   sessionStorage.removeItem(TX_STATE_KEY);
 
   // redirect_uri is not sent: the server derives it from the request origin so
-  // it cannot be pointed elsewhere by a caller. tenant_slug carries the hotel the
-  // guest is signing up on (their `?hotel={slug}` portal link) so a brand-new
-  // profile is filed under that hotel; it only affects a first-ever insert (a
-  // returning guest keeps the tenant their profile already has) and can only ever
-  // make someone a customer, never staff/admin.
+  // it cannot be pointed elsewhere by a caller. A tenant slug is sent ONLY for
+  // a portal deep-link login. The main app login is owner onboarding and must
+  // ignore a remembered/default hotel, otherwise a new owner is filed as that
+  // hotel's guest.
+  const signupContext = signupContextFor(tx.returnTo);
+  const tenantSlug = signupContext === "guest" ? currentTenantSlug() : null;
   const res = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       code,
       code_verifier: verifier,
-      ...(currentTenantSlug() ? { tenant_slug: currentTenantSlug() } : {}),
+      signup_context: signupContext,
+      ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
     }),
   });
 
@@ -142,6 +157,7 @@ export async function handleCallback(
     supabase_token: (tokens.supabase_token as string | null) ?? null,
     role: (tokens.role as SsoRole | null) ?? null,
     profile_id: (tokens.profile_id as string | null) ?? null,
+    tenant_id: (tokens.tenant_id as string | null) ?? null,
   };
 
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));

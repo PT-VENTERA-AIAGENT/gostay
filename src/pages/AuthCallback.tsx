@@ -32,9 +32,12 @@ export default function AuthCallback() {
       // back for the routing decision. A returnTo that points at a real page
       // (a deep link the user was sent to /login from) wins; the default "/"
       // is marketing, so fall through to the role's home instead.
-      const role = getSession()?.role ?? null;
+      const session = getSession();
+      const role = session?.role ?? null;
       const dest =
-        result.returnTo && result.returnTo !== "/" ? result.returnTo : roleHome(role);
+        result.returnTo && result.returnTo !== "/"
+          ? result.returnTo
+          : roleHome(role, session?.tenant_id);
       navigate(dest, { replace: true });
     });
   }, []);

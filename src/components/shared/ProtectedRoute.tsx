@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { roleHome, useAuth } from "@/contexts/AuthContext";
 import type { UserRole } from "@/types/database.types";
 
 interface Props {
@@ -28,7 +28,7 @@ export default function ProtectedRoute({ children, allowedRoles }: Props) {
   // the condition short-circuit to false.
   if (allowedRoles && (!role || !allowedRoles.includes(role))) {
     // Send guests somewhere useful rather than bouncing them to the landing page.
-    return <Navigate to={role === "customer" ? "/portal" : "/"} replace />;
+    return <Navigate to={roleHome(role, session.tenant_id)} replace />;
   }
 
   return <>{children}</>;
