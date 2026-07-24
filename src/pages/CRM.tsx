@@ -33,12 +33,14 @@ interface CustomerWithBookings extends Customer {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getInitials(name: string) {
-  return name
+  const initials = String(name ?? "")
+    .trim()
     .split(" ")
     .slice(0, 2)
     .map((n) => n[0])
     .join("")
     .toUpperCase();
+  return initials || "?";
 }
 
 function formatDate(dateStr: string) {
@@ -100,7 +102,12 @@ async function fetchCustomers(): Promise<CustomerWithBookings[]> {
     )
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as CustomerWithBookings[];
+  return (data ?? []).map((row) => ({
+    ...(row as Customer),
+    bookings: Array.isArray((row as { bookings?: unknown }).bookings)
+      ? (row as { bookings: BookingRow[] }).bookings
+      : [],
+  }));
 }
 
 // ─── Guest Detail Panel ───────────────────────────────────────────────────────
@@ -114,9 +121,14 @@ function GuestPanel({
   open: boolean;
   onClose: () => void;
 }) {
+  const t = useT();
   if (!customer) return null;
 
-  const totalSpend = getTotalSpend(customer);
+  // Keep the drawer renderable if PostgREST returns a missing relation while
+  // a booking is being removed; a malformed relation must not crash /crm.
+  const bookings = Array.isArray(customer.bookings) ? customer.bookings : [];
+  const safeCustomer = { ...customer, bookings };
+  const totalSpend = getTotalSpend(safeCustomer);
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -164,7 +176,7 @@ function GuestPanel({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-card border border-border rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-foreground">{customer.bookings.length}</p>
+              <p className="text-xl font-bold text-foreground">{bookings.length}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{t("Total Bookings")}</p>
             </div>
             <div className="bg-card border border-border rounded-lg p-3 text-center">
@@ -177,12 +189,12 @@ function GuestPanel({
         {/* Booking history */}
         <div className="space-y-3 mb-6">
           <h3 className="text-sm font-semibold text-foreground">{t("Booking History")}</h3>
-          {customer.bookings.length === 0 ? (
+          {bookings.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("No bookings yet.")}</p>
           ) : (
             <div className="space-y-2">
-              {customer.bookings.map((booking) => {
-                const sc = statusConfig[booking.status];
+              {bookings.map((booking) => {
+                const sc = statusConfig[booking.status] ?? statusConfig.pending;
                 return (
                   <div key={booking.id} className="bg-card border border-border rounded-lg p-3">
                     <div className="flex items-start justify-between gap-2">
@@ -257,7 +269,7 @@ export default function CRM() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("CRM")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {isLoading ? "Loading..." : `${customers.length} {t("guests")}`}
+              {isLoading ? "Loading..." : `${customers.length} ${t("guests")}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
