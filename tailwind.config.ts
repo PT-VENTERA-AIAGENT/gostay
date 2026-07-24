@@ -15,6 +15,10 @@ export default {
     extend: {
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        // Landing-page heading face. Scoped: only applied to landing headings so
+        // the app UI keeps Plus Jakarta Sans everywhere. Rubik is the free,
+        // rounded-geometric stand-in closest to All Around Gothic.
+        display: ['Rubik', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

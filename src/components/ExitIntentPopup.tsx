@@ -69,7 +69,7 @@ export function ExitIntentPopup() {
     const msg = encodeURIComponent(
       "Halo, saya mau minta demo gratis sistem reservasi GoStay.",
     );
-    window.open(`https://wa.me/6281318000263?text=${msg}`, "_blank");
+    window.open(`https://wa.me/628138053323?text=${msg}`, "_blank");
     handleClose();
   };
 
