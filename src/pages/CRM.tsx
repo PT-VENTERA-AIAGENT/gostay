@@ -294,7 +294,7 @@ export default function CRM() {
         </motion.div>
 
         {/* Search */}
-        <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 max-w-sm">
+        <div className="search-focus flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 max-w-sm">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             value={search}

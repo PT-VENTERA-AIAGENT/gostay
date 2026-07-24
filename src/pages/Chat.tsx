@@ -108,7 +108,7 @@ export default function Chat() {
         <div className={cn("w-full md:w-80 border-r border-border bg-card flex flex-col shrink-0", showChat ? "hidden md:flex" : "flex")}>
           <div className="p-4 border-b border-border">
             <h2 className="font-semibold text-foreground mb-3">{t("Messages")}</h2>
-            <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
+            <div className="search-focus flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
               <Search className="w-4 h-4 text-muted-foreground" />
               <input value={threadSearch} onChange={(e) => setThreadSearch(e.target.value)} placeholder={t("Search conversations...")} className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
             </div>

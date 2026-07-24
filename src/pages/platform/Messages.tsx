@@ -50,7 +50,7 @@ export default function PlatformMessages() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 flex-1 min-w-[200px] max-w-sm">
+          <div className="search-focus flex items-center gap-2 bg-muted rounded-lg px-3 py-2 flex-1 min-w-[200px] max-w-sm">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Cari tamu / hotel / nomor...")}
               className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />

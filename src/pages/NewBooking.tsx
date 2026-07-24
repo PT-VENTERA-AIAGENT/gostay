@@ -148,7 +148,7 @@ export default function NewBooking() {
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
                 <div className="relative flex-1 w-full">
-                  <div className="flex items-center gap-2 bg-background border border-input rounded-lg px-4 py-2.5">
+                  <div className="search-focus flex items-center gap-2 bg-background border border-input rounded-lg px-4 py-2.5">
                     <Search className="w-4 h-4 text-muted-foreground shrink-0" />
                     <input
                       value={guestQuery}
