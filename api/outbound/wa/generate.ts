@@ -73,7 +73,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
 
   const guard = await requirePlatformAdmin(authHeader(req));
-  if (!guard.ok) return res.status(guard.status).json({ error: guard.error });
+  if (guard.ok === false) return res.status(guard.status).json({ error: guard.error });
 
   const body = readJson(req);
   const leadId = typeof body.leadId === "string" ? body.leadId : undefined;

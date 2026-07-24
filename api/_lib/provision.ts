@@ -332,7 +332,7 @@ async function upsertProfile(
   }
 
   const tenant = await resolveTenant({ url, headers });
-  if (!tenant.ok) {
+  if (tenant.ok === false) {
     return {
       ok: false,
       created: false,

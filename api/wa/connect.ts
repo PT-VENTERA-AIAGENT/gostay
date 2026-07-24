@@ -87,7 +87,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     (method === "POST" || method === "DELETE" ? (readJson(req).tenantId as string | undefined) : undefined);
 
   const guard = await requireTenantMember(authHeader(req), requestedTenant);
-  if (!guard.ok) {
+  if (guard.ok === false) {
     res.status(guard.status).json({ ok: false, error: guard.error });
     return;
   }

@@ -40,7 +40,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   }
 
   const guard = await requirePlatformAdmin(authHeader(req));
-  if (!guard.ok) {
+  if (guard.ok === false) {
     res.status(guard.status).json({ ok: false, error: guard.error });
     return;
   }

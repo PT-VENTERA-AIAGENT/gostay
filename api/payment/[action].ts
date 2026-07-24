@@ -52,7 +52,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
       amount: typeof body.amount === "number" ? body.amount : undefined,
       successRedirectUrl: typeof body.successRedirectUrl === "string" ? body.successRedirectUrl : undefined,
     });
-    if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
+    if (result.ok === false) { res.status(result.status).json({ error: result.error }); return; }
     res.status(200).json({
       ok: true, invoiceUrl: result.invoiceUrl, invoiceId: result.invoiceId,
       amount: result.amount, mode: result.mode,
@@ -63,7 +63,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   // ── webhook: settlement callback from the gateway (auth inside handler) ──
   if (action === "webhook") {
     const result = await handleWebhook(token, readJson(req));
-    if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
+    if (result.ok === false) { res.status(result.status).json({ error: result.error }); return; }
     res.status(result.status).json({ ok: true, outcome: result.outcome });
     return;
   }
