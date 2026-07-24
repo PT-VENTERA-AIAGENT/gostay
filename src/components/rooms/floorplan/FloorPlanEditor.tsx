@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
   DoorOpen, Trees, Waves, Landmark, Route, CircleParking, Shapes,
   ZoomIn, ZoomOut, Maximize, Grid3x3, Magnet, Save, Loader2, Spline, MousePointer2,
+  Download, Upload,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { tr } from "@/lib/i18n";
@@ -9,7 +10,7 @@ import { useRooms } from "@/hooks/useRooms";
 import { useFloorPlan, useSaveFloorPlan } from "@/hooks/useFloorPlan";
 import ElementInspector from "./ElementInspector";
 import {
-  CATEGORY_META, CATEGORY_ORDER, emptyPlan, regularPolygonPoints,
+  CATEGORY_META, CATEGORY_ORDER, coercePlan, emptyPlan, regularPolygonPoints,
   type PlanCategory, type PlanElement, type SitePlan,
 } from "@/types/floorPlan";
 
@@ -51,6 +52,7 @@ export default function FloorPlanEditor() {
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<Drag | null>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const fittedRef = useRef(false);
@@ -267,6 +269,51 @@ export default function FloorPlanEditor() {
     });
   }
 
+  function handleExport() {
+    if (!plan) return;
+    const blob = new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `gostay-denah-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    toast({ title: tr("Desain denah diekspor") });
+  }
+
+  async function handleImport(file: File) {
+    try {
+      const raw: unknown = JSON.parse(await file.text());
+      if (!raw || typeof raw !== "object" || !Array.isArray((raw as { elements?: unknown }).elements)) {
+        throw new Error("Format denah tidak valid.");
+      }
+      const imported = coercePlan(raw);
+      const roomIds = new Set(rooms.map((r) => r.id));
+      // A template may come from another hotel. Preserve matching links and
+      // detach unknown room ids so the imported design never points at another
+      // tenant's rooms or renders misleading status badges.
+      const safePlan: SitePlan = {
+        ...imported,
+        elements: imported.elements.map((el) => ({
+          ...el,
+          roomId: el.roomId && roomIds.has(el.roomId) ? el.roomId : (el.roomId ? null : el.roomId),
+        })),
+      };
+      setPlan(safePlan);
+      setDirty(true);
+      setSelectedId(null);
+      setVertexMode(false);
+      toast({ title: tr("Desain denah diimpor"), description: tr("Periksa lalu tekan Simpan untuk menerapkannya.") });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "File denah tidak dapat dibaca.";
+      toast({ variant: "destructive", title: tr("Gagal mengimpor denah"), description: message });
+    } finally {
+      if (importRef.current) importRef.current.value = "";
+    }
+  }
+
   if (isLoading || !plan) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -312,6 +359,33 @@ export default function FloorPlanEditor() {
           <ToolToggle active={false} onClick={fitView} title="Paskan ke layar"><Maximize className="w-4 h-4" /></ToolToggle>
 
           <div className="ml-auto flex items-center gap-2">
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleImport(file);
+              }}
+            />
+            <button
+              onClick={() => importRef.current?.click()}
+              title="Impor desain JSON"
+              className="inline-flex items-center gap-1.5 border border-border bg-background text-foreground px-2.5 py-1.5 rounded-md text-xs font-semibold hover:bg-muted transition-colors btn-press"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline">Impor</span>
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={!plan}
+              title="Ekspor desain JSON"
+              className="inline-flex items-center gap-1.5 border border-border bg-background text-foreground px-2.5 py-1.5 rounded-md text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50 btn-press"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Ekspor</span>
+            </button>
             {dirty && <span className="text-xs text-amber-600 dark:text-amber-400">Belum disimpan</span>}
             <button
               onClick={handleSave}
