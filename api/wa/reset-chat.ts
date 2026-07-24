@@ -69,7 +69,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     // The requested tenant is taken from the thread, while the guard ensures
     // staff can only reset chats belonging to their own hotel.
     const guard = await requireTenantMember(authHeader(req), customer.tenant_id);
-    if (!guard.ok) {
+    if (guard.ok === false) {
       res.status(guard.status).json({ ok: false, error: guard.error });
       return;
     }
@@ -97,4 +97,3 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     res.status(500).json({ ok: false, error: "reset_failed" });
   }
 }
-
