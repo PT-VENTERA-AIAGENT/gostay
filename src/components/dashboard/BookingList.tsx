@@ -57,7 +57,7 @@ export default function BookingList() {
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between mb-4 gap-3">
         <h3 className="font-semibold text-foreground shrink-0">{t("Booking List")}</h3>
         <div className="flex items-center gap-3 w-full lg:w-auto">
-          <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 flex-1 min-w-0 lg:w-56 lg:flex-none">
+          <div className="search-focus flex items-center gap-2 bg-muted rounded-lg px-3 py-2 flex-1 min-w-0 lg:w-56 lg:flex-none">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input
               value={search}

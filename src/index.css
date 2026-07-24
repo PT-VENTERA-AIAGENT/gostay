@@ -176,9 +176,15 @@
     padding-bottom: max(0.375rem, env(safe-area-inset-bottom));
   }
 
-  /* Smooth focus-within ring for search bars */
+  /* Search-bar focus: highlight the WHOLE pill, hugging it (no offset), instead
+     of the bare <input> inside picking up the global :focus-visible ring — that
+     drew an ugly green box floating inside the pill. The nested rule cancels the
+     input's own ring so only the container lights up, as one clean unit. */
   .search-focus {
-    @apply focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background transition-shadow;
+    @apply focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0 transition-shadow;
+  }
+  .search-focus :is(input, textarea):focus-visible {
+    @apply ring-0 ring-offset-0;
   }
 
   /* Truncate text with ellipsis — one line */

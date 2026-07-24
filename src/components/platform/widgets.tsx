@@ -162,7 +162,7 @@ export function SearchBox({
   placeholder?: string;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 w-full sm:w-64">
+    <div className="search-focus flex items-center gap-2 rounded-lg bg-muted px-3 py-2 w-full sm:w-64">
       <svg className="w-4 h-4 text-muted-foreground shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
       </svg>
