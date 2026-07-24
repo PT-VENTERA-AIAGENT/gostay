@@ -33,7 +33,14 @@ export default function PortalLayout() {
   // hotel's portal (which the sole-tenant fallback would otherwise render, making
   // them look like a guest of that hotel). Staff/admin have their own dashboard;
   // guests of a real hotel (WhatsApp / portal-link) carry a tenant and stay here.
-  const hasNoHotel = session && role !== "staff" && role !== "admin" && !tenantLoading && tenant === null;
+  const hasNoHotel =
+    session &&
+    role === "customer" &&
+    (
+      session.tenant_id === null ||
+      // Compatibility with sessions issued before tenant_id was included.
+      (session.tenant_id === undefined && !tenantLoading && tenant === null)
+    );
   if (hasNoHotel) {
     return <Navigate to="/create-hotel" replace />;
   }
@@ -101,7 +108,11 @@ export default function PortalLayout() {
               </button>
             </>
           ) : (
-            <Link to="/login" className="hidden sm:inline text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity btn-press">
+            <Link
+              to="/login"
+              state={{ from: pathname }}
+              className="hidden sm:inline text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity btn-press"
+            >
               {t("Masuk")}
             </Link>
           )}
@@ -145,7 +156,14 @@ export default function PortalLayout() {
                     {t("Keluar")}
                   </button>
                 ) : (
-                  <Link to="/login" className="flex-1 text-center text-sm font-medium bg-primary text-primary-foreground py-2.5 rounded-lg touch-target" onClick={() => setMobileMenu(false)}>{t("Masuk")}</Link>
+                  <Link
+                    to="/login"
+                    state={{ from: pathname }}
+                    className="flex-1 text-center text-sm font-medium bg-primary text-primary-foreground py-2.5 rounded-lg touch-target"
+                    onClick={() => setMobileMenu(false)}
+                  >
+                    {t("Masuk")}
+                  </Link>
                 )}
               </div>
             </div>

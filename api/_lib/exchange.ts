@@ -37,6 +37,11 @@ export interface ExchangeRequest {
    * — the same spoof-safe, public-scope-only hint x-tenant-slug already is (011).
    */
   tenantSlug?: string;
+  /**
+   * Main app (`owner`) or a hotel's public portal (`guest`). Owner is the safe
+   * default: it grants no tenant access and leads to self-serve hotel creation.
+   */
+  signupContext?: "owner" | "guest";
 }
 
 export interface ExchangeResult {
@@ -64,6 +69,7 @@ export async function exchangeCode({
   code_verifier,
   origin,
   tenantSlug,
+  signupContext = "owner",
 }: ExchangeRequest): Promise<ExchangeResult> {
   const { issuer, clientId, clientSecret, extraOrigins } = config();
 
@@ -132,7 +138,12 @@ export async function exchangeCode({
   // Bridge the SSO identity into Supabase. Without this the browser talks to
   // PostgREST as anon, auth.uid() is NULL, and every RLS policy denies.
   const supabase = claims?.sub
-    ? await buildSupabaseSession(claims, Number(tokens.expires_in ?? 3600), tenantSlug)
+    ? await buildSupabaseSession(
+        claims,
+        Number(tokens.expires_in ?? 3600),
+        tenantSlug,
+        signupContext,
+      )
     : null;
 
   // Only the fields the client actually needs. The refresh_token, if the issuer
@@ -149,6 +160,7 @@ export async function exchangeCode({
       // infers from the realm for display purposes.
       role: supabase?.role ?? null,
       profile_id: supabase?.profileId ?? null,
+      tenant_id: supabase?.tenantId ?? null,
     },
   };
 }
@@ -202,6 +214,7 @@ async function buildSupabaseSession(
   claims: IdTokenClaims,
   expiresInSeconds: number,
   tenantSlug?: string,
+  signupContext: "owner" | "guest" = "owner",
 ) {
   // The bridge is all-or-nothing on the signing secret: without it we cannot
   // mint a usable token, so provisioning a row would be a pointless write to
@@ -216,6 +229,7 @@ async function buildSupabaseSession(
   // a role: profiles.role is the only source of truth, and a null role means
   // the UI denies every gated route.
   let role: AppRole | null = null;
+  let tenantId: string | null = null;
 
   if (provisioningEnabled()) {
     const result = await provisionProfile({
@@ -225,6 +239,7 @@ async function buildSupabaseSession(
       fullName: claims.name ?? claims.email ?? "",
       now: new Date(issuedAt * 1000).toISOString(),
       tenantSlug,
+      signupContext,
     });
     if (!result.ok) {
       // Sign-in still succeeds; the user simply sees empty data rather than a
@@ -235,9 +250,10 @@ async function buildSupabaseSession(
       // to anon and reads only public data. get_my_role() also excludes inactive
       // users, which covers anyone deactivated mid-session who still holds a
       // valid token — this check only stops them getting a fresh one.
-      return { token: null, role: null, profileId };
+      return { token: null, role: null, profileId, tenantId: result.tenantId };
     } else {
       role = result.role;
+      tenantId = result.tenantId;
     }
   }
 
@@ -248,5 +264,5 @@ async function buildSupabaseSession(
     expiresAt: issuedAt + expiresInSeconds,
   });
 
-  return { token, role, profileId };
+  return { token, role, profileId, tenantId };
 }

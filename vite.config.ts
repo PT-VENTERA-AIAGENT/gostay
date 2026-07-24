@@ -34,6 +34,7 @@ function ssoDevApi(): Plugin {
             code_verifier: body.code_verifier ?? "",
             origin: req.headers.origin ?? "",
             tenantSlug: body.tenant_slug,
+            signupContext: body.signup_context === "guest" ? "guest" : "owner",
           });
 
           res.statusCode = result.status;

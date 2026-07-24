@@ -280,7 +280,7 @@ function Navbar() {
   const { session, role, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const home = roleHome(role);
+  const home = roleHome(role, session?.tenant_id);
 
   const { scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 140, damping: 30, mass: 0.3 });

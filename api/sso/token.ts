@@ -25,7 +25,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const body = (typeof req.body === "string" ? JSON.parse(req.body) : req.body) as
-    | { code?: string; code_verifier?: string; tenant_slug?: string }
+    | {
+        code?: string;
+        code_verifier?: string;
+        tenant_slug?: string;
+        signup_context?: "owner" | "guest";
+      }
     | undefined;
 
   const result = await exchangeCode({
@@ -33,6 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     code_verifier: body?.code_verifier ?? "",
     origin: headerValue(req.headers.origin),
     tenantSlug: body?.tenant_slug,
+    signupContext: body?.signup_context === "guest" ? "guest" : "owner",
   });
 
   res.status(result.status).json(result.body);
