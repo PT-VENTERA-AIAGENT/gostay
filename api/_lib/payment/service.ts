@@ -8,12 +8,12 @@ import type { PaymentMode } from "./xendit";
 
 export { isConfigured };
 
-/** The global platform fee in basis points (500 = 5%). Falls back to 500. */
+/** The global platform fee in basis points (700 = 7%). Falls back to 700. */
 export async function getFeeBps(): Promise<number> {
   const res = await serviceGet("payment_config?id=eq.true&select=platform_fee_bps&limit=1");
   if (!res.ok) throw new Error(`payment_config_read_failed_${res.status}`);
   const rows = (await res.json()) as Array<{ platform_fee_bps?: number }>;
-  return typeof rows[0]?.platform_fee_bps === "number" ? rows[0].platform_fee_bps : 500;
+  return typeof rows[0]?.platform_fee_bps === "number" ? rows[0].platform_fee_bps : 700;
 }
 
 /**

@@ -7,7 +7,7 @@
 // If you change one, change the other:
 //
 //   gross = amount
-//   fee   = round(gross * feeBps / 10000, 2)   -- Ventera's cut (500 bps = 5%)
+//   fee   = round(gross * feeBps / 10000, 2)   -- Ventera's cut (700 bps = 7%)
 //   net   = gross - fee                         -- credited to the hotel
 //
 // net is DERIVED from fee (never rounded on its own), so gross === fee + net
@@ -20,7 +20,7 @@ export interface FeeSplit {
   fee: number;
   /** What the hotel's balance is actually credited. */
   net: number;
-  /** The rate used, in basis points (500 = 5%). */
+  /** The rate used, in basis points (700 = 7%). */
   feeBps: number;
 }
 
@@ -33,9 +33,9 @@ export function round2(n: number): number {
  * Split a gross payment into the hotel's net credit and Ventera's fee.
  *
  * @param amount  gross payment amount (rupiah)
- * @param feeBps  platform fee in basis points; defaults to 500 (5%)
+ * @param feeBps  platform fee in basis points; defaults to 700 (7%)
  */
-export function feeSplit(amount: number, feeBps = 500): FeeSplit {
+export function feeSplit(amount: number, feeBps = 700): FeeSplit {
   if (!Number.isFinite(amount) || amount < 0) {
     throw new Error(`invalid amount: ${amount}`);
   }

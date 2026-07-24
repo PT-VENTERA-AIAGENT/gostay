@@ -30,7 +30,7 @@ export default function Saldo() {
   const { data: payouts = [] } = usePayouts();
   const { data: config } = usePaymentConfig();
 
-  const feePct = (config?.feeBps ?? 500) / 100;
+  const feePct = (config?.feeBps ?? 700) / 100;
   const available = balance?.available ?? 0;
   const stats = [
     { icon: Wallet, label: t("Saldo tersedia"), value: available, accent: "text-primary", highlight: true },

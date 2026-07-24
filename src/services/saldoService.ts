@@ -83,7 +83,7 @@ export async function getPaymentConfig(): Promise<PaymentConfig> {
   if (error) throw error;
   return {
     mode: data?.mode === "live" ? "live" : "test",
-    feeBps: typeof data?.platform_fee_bps === "number" ? data.platform_fee_bps : 500,
+    feeBps: typeof data?.platform_fee_bps === "number" ? data.platform_fee_bps : 700,
   };
 }
 
