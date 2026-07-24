@@ -149,6 +149,7 @@ export interface PlatformBooking {
   hotel: string;
   guest: string;
   room: string | null;
+  room_type: string | null;
   check_in: string;
   check_out: string;
   status: string;
@@ -157,11 +158,11 @@ export interface PlatformBooking {
   created_at: string;
 }
 
-/** Recent reservations across ALL hotels. */
+/** Recent reservations across ALL hotels, with room number + type. */
 export async function listAllReservations(limit = 100): Promise<PlatformBooking[]> {
   const { data, error } = await db
     .from("bookings")
-    .select("id,reference,check_in,check_out,status,payment_status,total_amount,created_at,tenants(name),customers(full_name),rooms(number)")
+    .select("id,reference,check_in,check_out,status,payment_status,total_amount,created_at,tenants(name),customers(full_name),rooms(number,room_types(name))")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -171,6 +172,7 @@ export async function listAllReservations(limit = 100): Promise<PlatformBooking[
     hotel: b.tenants?.name ?? "—",
     guest: b.customers?.full_name ?? "—",
     room: b.rooms?.number ?? null,
+    room_type: b.rooms?.room_types?.name ?? null,
     check_in: b.check_in,
     check_out: b.check_out,
     status: b.status,
@@ -379,6 +381,133 @@ export async function getPlatformCalendar(from: string, days: number): Promise<P
   };
 }
 
+// ─── Rincian per kamar: room board (satu tanggal) ─────────────────────────────
+
+export interface PlatformRoomCell {
+  id: string;
+  number: string;
+  type: string | null;
+  occupied: boolean;
+}
+
+export interface PlatformHotelRooms {
+  tenant_id: string;
+  hotel: string;
+  total: number;
+  booked: number;
+  available: number;
+  rooms: PlatformRoomCell[];
+}
+
+/**
+ * Every hotel's individual rooms (number + type) with their booked/free status
+ * for one date — the drill-down behind the aggregate availability page. A room
+ * counts as booked on `date` when an active booking overlaps that single night
+ * (check_in <= date < check_out), the same half-open rule as the aggregate.
+ */
+export async function getPlatformRoomBoard(date: string): Promise<PlatformHotelRooms[]> {
+  const [tenantsRes, roomsRes, bookingsRes] = await Promise.all([
+    db.from("tenants").select("id,name").order("name"),
+    db.from("rooms").select("id,tenant_id,number,room_types(name)").eq("is_active", true),
+    db.from("bookings").select("room_id,tenant_id")
+      .in("status", ["pending", "confirmed", "checked_in"])
+      .lte("check_in", date).gt("check_out", date),
+  ]);
+  if (tenantsRes.error) throw tenantsRes.error;
+  if (roomsRes.error) throw roomsRes.error;
+  if (bookingsRes.error) throw bookingsRes.error;
+
+  const occupied = new Set(((bookingsRes.data ?? []) as any[]).map((b) => b.room_id).filter(Boolean));
+  const byTenant = new Map<string, PlatformRoomCell[]>();
+  for (const r of (roomsRes.data ?? []) as any[]) {
+    const cell: PlatformRoomCell = {
+      id: r.id,
+      number: r.number,
+      type: r.room_types?.name ?? null,
+      occupied: occupied.has(r.id),
+    };
+    (byTenant.get(r.tenant_id) ?? byTenant.set(r.tenant_id, []).get(r.tenant_id)!).push(cell);
+  }
+
+  return (tenantsRes.data ?? []).map((t: any) => {
+    const rooms = (byTenant.get(t.id) ?? []).sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+    const booked = rooms.filter((r) => r.occupied).length;
+    return {
+      tenant_id: t.id,
+      hotel: t.name,
+      total: rooms.length,
+      booked,
+      available: rooms.length - booked,
+      rooms,
+    };
+  });
+}
+
+// ─── Rincian per kamar: kalender hunian (banyak malam) ────────────────────────
+
+export interface PlatformRoomRow {
+  id: string;
+  tenant_id: string;
+  number: string;
+  type: string | null;
+}
+
+export interface PlatformRoomCalendar {
+  hotels: Array<{ tenant_id: string; name: string; rooms: PlatformRoomRow[] }>;
+  days: string[];
+  /** `${roomId}|${date}` present ⇒ that room is occupied that night. */
+  occupied: Set<string>;
+}
+
+/**
+ * Per-ROOM occupancy over a window: each hotel expands into its rooms (number +
+ * type), and every night is marked occupied/free — the room-board view of the
+ * calendar rather than the aggregate 0/10 counts. Bookings that overlap the
+ * window are expanded client-side into (room, night) cells in one pass.
+ */
+export async function getPlatformRoomCalendar(from: string, days: number): Promise<PlatformRoomCalendar> {
+  const start = new Date(from + "T00:00:00Z");
+  const endIso = new Date(start.getTime() + days * 86400000).toISOString().slice(0, 10);
+
+  const [tenantsRes, roomsRes, bookingsRes] = await Promise.all([
+    db.from("tenants").select("id,name").order("name"),
+    db.from("rooms").select("id,tenant_id,number,room_types(name)").eq("is_active", true),
+    db.from("bookings").select("room_id,check_in,check_out")
+      .in("status", ["pending", "confirmed", "checked_in"])
+      .lt("check_in", endIso).gt("check_out", from),
+  ]);
+  if (tenantsRes.error) throw tenantsRes.error;
+  if (roomsRes.error) throw roomsRes.error;
+  if (bookingsRes.error) throw bookingsRes.error;
+
+  const dayList: string[] = [];
+  for (let i = 0; i < days; i++) dayList.push(new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10));
+
+  const occupied = new Set<string>();
+  for (const b of (bookingsRes.data ?? []) as any[]) {
+    if (!b.room_id) continue;
+    for (const d of dayList) {
+      if (b.check_in <= d && b.check_out > d) occupied.add(`${b.room_id}|${d}`);
+    }
+  }
+
+  const byTenant = new Map<string, PlatformRoomRow[]>();
+  for (const r of (roomsRes.data ?? []) as any[]) {
+    const row: PlatformRoomRow = { id: r.id, tenant_id: r.tenant_id, number: r.number, type: r.room_types?.name ?? null };
+    (byTenant.get(r.tenant_id) ?? byTenant.set(r.tenant_id, []).get(r.tenant_id)!).push(row);
+  }
+
+  return {
+    hotels: (tenantsRes.data ?? []).map((t: any) => ({
+      tenant_id: t.id,
+      name: t.name,
+      rooms: (byTenant.get(t.id) ?? []).sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true })),
+    })),
+    days: dayList,
+    occupied,
+  };
+}
+
 export interface PlatformRequest {
   id: string;
   hotel: string;
@@ -463,7 +592,7 @@ export async function getHotelDetail(tenantId: string): Promise<HotelDetail | nu
     db.from("bookings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     db.from("customers").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     db.from("bookings")
-      .select("id,reference,check_in,check_out,status,payment_status,total_amount,created_at,customers(full_name),rooms(number)")
+      .select("id,reference,check_in,check_out,status,payment_status,total_amount,created_at,customers(full_name),rooms(number,room_types(name))")
       .eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(8),
     db.from("chat_threads")
       .select("id,status,updated_at,customers(full_name,phone,profile_id)")
@@ -515,6 +644,7 @@ export async function getHotelDetail(tenantId: string): Promise<HotelDetail | nu
       hotel: t.name,
       guest: b.customers?.full_name ?? "—",
       room: b.rooms?.number ?? null,
+      room_type: b.rooms?.room_types?.name ?? null,
       check_in: b.check_in,
       check_out: b.check_out,
       status: b.status,
