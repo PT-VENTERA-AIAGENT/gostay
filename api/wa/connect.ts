@@ -2,6 +2,7 @@
 // through GoStay so the operator never touches the wa-ventera gateway admin.
 //
 //   POST   /api/wa/connect  → create/refresh the gateway session for my hotel (pair)
+//   POST   /api/wa/connect?action=reset-chat → clear one chat's automation state
 //   GET    /api/wa/connect  → poll: { status, qr?, connected, linkedNumber? }
 //   DELETE /api/wa/connect  → unlink (logout the gateway session, deactivate mapping)
 //
@@ -13,6 +14,7 @@ import QRCode from "qrcode";
 import { requireTenantMember } from "../_lib/admin/tenant-auth";
 import { serviceConfig, serviceHeaders, serviceGet } from "../_lib/wa/client";
 import { createSession, getSessionQr, getSessionStatus, deleteSession } from "../_lib/wa/gateway";
+import resetChatHandler from "../_lib/wa/reset-chat";
 import { authHeader, readJson, type VercelReq, type VercelRes } from "../_lib/admin/http";
 
 /**
@@ -79,6 +81,13 @@ async function upsertMapping(
 
 export default async function handler(req: VercelReq, res: VercelRes) {
   res.setHeader("Cache-Control", "no-store");
+
+  const rawAction = req.query?.action;
+  const action = Array.isArray(rawAction) ? rawAction[0] : rawAction;
+  if (action === "reset-chat") {
+    await resetChatHandler(req, res);
+    return;
+  }
 
   const method = req.method ?? "GET";
   // Admin may target a specific hotel via ?tenantId= or body.tenantId; staff can't.

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import handler from "../api/wa/reset-chat";
+import handler from "../api/_lib/wa/reset-chat";
 import { mintSupabaseToken } from "../api/_lib/identity";
 
 const THREAD = "11111111-1111-4111-8111-111111111111";
@@ -17,7 +17,7 @@ function response(status: number, body: unknown) {
   } as Response;
 }
 
-describe("POST /api/wa/reset-chat", () => {
+describe("POST /api/wa/connect?action=reset-chat", () => {
   beforeEach(() => {
     process.env.SUPABASE_URL = "https://supabase.test";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
@@ -64,4 +64,3 @@ describe("POST /api/wa/reset-chat", () => {
     expect(deletes.map((call) => call.url).join("\n")).toContain("wa_rate_limits");
   });
 });
-

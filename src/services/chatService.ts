@@ -222,7 +222,7 @@ export async function markMessagesRead(threadId: string, userId: string): Promis
  */
 export async function resetWaChat(threadId: string): Promise<{ phoneJids: string[]; resetCount: number }> {
   const token = getSession()?.supabase_token;
-  const response = await fetch("/api/wa/reset-chat", {
+  const response = await fetch("/api/wa/connect?action=reset-chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -5,9 +5,9 @@
 // bot stay quiet: the pending booking action and the per-number rate-limit
 // counters (including the one-hour greeting cooldown).
 
-import { requireTenantMember } from "../_lib/admin/tenant-auth";
-import { authHeader, readJson, type VercelReq, type VercelRes } from "../_lib/admin/http";
-import { serviceConfig, serviceGet, serviceHeaders } from "../_lib/wa/client";
+import { requireTenantMember } from "../admin/tenant-auth";
+import { authHeader, readJson, type VercelReq, type VercelRes } from "../admin/http";
+import { serviceConfig, serviceGet, serviceHeaders } from "./client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
