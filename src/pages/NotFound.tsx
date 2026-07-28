@@ -26,7 +26,7 @@ const NotFound = () => {
         >
           404
         </motion.div>
-        <h1 className="text-2xl font-bold text-foreground mb-2">{t("Page not found")}</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-2">Page not found</h1>
         <p className="text-muted-foreground mb-8">
           The page you're looking for doesn't exist or has been moved.
         </p>
