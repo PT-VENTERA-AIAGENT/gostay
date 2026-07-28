@@ -50,6 +50,8 @@ export interface FlowActions {
    */
   startRoomService(): Promise<boolean>;
   showRoomTypes(): Promise<void>;
+  /** Answer an availability question from live booking data. */
+  checkAvailability(): Promise<void>;
   showMenu(): Promise<void>;
   sendPortalLink(): Promise<void>;
 }
@@ -354,6 +356,9 @@ async function runAction(action: string, actions: FlowActions): Promise<boolean>
       return actions.startRoomService();
     case "show_room_types":
       await actions.showRoomTypes();
+      return false;
+    case "check_availability":
+      await actions.checkAvailability();
       return false;
     case "show_menu":
       await actions.showMenu();

@@ -18,7 +18,7 @@
 // a thin shell. Provisioning is deferred to the "YA" step and FAILS CLOSED: if
 // the guest cannot be provisioned, no booking is written.
 
-import { extractBookingIntent, detectRoomServiceIntent, detectMenuKeyword, detectRoomNumberQuery, type BookingSlots, type RoomNumberQuery } from "./ai";
+import { extractBookingIntent, detectRoomServiceIntent, detectMenuKeyword, detectAvailabilityQuery, detectRoomNumberQuery, type BookingSlots, type RoomNumberQuery } from "./ai";
 import { getPending, setPending, clearPending } from "./pending";
 import {
   getInhouseStay,
@@ -28,6 +28,7 @@ import {
   type OrderLine,
 } from "./roomservice";
 import { paymentInstruction } from "./payment";
+import { checkAvailability as queryAvailability, renderAvailability } from "./availability";
 import { routeFlow } from "./flow/route";
 import type { FlowActions } from "./flow/engine";
 import {
@@ -297,6 +298,22 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       if (roomQuery) {
         await answerRoomNumberQuery(msg, roomQuery, reply, brand);
         return;
+      }
+    }
+
+    // ── 1f. "Ada kamar kosong?" — answer it, do not hand back a form ────────
+    // Before this existed the booking extractor read the question as an intent
+    // to book and replied with five fields to fill in, so a guest had to
+    // complete a form to learn the hotel was full. Only when nothing is
+    // mid-flight, so it cannot interrupt a quote the guest is answering.
+    if (!pending && detectAvailabilityQuery(trimmed)) {
+      try {
+        const a = await queryAvailability({ tenantId, typeHint: trimmed });
+        await reply(renderAvailability(brand, a));
+        return;
+      } catch (e) {
+        // Fall through to the booking flow rather than leaving them unanswered.
+        console.error("[wa/converse] availability:", (e as Error).message);
       }
     }
 
@@ -622,6 +639,15 @@ function builtInActions(
     /** Reuses the existing entry point, including its in-house check. */
     startRoomService() {
       return startRoomService(msg, reply, guest, brand, { fallThroughWhenNotInhouse: true });
+    },
+
+    /**
+     * Answer "is anything free?" from live bookings. Counts only — see
+     * availability.ts on why the room rows never reach this layer.
+     */
+    async checkAvailability() {
+      const a = await queryAvailability({ tenantId, typeHint: msg.text ?? "" });
+      await reply(renderAvailability(brand, a));
     },
 
     async showRoomTypes() {

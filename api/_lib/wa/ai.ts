@@ -135,6 +135,44 @@ export function detectRoomServiceIntent(text: string): boolean {
   return ROOM_SERVICE_HINTS.some((h) => lower.includes(h));
 }
 
+// ── "Is anything free?" (deterministic, no model) ──────────────────────────────
+
+/**
+ * Phrases that mark a guest ASKING WHETHER ANYTHING IS FREE, as opposed to
+ * asking to book.
+ *
+ * The distinction matters because the two deserve opposite replies. Until this
+ * existed, "ada kamar yang kosong di reguler?" was read as a booking intent and
+ * answered with a five-field form — the guest had to fill it in before learning
+ * the hotel was full. A question should be answered before a form is offered.
+ *
+ * Each entry is a two-part test: an availability cue AND a room word, both
+ * present. A bare "ada?" is too little to act on, and "kamar" alone appears in
+ * every booking request ever sent.
+ */
+const AVAILABILITY_CUES = [
+  "kosong", "tersedia", "available", "ready", "masih ada", "ada gak", "ada ga",
+  "ada tidak", "ada nggak", "adakah", "sisa", "free",
+];
+
+const ROOM_WORDS = ["kamar", "room", "tipe", "type"];
+
+/**
+ * True when the message reads as "do you have anything free?".
+ *
+ * Deliberately requires BOTH an availability cue and a room word, so
+ * "kamar deluxe untuk 2 orang" (a booking) does not match while
+ * "kamar deluxe masih ada?" does. Deterministic and synchronous — never calls
+ * the model.
+ */
+export function detectAvailabilityQuery(text: string): boolean {
+  const lower = (text ?? "").toLowerCase();
+  if (!lower.trim()) return false;
+  const hasCue = AVAILABILITY_CUES.some((c) => lower.includes(c));
+  if (!hasCue) return false;
+  return ROOM_WORDS.some((w) => lower.includes(w));
+}
+
 /**
  * The bare word "menu" — an in-house guest asking to see the room-service list.
  *

@@ -17,6 +17,7 @@ const { ai, pending, booking, guest, send, crm, roomservice, WaRateLimitError } 
       extractBookingIntent: vi.fn(),
       detectRoomServiceIntent: vi.fn(),
       detectMenuKeyword: vi.fn(),
+      detectAvailabilityQuery: vi.fn(),
       detectRoomNumberQuery: vi.fn(),
     },
     pending: { getPending: vi.fn(), setPending: vi.fn(), clearPending: vi.fn() },
@@ -79,6 +80,7 @@ beforeEach(() => {
   // Room service defaults: not a room-service message, no active stay, empty menu.
   ai.detectRoomServiceIntent.mockReturnValue(false);
   ai.detectMenuKeyword.mockReturnValue(false);
+  ai.detectAvailabilityQuery.mockReturnValue(false);
   // Not a specific-room-number question by default.
   ai.detectRoomNumberQuery.mockReturnValue(null);
   booking.getRoomByNumberSrv.mockResolvedValue(null);

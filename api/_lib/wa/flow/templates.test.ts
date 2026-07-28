@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { runFlow, type FlowActions } from "./engine";
 import { pickFlow } from "./select";
-import { FLOW_TEMPLATES, findTemplate, type FlowTemplate } from "./templates";
+import { FLOW_TEMPLATES, findTemplate, CATEGORY_META, CATEGORY_ORDER, type FlowTemplate } from "./templates";
 import { coerceFlow } from "./types";
 import type { StoredFlow } from "./store";
 
@@ -27,6 +27,10 @@ beforeEach(() => {
     startRoomService: vi.fn().mockImplementation(async () => {
       sent.push("[room service conversation takes over]");
       return true;
+    }),
+    checkAvailability: vi.fn().mockImplementation(async () => {
+      // Shape only — availability.test.ts owns the wording and the privacy rule.
+      sent.push("[ketersediaan: 2 kamar Deluxe tersedia dari 3]");
     }),
     showRoomTypes: vi.fn().mockImplementation(async () => {
       sent.push("Pilihan kamar & tarif per malam di *Hotel Uji*:\n\n*Deluxe*\n    Rp 500.000 / malam");
@@ -107,6 +111,71 @@ describe("templates are well-formed", () => {
 
 // ─── Routing: the reservation-vs-menu question, on the real templates ────────
 
+describe("the shipped set is coherent", () => {
+  it("ships thirteen templates with unique keys and names", () => {
+    expect(FLOW_TEMPLATES).toHaveLength(13);
+    expect(new Set(FLOW_TEMPLATES.map((t) => t.key)).size).toBe(13);
+    expect(new Set(FLOW_TEMPLATES.map((t) => t.name)).size).toBe(13);
+  });
+
+  it("gives every template a known category, and every category a template", () => {
+    for (const t of FLOW_TEMPLATES) {
+      expect(CATEGORY_META[t.category], `${t.name} has an unknown category`).toBeTruthy();
+      expect(CATEGORY_ORDER).toContain(t.category);
+    }
+    // An empty group would render as a heading with nothing under it.
+    for (const c of CATEGORY_ORDER) {
+      expect(FLOW_TEMPLATES.some((t) => t.category === c), `category ${c} is empty`).toBe(true);
+    }
+  });
+
+  it("keeps the greeting last so it cannot swallow a specific flow's words", () => {
+    const sapaan = findTemplate("sapaan")!;
+    for (const t of FLOW_TEMPLATES) {
+      if (t.key === "sapaan") continue;
+      expect(t.priority, `${t.name} must outrank the catch-all`).toBeLessThan(sapaan.priority);
+    }
+  });
+
+  it("never gives two templates the same priority AND an overlapping keyword", () => {
+    // Equal priority plus a shared word means the winner depends on array order,
+    // which is exactly the arbitrariness the tiered matcher exists to remove.
+    for (let i = 0; i < FLOW_TEMPLATES.length; i++) {
+      for (let j = i + 1; j < FLOW_TEMPLATES.length; j++) {
+        const a = FLOW_TEMPLATES[i], b = FLOW_TEMPLATES[j];
+        if (a.priority !== b.priority) continue;
+        const shared = a.triggerKeywords.filter((k) => b.triggerKeywords.includes(k));
+        expect(shared, `${a.name} and ${b.name} share ${shared} at priority ${a.priority}`).toHaveLength(0);
+      }
+    }
+  });
+
+  it("does not let an ungated flow shadow an in-house one at the same word", () => {
+    // A shared word is fine — that is the whole design — but only when the
+    // in-house flow runs FIRST, or the gate can never be reached.
+    const gated = FLOW_TEMPLATES.filter((t) => t.requires === "inhouse");
+    const open = FLOW_TEMPLATES.filter((t) => t.requires === "none");
+    for (const g of gated) {
+      for (const o of open) {
+        const shared = g.triggerKeywords.filter((k) => o.triggerKeywords.includes(k));
+        if (shared.length === 0) continue;
+        expect(
+          g.priority,
+          `${o.name} would claim ${shared} before ${g.name} could gate on it`,
+        ).toBeLessThan(o.priority);
+      }
+    }
+  });
+
+  it("keeps 'batal' out of the templates — the built-in quote owns it", () => {
+    // A guest typing "batal" is backing out of a pending quote. A template
+    // claiming it would steal that from the booking conversation.
+    for (const t of FLOW_TEMPLATES) {
+      expect(t.triggerKeywords, `${t.name} claims 'batal'`).not.toContain("batal");
+    }
+  });
+});
+
 describe("routing across the installed templates", () => {
   const pick = (input: string, isInhouse: boolean) => pickFlow(ALL, input, { isInhouse })?.id ?? null;
 
@@ -142,6 +211,31 @@ describe("routing across the installed templates", () => {
   it("does not fire on words that merely contain a trigger", () => {
     // "menunggu" ⊃ "menu"; substring alone cannot start a flow.
     expect(pick("saya menunggu konfirmasi transfer", true)).toBeNull();
+  });
+
+  it("routes the new question templates to their own flows", () => {
+    expect(pick("berapa harga kamarnya", false)).toBe("harga");
+    expect(pick("jam berapa check in", false)).toBe("checkin_info");
+    expect(pick("alamat hotelnya dimana", false)).toBe("lokasi");
+    expect(pick("ada wifi tidak", false)).toBe("fasilitas");
+    expect(pick("mau refund", false)).toBe("pembatalan");
+    expect(pick("mau kasih masukan", false)).toBe("ulasan");
+  });
+
+  it("sends a complaint and a request for a human straight to the right place", () => {
+    expect(pick("ac nya rusak", false)).toBe("keluhan");
+    expect(pick("mau bicara dengan admin", false)).toBe("staf");
+  });
+
+  it("routes housekeeping words only for a guest who is staying", () => {
+    expect(pick("minta handuk", true)).toBe("housekeeping");
+    expect(pick("minta handuk", false)).toBeNull();
+  });
+
+  it('lets "check in" mean the question, not a booking', () => {
+    // Reservasi deliberately drops "check in": a guest asking the time is not
+    // trying to book, and the booking flow outranks the info one.
+    expect(pick("jam check in berapa ya", false)).toBe("checkin_info");
   });
 });
 

@@ -16,11 +16,12 @@ import {
   listFlows, createFlow, updateFlow, deleteFlow, blankFlow,
 } from "@/services/waFlowService";
 import { REQUIREMENT_META, type WaFlow } from "@/types/waFlow";
+import TemplatePicker from "@/components/waflow/TemplatePicker";
 // The templates live beside the engine that runs them, and are imported here
 // rather than copied: the file is pure data with no server-only imports, so a
 // single definition serves both the installer and the engine's transcript
 // tests. A copy would drift the first time anyone edited one side.
-import { FLOW_TEMPLATES } from "../../../api/_lib/wa/flow/templates";
+import { FLOW_TEMPLATES, type FlowTemplate } from "../../../api/_lib/wa/flow/templates";
 
 /**
  * The hotel's WhatsApp script: every flow, in the order the engine evaluates
@@ -40,6 +41,7 @@ export default function WaFlows() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<WaFlow | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   async function refresh() {
     try {
@@ -61,19 +63,17 @@ export default function WaFlows() {
   }, []);
 
   /**
-   * Install the starter pack. Skips any template whose name a flow already
-   * uses, so pressing this twice adds nothing and destroys nothing — the hotel
-   * may have edited the first copy.
+   * Install exactly the templates the hotel ticked.
+   *
+   * Skips any whose name is already taken — the unique index would reject it,
+   * and overwriting would discard words the hotel has since edited.
    */
-  async function installTemplates() {
-    setBusy(true);
+  async function installTemplates(chosen: FlowTemplate[]) {
+    const existing = new Set(flows.map((f) => f.name));
+    const todo = chosen.filter((t) => !existing.has(t.name));
+    if (todo.length === 0) return;
+
     try {
-      const existing = new Set(flows.map((f) => f.name));
-      const todo = FLOW_TEMPLATES.filter((t) => !existing.has(t.name));
-      if (todo.length === 0) {
-        toast({ title: "Semua template sudah terpasang" });
-        return;
-      }
       for (const t of todo) {
         await createFlow({
           name: t.name,
@@ -95,8 +95,7 @@ export default function WaFlows() {
       });
     } catch (e) {
       toast({ title: "Gagal memasang template", description: (e as Error).message, variant: "destructive" });
-    } finally {
-      setBusy(false);
+      throw e;
     }
   }
 
@@ -154,9 +153,9 @@ export default function WaFlows() {
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button variant="outline" onClick={installTemplates} disabled={busy}>
+            <Button variant="outline" onClick={() => setPickerOpen(true)} disabled={busy}>
               <Sparkles className="mr-2 h-4 w-4" />
-              Pasang Template
+              Pilih Template
             </Button>
             <Button onClick={createBlank} disabled={busy}>
               <Plus className="mr-2 h-4 w-4" />
@@ -170,7 +169,7 @@ export default function WaFlows() {
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         ) : flows.length === 0 ? (
-          <EmptyState onInstall={installTemplates} busy={busy} />
+          <EmptyState onBrowse={() => setPickerOpen(true)} />
         ) : (
           <>
             {activeCount === 0 && (
@@ -195,6 +194,13 @@ export default function WaFlows() {
           </>
         )}
       </div>
+
+      <TemplatePicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        installedNames={new Set(flows.map((f) => f.name))}
+        onInstall={installTemplates}
+      />
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
@@ -301,27 +307,21 @@ function FlowRow({
   );
 }
 
-function EmptyState({ onInstall, busy }: { onInstall: () => void; busy: boolean }) {
+function EmptyState({ onBrowse }: { onBrowse: () => void }) {
   return (
     <div className="rounded-lg border border-dashed p-10 text-center">
       <Workflow className="mx-auto h-10 w-10 text-muted-foreground/50" />
       <h2 className="mt-4 font-medium">Belum ada alur</h2>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        Mulai dari template siap pakai: alur reservasi lengkap dengan pembayaran di chat, alur
-        request tamu yang sedang menginap, dan sapaan dengan menu pilihan. Semuanya bisa Anda ubah.
+        Tersedia {FLOW_TEMPLATES.length} template siap pakai — reservasi dengan pembayaran di
+        chat, request tamu yang menginap, info harga dan lokasi, penanganan keluhan, dan
+        lainnya. Pilih yang Anda butuhkan; semuanya bisa diubah.
       </p>
-      <div className="mt-5 space-y-2 text-left mx-auto max-w-md">
-        {FLOW_TEMPLATES.map((t) => (
-          <div key={t.key} className="rounded-md border bg-muted/30 p-3">
-            <p className="text-sm font-medium">{t.name}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>
-          </div>
-        ))}
-      </div>
-      <Button className="mt-5" onClick={onInstall} disabled={busy}>
+      <Button className="mt-5" onClick={onBrowse}>
         <Sparkles className="mr-2 h-4 w-4" />
-        Pasang {FLOW_TEMPLATES.length} Template
+        Lihat {FLOW_TEMPLATES.length} Template
       </Button>
     </div>
   );
 }
+

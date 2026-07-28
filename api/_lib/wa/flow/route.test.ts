@@ -36,6 +36,7 @@ beforeEach(() => {
   actions = {
     startBooking: vi.fn().mockResolvedValue(undefined),
     startRoomService: vi.fn().mockResolvedValue(true),
+    checkAvailability: vi.fn().mockResolvedValue(undefined),
     showRoomTypes: vi.fn().mockResolvedValue(undefined),
     showMenu: vi.fn().mockResolvedValue(undefined),
     sendPortalLink: vi.fn().mockResolvedValue(undefined),
@@ -283,6 +284,65 @@ describe("routeFlow — anti-spam", () => {
 
     expect(sent).toEqual(["Terima kasih Budi"]);
     expect(inbound.checkFlowStartBudget).not.toHaveBeenCalled();
+  });
+});
+
+describe("routeFlow — leaving a flow", () => {
+  const asking = flow({
+    id: "f-ask",
+    definition: coerceFlow({
+      version: 1,
+      nodes: [
+        { id: "t", type: "trigger", data: {} },
+        { id: "q", type: "ask", data: { prompt: "Nama Anda?", variable: "n" } },
+      ],
+      edges: [{ id: "e1", source: "t", target: "q" }],
+    }),
+  });
+
+  it("lets a parked guest out in one word", async () => {
+    // Without this the option matcher just re-asks, and the guest is stuck
+    // until the 30-minute TTL. Tolerable with 3 flows, hostile with 12.
+    store.getFlow.mockResolvedValue(asking);
+
+    const r = await routeFlow(params({
+      input: "batal",
+      pending: { kind: "flow", payload: { flowId: "f-ask", nodeId: "q", vars: {} } },
+    }));
+
+    expect(r.handled).toBe(true);
+    expect(sent[0]).toContain("dibatalkan");
+    expect(pending.clearPending).toHaveBeenCalled();
+    // The flow is never resumed, so its next node cannot run.
+    expect(store.getFlow).not.toHaveBeenCalled();
+  });
+
+  it("accepts the common ways of saying it", async () => {
+    for (const word of ["batal", "BATAL", " cancel ", "stop", "keluar", "gak jadi"]) {
+      sent = [];
+      vi.clearAllMocks();
+      client.isConfigured.mockReturnValue(true);
+      const r = await routeFlow(params({
+        input: word,
+        pending: { kind: "flow", payload: { flowId: "f-ask", nodeId: "q", vars: {} } },
+      }));
+      expect(r.handled, word).toBe(true);
+      expect(sent[0], word).toContain("dibatalkan");
+    }
+  });
+
+  it("does not treat a sentence containing the word as an exit", async () => {
+    // "batalkan saja yang kemarin" is a plausible ANSWER, not a command to
+    // leave — matching it as a substring would drop the guest mid-flow.
+    store.getFlow.mockResolvedValue(asking);
+
+    await routeFlow(params({
+      input: "batalkan saja yang kemarin ya",
+      pending: { kind: "flow", payload: { flowId: "f-ask", nodeId: "q", vars: {} } },
+    }));
+
+    expect(sent[0] ?? "").not.toContain("dibatalkan");
+    expect(store.getFlow).toHaveBeenCalled(); // resumed as a normal answer
   });
 });
 

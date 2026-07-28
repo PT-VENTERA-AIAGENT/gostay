@@ -42,6 +42,11 @@ export type ActionType =
   | "start_room_service"
   /** Reply with the hotel's active room types and nightly rates. */
   | "show_room_types"
+  /**
+   * Answer "is anything free?" with real counts per room type. Reports how many
+   * rooms are free, never which ones are taken or by whom.
+   */
+  | "check_availability"
   /** Reply with the hotel's active POS menu. Does not start an order. */
   | "show_menu"
   /** Reply with the guest-portal link for this hotel. */
@@ -194,7 +199,8 @@ const NODE_TYPES = new Set<NodeType>([
 ]);
 
 const ACTION_TYPES = new Set<ActionType>([
-  "start_booking", "start_room_service", "show_room_types", "show_menu", "send_portal_link",
+  "start_booking", "start_room_service", "show_room_types", "check_availability",
+  "show_menu", "send_portal_link",
 ]);
 
 function isRecord(v: unknown): v is Record<string, unknown> {

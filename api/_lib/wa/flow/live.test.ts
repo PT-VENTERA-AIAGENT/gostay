@@ -96,6 +96,9 @@ function liveActions(brand: string, sent: string[]): FlowActions {
       );
       return true;
     },
+    async checkAvailability() {
+      sent.push("→ [cek ketersediaan: jumlah kamar kosong per tipe]");
+    },
     async showRoomTypes() {
       const types = await listRoomTypes(TENANT);
       sent.push(

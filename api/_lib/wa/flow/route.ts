@@ -25,6 +25,26 @@ import { pickFlow, type GuestState } from "./select";
 /** How long a halted flow run stays resumable. Matches the booking TTL. */
 const FLOW_TTL_MINUTES = 30;
 
+/**
+ * Words that let a guest walk out of a flow they did not mean to enter.
+ *
+ * Without this a guest parked on a choice node has no exit: the option matcher
+ * does not recognise "batal", so it re-asks, and they stay stuck until the 30
+ * minute TTL expires. That is tolerable with three flows and actively hostile
+ * with twelve, where landing in the wrong one is routine.
+ *
+ * Matched against the WHOLE trimmed message, never as a substring — "batal" must
+ * not fire on "batalkan saja yang kemarin", which is a sentence a guest might
+ * legitimately answer a question with.
+ */
+const CANCEL_WORDS = new Set([
+  "batal", "batalkan", "cancel", "stop", "keluar", "selesai", "udahan", "gak jadi", "ga jadi",
+]);
+
+function isCancel(input: string): boolean {
+  return CANCEL_WORDS.has(input.trim().toLowerCase());
+}
+
 export interface FlowRouteParams {
   tenantId: string;
   phoneJid: string;
@@ -132,6 +152,14 @@ async function resume(
   const flowId = typeof payload.flowId === "string" ? payload.flowId : null;
   const nodeId = typeof payload.nodeId === "string" ? payload.nodeId : null;
   const saved = isStringMap(payload.vars) ? payload.vars : {};
+
+  // An explicit exit, before anything else. A guest who lands in the wrong flow
+  // must be able to leave it in one word rather than waiting out the TTL.
+  if (isCancel(params.input)) {
+    await clearPending(params.tenantId, params.phoneJid);
+    await params.reply("Baik, dibatalkan. Ada lagi yang dapat kami bantu?");
+    return { handled: true };
+  }
 
   if (!flowId || !nodeId) {
     // A malformed pending row can only strand the guest. Drop it and let the

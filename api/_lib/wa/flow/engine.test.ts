@@ -15,6 +15,7 @@ beforeEach(() => {
   actions = {
     startBooking: vi.fn().mockResolvedValue(undefined),
     startRoomService: vi.fn().mockResolvedValue(true),
+    checkAvailability: vi.fn().mockResolvedValue(undefined),
     showRoomTypes: vi.fn().mockResolvedValue(undefined),
     showMenu: vi.fn().mockResolvedValue(undefined),
     sendPortalLink: vi.fn().mockResolvedValue(undefined),
