@@ -127,7 +127,7 @@ export default function PortalHome() {
             <motion.div variants={staggerItem} className="bg-card rounded-2xl border border-border p-4 md:p-6 shadow-sm max-w-3xl mx-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Check-in</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">{t("Check-in")}</label>
                   <DatePicker
                     value={checkIn}
                     min={todayISO}
@@ -141,7 +141,7 @@ export default function PortalHome() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">Check-out</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block text-left">{t("Check-out")}</label>
                   <DatePicker
                     value={checkOut}
                     min={checkIn || todayISO}
@@ -219,7 +219,7 @@ export default function PortalHome() {
             </div>
           ) : searched && displayedRooms.length === 0 ? (
             <div className="bg-muted rounded-xl p-8 text-center">
-              <p className="text-muted-foreground text-sm">No rooms available for the selected dates. Try different dates.</p>
+              <p className="text-muted-foreground text-sm">{t("No rooms available for the selected dates. Try different dates.")}</p>
             </div>
           ) : (
             <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">

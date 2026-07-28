@@ -54,7 +54,7 @@ export default function BookingReview() {
     return (
       <PageTransition>
         <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-8 text-center space-y-4">
-          <p className="text-muted-foreground">No booking data found. Please start from the rooms page.</p>
+          <p className="text-muted-foreground">{t("No booking data found. Please start from the rooms page.")}</p>
           <button onClick={() => navigate("/portal")} className="text-primary text-sm hover:underline">
             Browse rooms
           </button>
@@ -155,29 +155,29 @@ export default function BookingReview() {
         </div>
 
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">Review Your Booking</h1>
-          <p className="text-sm text-muted-foreground mt-1">Please review all details before confirming</p>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Review Your Booking")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("Please review all details before confirming")}</p>
         </div>
 
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-4">
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-            <h2 className="font-semibold text-foreground mb-3">Room Details</h2>
+            <h2 className="font-semibold text-foreground mb-3">{t("Room Details")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div><span className="text-muted-foreground">Room Type</span><p className="font-medium text-foreground mt-0.5">{roomType.name}</p></div>
+              <div><span className="text-muted-foreground">{t("Room Type")}</span><p className="font-medium text-foreground mt-0.5">{roomType.name}</p></div>
               <div><span className="text-muted-foreground">Max Occupancy</span><p className="font-medium text-foreground mt-0.5">{roomType.max_occupancy} guests</p></div>
-              <div><span className="text-muted-foreground">Check-in</span><p className="font-medium text-foreground mt-0.5">{formatDate(checkIn)}</p></div>
-              <div><span className="text-muted-foreground">Check-out</span><p className="font-medium text-foreground mt-0.5">{formatDate(checkOut)}</p></div>
-              <div><span className="text-muted-foreground">Nights</span><p className="font-medium text-foreground mt-0.5">{nights}</p></div>
-              <div><span className="text-muted-foreground">Guests</span><p className="font-medium text-foreground mt-0.5">{guests} Adult{guests !== 1 ? "s" : ""}</p></div>
+              <div><span className="text-muted-foreground">{t("Check-in")}</span><p className="font-medium text-foreground mt-0.5">{formatDate(checkIn)}</p></div>
+              <div><span className="text-muted-foreground">{t("Check-out")}</span><p className="font-medium text-foreground mt-0.5">{formatDate(checkOut)}</p></div>
+              <div><span className="text-muted-foreground">{t("Nights")}</span><p className="font-medium text-foreground mt-0.5">{nights}</p></div>
+              <div><span className="text-muted-foreground">{t("Guests")}</span><p className="font-medium text-foreground mt-0.5">{guests} Adult{guests !== 1 ? "s" : ""}</p></div>
             </div>
           </motion.div>
 
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-            <h2 className="font-semibold text-foreground mb-3">Guest Information</h2>
+            <h2 className="font-semibold text-foreground mb-3">{t("Guest Information")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div><span className="text-muted-foreground">Name</span><p className="font-medium text-foreground mt-0.5">{guestInfo.firstName} {guestInfo.lastName}</p></div>
-              <div><span className="text-muted-foreground">Email</span><p className="font-medium text-foreground mt-0.5">{guestInfo.email}</p></div>
-              <div><span className="text-muted-foreground">Phone</span><p className="font-medium text-foreground mt-0.5">{guestInfo.phone}</p></div>
+              <div><span className="text-muted-foreground">{t("Name")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.firstName} {guestInfo.lastName}</p></div>
+              <div><span className="text-muted-foreground">{t("Email")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.email}</p></div>
+              <div><span className="text-muted-foreground">{t("Phone")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.phone}</p></div>
               {guestInfo.specialRequests && (
                 <div className="sm:col-span-2"><span className="text-muted-foreground">Special Requests</span><p className="font-medium text-foreground mt-0.5">{guestInfo.specialRequests}</p></div>
               )}
@@ -185,14 +185,14 @@ export default function BookingReview() {
           </motion.div>
 
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-            <h2 className="font-semibold text-foreground mb-3">Price Breakdown</h2>
+            <h2 className="font-semibold text-foreground mb-3">{t("Price Breakdown")}</h2>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{nights} night{nights !== 1 ? "s" : ""} × {formatIDR(roomType.base_rate)}</span>
                 <span className="text-foreground tabular-nums">{formatIDR(total)}</span>
               </div>
               <div className="flex justify-between font-semibold pt-2 border-t border-border">
-                <span className="text-foreground">Total</span>
+                <span className="text-foreground">{t("Total")}</span>
                 <span className="text-primary tabular-nums">{formatIDR(total)}</span>
               </div>
             </div>
@@ -222,9 +222,9 @@ export default function BookingReview() {
               {submitting ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
               ) : user ? (
-                <>Request Booking <Check className="w-4 h-4" /></>
+                <>{t("Request Booking")} <Check className="w-4 h-4" /></>
               ) : (
-                <>Sign in to book <Check className="w-4 h-4" /></>
+                <>{t("Sign in to book")} <Check className="w-4 h-4" /></>
               )}
             </button>
           </motion.div>

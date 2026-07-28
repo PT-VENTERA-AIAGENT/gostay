@@ -128,7 +128,7 @@ export default function RoomTypeDetail() {
   if (!roomType) {
     return (
       <PageTransition>
-        <div className="p-6 text-center text-sm text-destructive">Room type not found.</div>
+        <div className="p-6 text-center text-sm text-destructive">{t("Room type not found.")}</div>
       </PageTransition>
     );
   }
@@ -146,12 +146,12 @@ export default function RoomTypeDetail() {
           </div>
           <div className="flex items-center gap-2 self-start">
             <button onClick={() => setEditOpen(true)} className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors btn-press">
-              <Edit className="w-4 h-4" /> <span className="hidden sm:inline">Edit</span>
+              <Edit className="w-4 h-4" /> <span className="hidden sm:inline">{t("Edit")}</span>
             </button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <button className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg border border-destructive bg-card text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors btn-press">
-                  <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Delete</span>
+                  <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">{t("Delete")}</span>
                 </button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -220,10 +220,10 @@ export default function RoomTypeDetail() {
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-foreground">Seasonal Pricing</h2>
-                <button onClick={() => setPricingOpen(true)} className="text-sm text-primary font-medium hover:underline flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add Rule</button>
+                <button onClick={() => setPricingOpen(true)} className="text-sm text-primary font-medium hover:underline flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> {t("Add Rule")}</button>
               </div>
               {pricing.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No seasonal pricing rules set.</p>
+                <p className="text-sm text-muted-foreground">{t("No seasonal pricing rules set.")}</p>
               ) : (
                 <div className="space-y-3">
                   {pricing.map((o) => (
@@ -247,11 +247,11 @@ export default function RoomTypeDetail() {
 
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-4 md:space-y-6">
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4">Details</h2>
+              <h2 className="font-semibold text-foreground mb-4">{t("Details")}</h2>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Base Price</span><span className="font-semibold text-foreground tabular-nums">{formatIDR(roomType.base_rate)}/night</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t("Base Price")}</span><span className="font-semibold text-foreground tabular-nums">{formatIDR(roomType.base_rate)}/night</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Max Occupancy</span><span className="font-medium text-foreground">{roomType.max_occupancy} guests</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Total Rooms</span><span className="font-medium text-foreground">{rooms.length}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t("Total Rooms")}</span><span className="font-medium text-foreground">{rooms.length}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Slug</span><span className="font-mono text-xs text-muted-foreground">{roomType.slug}</span></div>
               </div>
             </motion.div>
@@ -259,7 +259,7 @@ export default function RoomTypeDetail() {
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
               <h2 className="font-semibold text-foreground mb-4">Rooms ({rooms.length})</h2>
               {rooms.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No rooms added yet.</p>
+                <p className="text-sm text-muted-foreground">{t("No rooms added yet.")}</p>
               ) : (
                 <div className="space-y-2">
                   {rooms.map((r) => (
