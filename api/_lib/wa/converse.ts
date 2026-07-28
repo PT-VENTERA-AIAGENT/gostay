@@ -50,7 +50,8 @@ import {
 } from "./guest";
 import { sendText } from "./send";
 import { getOrCreateBotProfile, getOrCreateThread, logMessage } from "./crm";
-import { checkGreetCooldown } from "./inbound";
+import { checkGreetCooldown, checkFlowStartBudget } from "./inbound";
+import { isBotPaused, pauseBot } from "./takeover";
 
 export interface GuestMessage {
   tenantId: string;
@@ -66,6 +67,12 @@ export interface GuestMessage {
 // against the whole trimmed message so "ya", "Iya", "OK" all confirm.
 const YES = new Set(["ya", "iya", "y", "ok", "oke", "okay", "setuju", "lanjut"]);
 const NO = new Set(["batal", "cancel", "no", "tidak", "gak", "engga", "nggak"]);
+
+// Words that abandon ANY pending conversation, not just a yes/no prompt.
+// Narrower than NO on purpose: "tidak" is a legitimate answer to a question, so
+// only unambiguous exits belong here. Matched against the whole trimmed message
+// so "batalkan saja yang kemarin" — a plausible sentence — is not an exit.
+const ESCAPE = new Set(["batal", "batalkan", "cancel", "stop", "keluar", "selesai", "udahan", "gak jadi", "ga jadi"]);
 
 // Openers that a guest actually starts a chat with. The welcome greeting fires
 // ONLY for these — never for every stray/unrecognised message — so the bot can't
@@ -207,6 +214,12 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       return deliver(body);
     };
 
+    // ── 0a. A human owns this conversation — say nothing ────────────────────
+    // Placed AFTER the inbound message is logged, so staff still see what the
+    // guest wrote; it only stops the bot from answering over them. Everything
+    // below is skipped, including the flows.
+    if (await isBotPaused(threadId)) return;
+
     const word = trimmed.toLowerCase();
     const pending = await getPending(tenantId, phoneJid);
 
@@ -229,7 +242,49 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       // Lazy: only consulted when a flow actually gates on the guest staying.
       isInhouse: async () => (await getInhouseStay(tenantId, guest.customerId)) !== null,
     });
-    if (routed.handled) return;
+    if (routed.handled) {
+      // A handoff node fired. Until now that was only a sentence; this is what
+      // makes it true — the bot stops until staff hand it back or the takeover
+      // lapses.
+      if (routed.handoff) {
+        await clearPending(tenantId, phoneJid);
+        await pauseBot(threadId);
+      }
+      return;
+    }
+
+    // ── 0b. Let the guest out of a conversation they no longer want ─────────
+    // Without this a "collecting" row is a trap. Its TTL is refreshed on every
+    // turn, so waiting never frees them, and until now nothing in the collecting
+    // branch recognised "batal" — a guest who changed their mind was answered
+    // with the same form forever. Reported from production, where a stale row
+    // held a number for 47 minutes across a dozen messages.
+    if (pending && ESCAPE.has(word)) {
+      await clearPending(tenantId, phoneJid);
+      await reply("Baik, dibatalkan. Ada lagi yang dapat kami bantu?");
+      return;
+    }
+
+    // ── 0c. A question deserves an answer, even mid-form ────────────────────
+    // "Hari ini ada kamar yang kosong?" is not a slot value, and answering it
+    // with "mohon lengkapi data berikut" is how the trap above became visible.
+    // The detector demands BOTH an availability cue and a room word, so a real
+    // slot answer ("2 orang", "27 Juli") cannot reach this.
+    //
+    // The booking state is deliberately LEFT INTACT: the guest asked a question
+    // in the middle of booking, and should be able to carry on afterwards.
+    // Room-service ordering is excluded — its pending payload carries a menu
+    // snapshot that a detour would strand.
+    const midRoomService = pending?.kind === "rs_collecting" || pending?.kind === "confirm_room_service";
+    if (!midRoomService && detectAvailabilityQuery(trimmed)) {
+      try {
+        const a = await queryAvailability({ tenantId, typeHint: trimmed });
+        await reply(renderAvailability(brand, a));
+        return;
+      } catch (e) {
+        console.error("[wa/converse] availability:", (e as Error).message);
+      }
+    }
 
     // ── 1. Awaiting a YES/NO on a priced quote ──────────────────────────────
     if (pending?.kind === "confirm_booking") {
@@ -302,22 +357,6 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
       }
     }
 
-    // ── 1f. "Ada kamar kosong?" — answer it, do not hand back a form ────────
-    // Before this existed the booking extractor read the question as an intent
-    // to book and replied with five fields to fill in, so a guest had to
-    // complete a form to learn the hotel was full. Only when nothing is
-    // mid-flight, so it cannot interrupt a quote the guest is answering.
-    if (!pending && detectAvailabilityQuery(trimmed)) {
-      try {
-        const a = await queryAvailability({ tenantId, typeHint: trimmed });
-        await reply(renderAvailability(brand, a));
-        return;
-      } catch (e) {
-        // Fall through to the booking flow rather than leaving them unanswered.
-        console.error("[wa/converse] availability:", (e as Error).message);
-      }
-    }
-
     // ── 2. Understand the message ───────────────────────────────────────────
     const intent = await extractBookingIntent(trimmed, knownFromPending(pending));
 
@@ -326,11 +365,21 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     // as small talk. Only greet when there's NO booking in progress.
     const collecting = pending?.kind === "collecting";
     if (intent.intent !== "book" && !collecting) {
-      // Narrow trigger: the welcome greeting fires ONLY for an actual opener
-      // ("halo", "hai", …) — never for every stray message. This is the core
-      // anti-spam/anti-loop rule: a message that isn't a greeting gets no reply,
-      // so an echoing/looping number can't pull an endless stream of greetings.
-      if (!isGreetingTrigger(trimmed)) return;
+      // Not a greeting either. Before answering nothing, let the grounded
+      // assistant try — this is the point where a guest asking something the
+      // keyword flows never anticipated used to get silence.
+      //
+      // It is NOT a licence to answer everything: looksLikeQuestion() and a
+      // per-number budget stand in front, and the assistant itself refuses when
+      // its tools do not cover the question. See concierge.ts.
+      if (!isGreetingTrigger(trimmed)) {
+        if (await tryAiFallback({ tenantId, phoneJid, brand, text: trimmed, reply })) return;
+        // Narrow trigger: the welcome greeting fires ONLY for an actual opener
+        // ("halo", "hai", …) — never for every stray message. This is the core
+        // anti-spam/anti-loop rule: a message that isn't a greeting gets no
+        // reply, so an echoing/looping number can't pull an endless stream.
+        return;
+      }
       // And even a real greeting is answered at most once per window per number.
       if (!(await checkGreetCooldown(phoneJid))) return;
 
@@ -590,6 +639,66 @@ async function confirmBooking(
       `Sampai jumpa di *${brand}*!` +
       portal,
   );
+}
+
+// ─── The assistant as a last resort, not as a free-for-all ───────────────────
+
+/**
+ * Whether a message is worth spending a model call on.
+ *
+ * Three filters, each closing a specific hole:
+ *   - Too short ("ok", "👍", "y") carries no question, and answering it invites
+ *     a reply to every acknowledgement a guest sends.
+ *   - Too long is almost always our own reply relayed back by a third-party
+ *     system. The fromMe filter cannot see those, and they contain question
+ *     marks and room words, so length is what distinguishes them.
+ *   - No question shape at all — a statement like "oke besok saya datang" needs
+ *     no answer, and answering it is how a bot becomes tiresome.
+ */
+export function looksLikeQuestion(text: string): boolean {
+  const t = (text ?? "").trim();
+  if (t.length < 6 || t.length > 300) return false;
+
+  const words = t.split(/\s+/).length;
+  if (words < 2) return false;
+
+  if (t.includes("?")) return true;
+  // Indonesian question words, as whole words.
+  return /(?:^|\s)(apa|apakah|adakah|ada|berapa|bisakah|bisa|boleh|kapan|dimana|di mana|gimana|bagaimana|kenapa|mengapa|siapa|minta|tolong)(?:\s|$)/i
+    .test(t);
+}
+
+/**
+ * Let the grounded assistant answer when nothing else did.
+ *
+ * Returns true when it replied. Every guard is deliberately BEFORE the model
+ * call, so a message that should not be answered costs nothing:
+ *   1. shape — looksLikeQuestion above
+ *   2. budget — the same per-number window flows use, under its own namespace,
+ *      so a loop cannot pull an unbounded number of model calls
+ *   3. grounding — the assistant refuses rather than inventing (concierge.ts),
+ *      and we stay silent on a refusal rather than sending "saya belum tahu" to
+ *      a message that may not have been a question at all
+ */
+async function tryAiFallback(p: {
+  tenantId: string;
+  phoneJid: string;
+  brand: string;
+  text: string;
+  reply: (body: string) => Promise<unknown>;
+}): Promise<boolean> {
+  if (!looksLikeQuestion(p.text)) return false;
+  if (!(await checkFlowStartBudget("ai-fallback", p.phoneJid))) return false;
+
+  const r = await askConcierge({ tenantId: p.tenantId, brand: p.brand, question: p.text });
+
+  // Ungrounded means the model looked nothing up — it was talking from memory,
+  // the key is missing, or the guardrail replaced the answer. None of those is
+  // worth sending to a message we were not sure was a question.
+  if (!r.grounded) return false;
+
+  await p.reply(r.text);
+  return true;
 }
 
 // ─── The capabilities a drawn flow can invoke ────────────────────────────────

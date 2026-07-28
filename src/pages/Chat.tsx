@@ -12,7 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Bot, UserRound } from "lucide-react";
 import WaText from "@/components/shared/WaText";
+import { deliverToWhatsApp, setBotTakeover, isBotPaused } from "@/services/chatService";
 
 export default function Chat() {
   const t = useT();
@@ -24,10 +26,10 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { toast } = useToast();
 
-  const { data: threads = [], isLoading: threadsLoading } = useChatThreads();
+  const { data: threads = [], isLoading: threadsLoading, refetch: refetchThreads } = useChatThreads();
   const { data: messages = [], isLoading: messagesLoading } = useChatMessages(selectedThreadId ?? "");
   const sendMessage = useSendMessage();
   const markRead = useMarkMessagesRead();
@@ -91,8 +93,48 @@ export default function Chat() {
     setMessageText("");
     sendMessage.mutate(
       { thread_id: selectedThreadId, sender_id: user.id, content, attachment_url: null, is_read: false },
-      { onError: () => toast({ title: tr("Failed to send message"), variant: "destructive" }) }
+      {
+        onError: () => toast({ title: tr("Failed to send message"), variant: "destructive" }),
+        // Saving and sending are separate steps. Until now only the save
+        // happened, so a reply looked delivered in the inbox and never reached
+        // the guest. Tell staff plainly when it does not leave the building —
+        // the message is kept either way, so it can simply be resent.
+        onSuccess: async () => {
+          const r = await deliverToWhatsApp(selectedThreadId, content, session?.supabase_token ?? null);
+          if (r.ok) return;
+          if (r.error === "guest_not_on_whatsapp") {
+            toast({
+              title: "Tersimpan, tidak dikirim ke WhatsApp",
+              description: "Tamu ini belum pernah menghubungi lewat WhatsApp.",
+            });
+            return;
+          }
+          toast({
+            title: "Gagal mengirim ke WhatsApp",
+            description: `Pesan tersimpan di sini, tetapi belum sampai ke tamu (${r.error ?? "tidak diketahui"}).`,
+            variant: "destructive",
+          });
+        },
+      }
     );
+  }
+
+  const botPaused = isBotPaused(selectedThread as { bot_paused_until?: string | null } | undefined);
+
+  async function toggleTakeover() {
+    if (!selectedThreadId) return;
+    try {
+      await setBotTakeover(selectedThreadId, botPaused ? null : 4);
+      await refetchThreads();
+      toast({
+        title: botPaused ? "Bot diaktifkan kembali" : "Anda mengambil alih percakapan",
+        description: botPaused
+          ? "Balasan otomatis berjalan lagi untuk tamu ini."
+          : "Bot tidak akan menjawab tamu ini selama 4 jam.",
+      });
+    } catch (e) {
+      toast({ title: "Gagal mengubah mode", description: (e as Error).message, variant: "destructive" });
+    }
   }
 
   function toggleThreadStatus() {
@@ -189,10 +231,30 @@ export default function Chat() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate" title={selectedThread.customers?.full_name ?? undefined}>{selectedThread.customers?.full_name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{selectedThread.status}</p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {selectedThread.status}
+                      {botPaused && " · diambil alih staf"}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Whether the bot answers this guest. Staff take over simply
+                      by replying, so this is mostly the way back. */}
+                  <button
+                    onClick={toggleTakeover}
+                    title={botPaused
+                      ? "Bot sedang diam. Klik untuk mengaktifkannya kembali."
+                      : "Bot menjawab otomatis. Klik untuk mengambil alih."}
+                    className={cn(
+                      "hidden sm:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      botPaused
+                        ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                        : "border-border text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    {botPaused ? <UserRound className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                    {botPaused ? "Mode CS" : "Bot aktif"}
+                  </button>
                   <button onClick={callCustomer} title="Telepon tamu" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"><Phone className="w-4 h-4" /></button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

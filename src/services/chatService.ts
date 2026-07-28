@@ -292,3 +292,59 @@ export function subscribeToThreadList(
     )
     .subscribe();
 }
+
+/**
+ * Deliver a staff reply to the guest over WhatsApp, after it has been saved.
+ *
+ * Saving and sending are separate on purpose. The insert is what the inbox
+ * renders, and it must not be undone when the gateway is unreachable — losing
+ * the staff member's words would be worse than a message that needs resending.
+ * So this reports whether it left the building and lets the caller say so.
+ *
+ * Returns a reason rather than throwing, because "this guest never used
+ * WhatsApp" is an ordinary state (portal-only guests) and not an error worth a
+ * red toast.
+ */
+export async function deliverToWhatsApp(
+  threadId: string,
+  text: string,
+  token: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!token) return { ok: false, error: "not_authenticated" };
+  try {
+    const res = await fetch("/api/wa/connect?action=reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ threadId, text }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    return { ok: res.ok && data.ok !== false, error: data.error };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Take a conversation off the bot, or give it back.
+ *
+ * `hours` null hands it back immediately. Staff already take over implicitly by
+ * replying (see deliverToWhatsApp), so this is mostly the way BACK — without
+ * it a takeover could only be ended by waiting it out, which is a strange thing
+ * to ask of someone who has just finished helping a guest.
+ */
+export async function setBotTakeover(threadId: string, hours: number | null): Promise<void> {
+  const bot_paused_until =
+    hours === null ? null : new Date(Date.now() + hours * 3_600_000).toISOString();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("chat_threads")
+    .update({ bot_paused_until })
+    .eq("id", threadId);
+  if (error) throw error;
+}
+
+/** True while a human owns the conversation. */
+export function isBotPaused(thread: { bot_paused_until?: string | null } | null | undefined): boolean {
+  const until = thread?.bot_paused_until;
+  return Boolean(until && new Date(until).getTime() > Date.now());
+}
