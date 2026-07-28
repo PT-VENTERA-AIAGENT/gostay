@@ -1,10 +1,13 @@
-// Shared payment types + status/environment mapping for the gateway model.
+// Shared payment types + status/environment mapping.
 //
-// In the gateway model GoStay does NOT hold Xendit keys or call Xendit directly
-// — the Ventera gateway does. What GoStay still needs is (a) the invoice-status
-// vocabulary Xendit uses (which the gateway forwards verbatim) and (b) the
-// mapping between a hotel's live/test mode and the gateway's
-// production/sandbox environment tokens.
+// GoStay creates invoices by calling Xendit DIRECTLY (see gateway.ts on why the
+// earlier "the Ventera gateway mints them for us" assumption was wrong). The
+// gateway still owns the return leg: it receives Xendit's callback and forwards
+// it here, so the status vocabulary below is what it hands over verbatim.
+//
+// live ⇄ production and test ⇄ sandbox map a hotel's mode onto BOTH the Xendit
+// key used to create the invoice and the internal token that authenticates the
+// callback, which is what keeps a test hotel from ever transacting live.
 
 import type { TokenEnv } from "./token";
 
