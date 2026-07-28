@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
-import { extractBookingIntent, detectRoomNumberQuery, type BookingIntent } from "./ai";
+import { extractBookingIntent, detectRoomNumberQuery, detectMenuKeyword, type BookingIntent } from "./ai";
 
 // The fallback assumes the running year when a phrase omits one ("20-22 juli").
 const YEAR = new Date().getFullYear();
@@ -249,5 +249,27 @@ describe("detectRoomNumberQuery — specific room-number questions", () => {
   it("requires an availability cue or a question mark", () => {
     expect(detectRoomNumberQuery("kamar 201 atas nama Budi")).toBeNull(); // booking, not a status question
     expect(detectRoomNumberQuery("kamar 201?")).toMatchObject({ roomNumber: "201" });
+  });
+});
+
+describe("detectMenuKeyword", () => {
+  it("matches the word on its own or inside a short request", () => {
+    for (const t of ["menu", "Menu", "menu dong", "lihat menu", "boleh minta menu?", "MENU!"]) {
+      expect(detectMenuKeyword(t)).toBe(true);
+    }
+  });
+
+  it("does not fire on Indonesian words that merely start with 'menu'", () => {
+    // The reason this is a word-boundary match and not a ROOM_SERVICE_HINTS
+    // substring: these are everyday words, and none of them orders room service.
+    for (const t of [
+      "saya menunggu konfirmasi",
+      "menuju lokasi hotel",
+      "menurut saya kamarnya bagus",
+      "apakah menular",
+      "",
+    ]) {
+      expect(detectMenuKeyword(t)).toBe(false);
+    }
   });
 });

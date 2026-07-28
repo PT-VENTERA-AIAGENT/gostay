@@ -317,6 +317,58 @@ function greetCooldown(): string {
   return typeof raw === "string" && raw.trim() !== "" ? raw : DEFAULT_GREET_COOLDOWN;
 }
 
+/**
+ * Throttle how often the SAME flow may be restarted for the same number.
+ *
+ * Two guards already stand between a loop and a reply: our own outbound never
+ * re-enters (api/wa/inbound.ts skips `fromMe`), and every number is capped at
+ * WA_REPLY_MAX replies per window. Neither covers a THIRD-party loop — another
+ * automated system that relays our reply back as a genuine inbound. That
+ * sustains indefinitely at the reply budget, which is exactly the "spam ke nomor
+ * sendiri" case the greeting cooldown was added for; flows need the equivalent.
+ *
+ * Scoped per FLOW, not per number, so a real conversation is never blocked: a
+ * guest who says "halo", picks an option, and later asks for the menu is
+ * starting different flows and never touches this. Only genuine repetition of
+ * one flow throttles. The budget is deliberately looser than the greeting's
+ * once-an-hour — a guest asking to see the menu twice in ten minutes is being
+ * served, not spammed, and silence is a worse failure than one extra reply.
+ *
+ * FAILS OPEN, same as the other limiters: a throttle hiccup must never mute a
+ * working bot.
+ */
+const DEFAULT_FLOW_START_MAX = 3;
+const DEFAULT_FLOW_START_WINDOW = "10 minutes";
+
+export async function checkFlowStartBudget(flowId: string, phoneJid: string): Promise<boolean> {
+  const { url, serviceKey } = serviceConfig();
+  if (!url || !serviceKey) return true;
+
+  const max = Number(process.env.WA_FLOW_START_MAX);
+  const windowRaw = process.env.WA_FLOW_START_WINDOW;
+
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/check_wa_rate_limit`, {
+      method: "POST",
+      headers: serviceHeaders(serviceKey),
+      body: JSON.stringify({
+        // Separate namespace per flow so these counters never collide with the
+        // reply, greeting, or provisioning budgets — or with each other.
+        p_phone: `flow:${flowId}:${phoneJid}`,
+        p_max: Number.isInteger(max) && max > 0 ? max : DEFAULT_FLOW_START_MAX,
+        p_window:
+          typeof windowRaw === "string" && windowRaw.trim() !== ""
+            ? windowRaw
+            : DEFAULT_FLOW_START_WINDOW,
+      }),
+    });
+    if (!res.ok) return true;
+    return (await res.json().catch(() => true)) === true;
+  } catch {
+    return true;
+  }
+}
+
 export async function checkGreetCooldown(phoneJid: string): Promise<boolean> {
   const { url, serviceKey } = serviceConfig();
   if (!url || !serviceKey) return true;

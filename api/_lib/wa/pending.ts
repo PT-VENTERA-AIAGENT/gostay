@@ -10,6 +10,8 @@
 //   - "rs_collecting"        — an in-house guest is picking room-service items off
 //                              the menu snapshot carried in the payload.
 //   - "confirm_room_service" — a totalled room-service order awaiting the "YA".
+//   - "flow"                 — a hotel-authored flow (wa_flows) halted at an
+//                              ask/choice node. Payload: { flowId, nodeId, vars }.
 //
 // Service-role only, same raw-PostgREST path as the rest of api/_lib/wa (see
 // client.ts on why not @supabase/supabase-js). Rows carry an expires_at so an
@@ -18,7 +20,7 @@
 import { serviceConfig, serviceGet, serviceHeaders } from "./client";
 
 export interface PendingAction {
-  kind: "collecting" | "confirm_booking" | "rs_collecting" | "confirm_room_service";
+  kind: "collecting" | "confirm_booking" | "rs_collecting" | "confirm_room_service" | "flow";
   payload: Record<string, unknown>;
 }
 

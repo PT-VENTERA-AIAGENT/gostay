@@ -13,7 +13,12 @@ const { ai, pending, booking, guest, send, crm, roomservice, WaRateLimitError } 
   // A real error class so `instanceof WaRateLimitError` works inside converse.
   class WaRateLimitError extends Error {}
   return {
-    ai: { extractBookingIntent: vi.fn(), detectRoomServiceIntent: vi.fn(), detectRoomNumberQuery: vi.fn() },
+    ai: {
+      extractBookingIntent: vi.fn(),
+      detectRoomServiceIntent: vi.fn(),
+      detectMenuKeyword: vi.fn(),
+      detectRoomNumberQuery: vi.fn(),
+    },
     pending: { getPending: vi.fn(), setPending: vi.fn(), clearPending: vi.fn() },
     booking: {
       findRoomType: vi.fn(),
@@ -73,6 +78,7 @@ beforeEach(() => {
   booking.setCustomerName.mockResolvedValue(undefined);
   // Room service defaults: not a room-service message, no active stay, empty menu.
   ai.detectRoomServiceIntent.mockReturnValue(false);
+  ai.detectMenuKeyword.mockReturnValue(false);
   // Not a specific-room-number question by default.
   ai.detectRoomNumberQuery.mockReturnValue(null);
   booking.getRoomByNumberSrv.mockResolvedValue(null);
@@ -411,6 +417,52 @@ describe("handleGuestMessage — room service", () => {
     expect(reply).toContain("pemesanan kamar");
     expect(pending.setPending).not.toHaveBeenCalled();
     expect(roomservice.listMenuProducts).not.toHaveBeenCalled();
+  });
+
+  it('opens room service on a bare "menu" from an in-house guest', async () => {
+    // Not a ROOM_SERVICE_HINTS phrase — "menu" is its own trigger.
+    ai.detectRoomServiceIntent.mockReturnValue(false);
+    ai.detectMenuKeyword.mockReturnValue(true);
+    roomservice.getInhouseStay.mockResolvedValue({ bookingId: "bk-1", roomId: "room-1", roomNumber: "101" });
+    roomservice.listMenuProducts.mockResolvedValue(MENU);
+
+    await handleGuestMessage({ ...BASE, text: "menu" });
+
+    expect(pending.setPending).toHaveBeenCalledWith(
+      "tenant-x", BASE.phoneJid, "rs_collecting",
+      expect.objectContaining({ bookingId: "bk-1", menu: MENU }),
+    );
+    expect(repliesText().toLowerCase()).toContain("menu room service");
+    expect(ai.extractBookingIntent).not.toHaveBeenCalled();
+  });
+
+  it('lets a bare "menu" fall through to the greeting when the guest is not checked in', async () => {
+    // The regression this guards: routing "menu" to room service unconditionally
+    // would answer a prospective guest with "only for checked-in guests" instead
+    // of the hotel greeting they have always got.
+    ai.detectRoomServiceIntent.mockReturnValue(false);
+    ai.detectMenuKeyword.mockReturnValue(true);
+    roomservice.getInhouseStay.mockResolvedValue(null);
+
+    await handleGuestMessage({ ...BASE, text: "menu" });
+
+    const reply = repliesText().toLowerCase();
+    expect(reply).not.toContain("hanya tersedia untuk tamu yang sedang menginap");
+    expect(pending.setPending).not.toHaveBeenCalled();
+    expect(roomservice.listMenuProducts).not.toHaveBeenCalled();
+    // Fell through to the normal path, which is what produces the greeting.
+    expect(ai.extractBookingIntent).toHaveBeenCalled();
+  });
+
+  it('still explains the rule for a real room-service phrase (not a bare "menu")', async () => {
+    ai.detectRoomServiceIntent.mockReturnValue(true);
+    ai.detectMenuKeyword.mockReturnValue(true); // e.g. "menu makanan dong" — hints win
+    roomservice.getInhouseStay.mockResolvedValue(null);
+
+    await handleGuestMessage({ ...BASE, text: "menu makanan dong" });
+
+    expect(repliesText().toLowerCase()).toContain("hanya tersedia untuk tamu yang sedang menginap");
+    expect(ai.extractBookingIntent).not.toHaveBeenCalled();
   });
 
   it("parses picks from the menu snapshot and parks a confirm_room_service quote", async () => {
