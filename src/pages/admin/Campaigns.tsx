@@ -390,7 +390,7 @@ export default function Campaigns() {
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>New Campaign</DialogTitle>
+              <DialogTitle>{t("New Campaign")}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>

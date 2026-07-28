@@ -69,7 +69,7 @@ export default function PortalProfile() {
         </Link>
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">Profile Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your personal information</p>
+          <p className="text-sm text-muted-foreground mt-1">{t("Manage your personal information")}</p>
         </div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="flex items-center gap-4">
@@ -97,7 +97,7 @@ export default function PortalProfile() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground mb-1.5 block">Full Name</label>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Full Name")}</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type="text" value={name} readOnly disabled
@@ -106,7 +106,7 @@ export default function PortalProfile() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground mb-1.5 block">Email</label>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Email")}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type="email" value={profile?.email ?? user?.email ?? ""} readOnly disabled
@@ -126,7 +126,7 @@ export default function PortalProfile() {
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-6 space-y-4">
             <h2 className="font-semibold text-foreground">Contact</h2>
             <div>
-              <label htmlFor="phone" className="text-sm font-medium text-foreground mb-1.5 block">Phone</label>
+              <label htmlFor="phone" className="text-sm font-medium text-foreground mb-1.5 block">{t("Phone")}</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -136,7 +136,7 @@ export default function PortalProfile() {
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-1.5">How the hotel reaches you about a stay.</p>
+              <p className="text-xs text-muted-foreground mt-1.5">{t("How the hotel reaches you about a stay.")}</p>
             </div>
 
             {error && (
@@ -152,7 +152,7 @@ export default function PortalProfile() {
               >
                 {updateProfile.isPending
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
-                  : <><Save className="w-4 h-4" /> Save Changes</>}
+                  : <><Save className="w-4 h-4" /> {t("Save Changes")}</>}
               </motion.button>
             </div>
           </motion.div>

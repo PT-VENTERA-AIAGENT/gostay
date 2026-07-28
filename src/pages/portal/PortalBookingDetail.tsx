@@ -65,8 +65,8 @@ export default function PortalBookingDetail() {
     return (
       <PageTransition>
         <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-4 text-center">
-          <p className="text-muted-foreground">This booking could not be found.</p>
-          <Link to="/portal/my-account" className="text-primary text-sm hover:underline">Back to My Account</Link>
+          <p className="text-muted-foreground">{t("This booking could not be found.")}</p>
+          <Link to="/portal/my-account" className="text-primary text-sm hover:underline">{t("Back to My Account")}</Link>
         </div>
       </PageTransition>
     );
@@ -91,12 +91,12 @@ export default function PortalBookingDetail() {
     <PageTransition>
       <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
         <Link to="/portal/my-account" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to My Account
+          <ArrowLeft className="w-4 h-4" /> {t("Back to My Account")}
         </Link>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Booking Detail</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Booking Detail")}</h1>
             <div className="flex items-center gap-1 mt-1">
               <p className="text-sm font-mono text-primary">{booking.reference}</p>
               <CopyButton text={booking.reference} />
@@ -107,20 +107,20 @@ export default function PortalBookingDetail() {
 
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-4">
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><MapPin className="w-4 h-4" /> Stay Details</h2>
+            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><MapPin className="w-4 h-4" /> {t("Stay Details")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
-                <span className="text-muted-foreground">Room Type</span>
+                <span className="text-muted-foreground">{t("Room Type")}</span>
                 <p className="font-medium text-foreground mt-0.5">{booking.rooms?.room_types?.name ?? "—"}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Dates</span>
+                <span className="text-muted-foreground">{t("Dates")}</span>
                 <p className="font-medium text-foreground mt-0.5">
                   {formatDate(booking.check_in)} – {formatDate(booking.check_out)} ({nights} night{nights !== 1 ? "s" : ""})
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Guests</span>
+                <span className="text-muted-foreground">{t("Guests")}</span>
                 <p className="font-medium text-foreground mt-0.5">
                   {booking.num_adults} Adult{booking.num_adults !== 1 ? "s" : ""}
                   {booking.num_children > 0 && `, ${booking.num_children} Child${booking.num_children !== 1 ? "ren" : ""}`}
@@ -134,7 +134,7 @@ export default function PortalBookingDetail() {
           </motion.div>
 
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Payment</h2>
+            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><CreditCard className="w-4 h-4" /> {t("Payment")}</h2>
             <div className="space-y-2 text-sm">
               {rate != null && nights > 0 && (
                 <div className="flex justify-between">
@@ -143,11 +143,11 @@ export default function PortalBookingDetail() {
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Payment status</span>
+                <span className="text-muted-foreground">{t("Payment status")}</span>
                 <span className="text-foreground capitalize">{booking.payment_status}</span>
               </div>
               <div className="flex justify-between font-semibold pt-2 border-t border-border">
-                <span className="text-foreground">Total</span>
+                <span className="text-foreground">{t("Total")}</span>
                 <span className="text-primary tabular-nums">{formatIDR(Number(booking.total_amount))}</span>
               </div>
             </div>
@@ -178,20 +178,20 @@ export default function PortalBookingDetail() {
                 >
                   {cancelBooking.isPending
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling…</>
-                    : <><XCircle className="w-4 h-4" /> Cancel Booking</>}
+                    : <><XCircle className="w-4 h-4" /> {t("Cancel Booking")}</>}
                 </button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+                  <AlertDialogTitle>{t("Cancel this booking?")}</AlertDialogTitle>
                   <AlertDialogDescription>
                     {booking.reference} for {formatDate(booking.check_in)} will be cancelled. This cannot be undone —
                     you would need to book again.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Keep booking</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleCancel}>Cancel booking</AlertDialogAction>
+                  <AlertDialogCancel>{t("Keep booking")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleCancel}>{t("Cancel booking")}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>

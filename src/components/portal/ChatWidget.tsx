@@ -36,7 +36,7 @@ export default function ChatWidget() {
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Link
               to="/portal/chat"
-              aria-label="Chat with the hotel"
+              aria-label={t("Chat with the hotel")}
               className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center"
             >
               <MessageSquare className="w-6 h-6" />
