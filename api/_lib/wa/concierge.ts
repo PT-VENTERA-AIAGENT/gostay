@@ -29,6 +29,7 @@
 
 import { checkAvailability, renderAvailability, todayJakarta } from "./availability";
 import { findKnowledge } from "./knowledge";
+import { isoOrNull } from "./ai";
 import { listRoomTypes } from "./booking";
 
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
@@ -138,8 +139,15 @@ interface ToolContext {
   brand: string;
 }
 
-const isoDate = (v: unknown): string | null =>
-  typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+/**
+ * A real calendar date, or null.
+ *
+ * Reuses the booking extractor's validator rather than re-checking the SHAPE
+ * here. A shape check alone passes "2026-13-45" and "2026-02-30" — both look
+ * like dates and neither exists — and forwarding one built a PostgREST filter
+ * on a day that never happened, which comes back empty and reads as "penuh".
+ */
+const isoDate = (v: unknown): string | null => isoOrNull(v);
 
 /**
  * Run one tool call and return what the model should see.
@@ -201,7 +209,19 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCon
  * redacted, because a partially-scrubbed answer still carries the claim.
  */
 const FORBIDDEN = [
-  /\b(?:\+?62|0)8\d{7,12}\b/,          // an Indonesian mobile number
+  // An Indonesian mobile number, tolerating the separators people actually
+  // type. The first version required unbroken digits, so "0812-3456-7890" —
+  // the form a staff member writes into a knowledge entry, and the form a model
+  // reaches for when it formats — walked straight past a guardrail that looked
+  // like it was working.
+  //
+  // Two bounds keep it from over-firing, which matters because a tripped
+  // guardrail replaces the WHOLE answer:
+  //   • the number must begin at a token boundary, so the "085" inside a price
+  //     like "Rp 1.085.000.000" is not read as the start of a phone number;
+  //   • separators are capped at two characters, so the pattern cannot wander
+  //     across a sentence stitching unrelated digits together.
+  /(?:^|[\s(])\+?(?:62|0)[\s.()-]{0,2}8[\s.()-]{0,2}(?:\d[\s.()-]{0,2}){7,12}/,
   /\b[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}\b/, // an email address
   /\bBK-\d{8}-[A-Z0-9]{4}\b/,          // a booking reference
 ];
