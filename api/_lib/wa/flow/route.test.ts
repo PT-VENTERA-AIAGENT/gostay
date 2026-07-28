@@ -1,16 +1,18 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { pending, store, client } = vi.hoisted(() => ({
+const { pending, store, client, inbound } = vi.hoisted(() => ({
   pending: { setPending: vi.fn(), clearPending: vi.fn() },
   store: { listActiveFlows: vi.fn(), getFlow: vi.fn() },
   // routeFlow declines outright when Supabase is unconfigured; these tests are
   // about routing, so stand it up as configured.
   client: { isConfigured: vi.fn(() => true) },
+  inbound: { checkFlowStartBudget: vi.fn() },
 }));
 vi.mock("../pending", () => pending);
 vi.mock("./store", () => store);
 vi.mock("../client", () => client);
+vi.mock("../inbound", () => inbound);
 
 import { routeFlow, type FlowRouteParams } from "./route";
 import { coerceFlow } from "./types";
@@ -25,6 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sent = [];
   client.isConfigured.mockReturnValue(true);
+  inbound.checkFlowStartBudget.mockResolvedValue(true);
   pending.setPending.mockResolvedValue(undefined);
   pending.clearPending.mockResolvedValue(undefined);
   store.listActiveFlows.mockResolvedValue([]);
@@ -223,6 +226,63 @@ describe("routeFlow — halting and resuming", () => {
 
     expect(r.handled).toBe(false);
     expect(pending.clearPending).toHaveBeenCalled();
+  });
+});
+
+describe("routeFlow — anti-spam", () => {
+  const greeting = simple("greeting", "Halo!", ["halo"]);
+
+  it("stays silent once the same flow's start budget is exhausted", async () => {
+    // The loop this guards: a third-party system relaying our reply back as a
+    // genuine inbound (so the fromMe filter does not catch it), re-triggering
+    // the same flow indefinitely.
+    store.listActiveFlows.mockResolvedValue([greeting]);
+    inbound.checkFlowStartBudget.mockResolvedValue(false);
+
+    const r = await routeFlow(params({ input: "halo" }));
+
+    expect(sent).toEqual([]);
+    // Reported as handled on purpose: falling back would let the built-in
+    // conversation answer the very message we just declined, and the loop
+    // would carry on under a different budget.
+    expect(r.handled).toBe(true);
+  });
+
+  it("budgets per flow, so a different flow still answers", async () => {
+    store.listActiveFlows.mockResolvedValue([greeting, simple("rs", "Menu:", ["menu"])]);
+    inbound.checkFlowStartBudget.mockImplementation(async (flowId: string) => flowId !== "greeting");
+
+    await routeFlow(params({ input: "menu" }));
+
+    expect(sent).toEqual(["Menu:"]);
+  });
+
+  it("never throttles a guest answering a question we asked", async () => {
+    // A resume must always get through — otherwise the guest is stranded on a
+    // node nothing can advance.
+    inbound.checkFlowStartBudget.mockResolvedValue(false);
+    store.getFlow.mockResolvedValue(
+      flow({
+        id: "f-ask",
+        definition: coerceFlow({
+          version: 1,
+          nodes: [
+            { id: "t", type: "trigger", data: {} },
+            { id: "q", type: "ask", data: { prompt: "Nama?", variable: "n" } },
+            { id: "m", type: "message", data: { text: "Terima kasih {{n}}" } },
+          ],
+          edges: [{ id: "e1", source: "t", target: "q" }, { id: "e2", source: "q", target: "m" }],
+        }),
+      }),
+    );
+
+    await routeFlow(params({
+      input: "Budi",
+      pending: { kind: "flow", payload: { flowId: "f-ask", nodeId: "q", vars: {} } },
+    }));
+
+    expect(sent).toEqual(["Terima kasih Budi"]);
+    expect(inbound.checkFlowStartBudget).not.toHaveBeenCalled();
   });
 });
 

@@ -16,6 +16,7 @@
 // itself, which is how a halted graph resumes.
 
 import { isConfigured } from "../client";
+import { checkFlowStartBudget } from "../inbound";
 import { clearPending, setPending, type PendingAction } from "../pending";
 import { runFlow, type FlowActions } from "./engine";
 import { getFlow, listActiveFlows, type StoredFlow } from "./store";
@@ -86,6 +87,18 @@ async function start(params: FlowRouteParams): Promise<FlowRouteResult> {
   const state = await resolveState(flows, params);
   const flow = pickFlow(flows, params.input, state);
   if (!flow) return NOT_HANDLED;
+
+  // Anti-spam, on STARTS only — see checkFlowStartBudget. A resume is never
+  // throttled: a guest answering a question we asked must always get through,
+  // or the flow strands them on a node they cannot leave.
+  //
+  // Report the message as HANDLED when throttled. Falling back would defeat the
+  // point: the built-in conversation would answer the very message we just
+  // decided not to answer, and the loop would continue at its own budget.
+  if (!(await checkFlowStartBudget(flow.id, params.phoneJid))) {
+    console.warn(`[wa/flow] start budget exhausted for ${flow.id} / ${params.phoneJid}`);
+    return { handled: true };
+  }
 
   return execute(params, flow, null, {
     ...params.vars,
