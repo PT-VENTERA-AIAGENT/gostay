@@ -46,7 +46,7 @@ export default function BookingDetails() {
     return (
       <PageTransition>
         <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-8 text-center space-y-4">
-          <p className="text-muted-foreground">{t("No booking data found. Please start from the rooms page.")}</p>
+          <p className="text-muted-foreground">No booking data found. Please start from the rooms page.</p>
           <button
             onClick={() => navigate("/portal")}
             className="text-primary text-sm hover:underline"
@@ -116,8 +116,8 @@ export default function BookingDetails() {
         </div>
 
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Guest Details")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("Please provide your information")}</p>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Guest Details</h1>
+          <p className="text-sm text-muted-foreground mt-1">Please provide your information</p>
         </div>
 
         <motion.div
@@ -127,7 +127,7 @@ export default function BookingDetails() {
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-foreground mb-1.5 block">{t("First Name")}</label>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">First Name</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -140,7 +140,7 @@ export default function BookingDetails() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Last Name")}</label>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">Last Name</label>
               <input
                 type="text"
                 value={lastName}
@@ -151,7 +151,7 @@ export default function BookingDetails() {
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Email")}</label>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Email</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
@@ -164,7 +164,7 @@ export default function BookingDetails() {
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Phone")}</label>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Phone</label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input

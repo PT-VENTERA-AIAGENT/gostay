@@ -73,7 +73,7 @@ export default function BookingList() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as BookingStatus | "all")}
-            aria-label={t("Filter by status")}
+            aria-label="Filter by status"
             className="text-sm bg-muted rounded-lg px-3 py-2 text-foreground border-none outline-none cursor-pointer shrink-0"
           >
             <option value="all">{t("All Status")}</option>
@@ -93,7 +93,7 @@ export default function BookingList() {
           Could not load bookings: {(error as Error).message}
         </p>
       ) : bookings.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-8 text-center">{t("No bookings match this filter.")}</p>
+        <p className="text-xs text-muted-foreground py-8 text-center">No bookings match this filter.</p>
       ) : (
         <>
           {/* Desktop table */}
@@ -139,7 +139,7 @@ export default function BookingList() {
                         <span className={cn("inline-block text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap", cls)}>{statusLabel(b.status, t)}</span>
                       </td>
                       <td className="py-3">
-                        <Link to={"/bookings/" + b.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title={t("View details")}>
+                        <Link to={"/bookings/" + b.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
                           <Eye className="w-4 h-4" />
                         </Link>
                       </td>

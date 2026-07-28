@@ -123,7 +123,7 @@ export default function CallLogs() {
                     {call.direction === "inbound" ? (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><PhoneIncoming className="w-3 h-3" /> In</span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> {t("Out")}</span>
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> Out</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm font-mono text-foreground">{call.caller_phone}</td>
@@ -151,7 +151,7 @@ export default function CallLogs() {
                 {call.direction === "inbound" ? (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><PhoneIncoming className="w-3 h-3" /> In</span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> {t("Out")}</span>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> Out</span>
                 )}
               </div>
               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{call.summary ?? "—"}</p>

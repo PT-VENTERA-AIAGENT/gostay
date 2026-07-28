@@ -175,8 +175,8 @@ export default function Bookings() {
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Reference")}</th>
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Guest")}</th>
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Room")}</th>
-                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Check-in")}</th>
-                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Check-out")}</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Check-in</th>
+                    <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Check-out</th>
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Status")}</th>
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Total")}</th>
                     <th className="text-left px-4 py-3 font-medium whitespace-nowrap">{t("Source")}</th>
