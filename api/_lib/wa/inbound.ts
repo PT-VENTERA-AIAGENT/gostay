@@ -317,6 +317,50 @@ function greetCooldown(): string {
   return typeof raw === "string" && raw.trim() !== "" ? raw : DEFAULT_GREET_COOLDOWN;
 }
 
+// ─── Test allowlist ──────────────────────────────────────────────────────────
+
+/**
+ * When WA_ALLOWED_GUESTS is set, ONLY those numbers are auto-answered.
+ *
+ * Exists for one specific, dangerous situation: linking a personal phone as a
+ * hotel's WhatsApp in order to test. Every other guard here protects the GUEST
+ * from a misbehaving bot — none protects the bot's own contacts from it. A
+ * friend who texts "halo" to that number is a one-to-one chat with a trigger
+ * word in it, which is indistinguishable from a real guest, so they get the
+ * hotel's reservation menu. That is spam sent to a real person, and no amount of
+ * rate limiting prevents the first one.
+ *
+ * UNSET means unrestricted, so production is untouched — a hotel with a proper
+ * dedicated number never sets this. It is a testing seatbelt, not a feature.
+ *
+ * Matching is on digits only, so entries may be written as 62…, +62…, or with
+ * spaces and still match the JID the gateway sends.
+ */
+export function guestAllowlist(): string[] {
+  const raw = process.env.WA_ALLOWED_GUESTS;
+  if (typeof raw !== "string" || raw.trim() === "") return [];
+  return raw
+    .split(",")
+    .map((s) => s.replace(/\D/g, ""))
+    .filter(Boolean);
+}
+
+/**
+ * Whether this sender may be auto-answered.
+ *
+ * True for everyone when the allowlist is empty. Compares digits, so a `@lid`
+ * address — which is NOT a phone number and yields no useful digits — never
+ * matches an allowlisted phone. That is the safe direction: an unrecognised
+ * sender stays silent while the seatbelt is on.
+ */
+export function isAllowedGuest(phoneJid: string): boolean {
+  const allow = guestAllowlist();
+  if (allow.length === 0) return true;
+  const digits = phoneJid.replace(/@.*$/i, "").replace(/\D/g, "");
+  if (!digits) return false;
+  return allow.includes(digits);
+}
+
 /**
  * Throttle how often the SAME flow may be restarted for the same number.
  *

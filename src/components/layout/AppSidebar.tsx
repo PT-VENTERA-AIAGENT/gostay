@@ -2,7 +2,7 @@ import {
   LayoutDashboard, CalendarCheck, DoorOpen, MessageSquare,
   CalendarDays, DollarSign, Star,
   Phone, Users, ChevronLeft, ChevronRight, Contact, MessageCircle, ConciergeBell, Store, Building2, Wallet, Radio,
-  Workflow
+  Workflow, BookOpen
 } from "lucide-react";
 import { useIsPlatformAdmin } from "@/hooks/usePlatform";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ const bottomItems = [
   { icon: Building2, label: "Profil Hotel", path: "/settings/hotel" },
   { icon: MessageCircle, label: "WhatsApp", path: "/settings/whatsapp" },
   { icon: Workflow, label: "Alur WhatsApp", path: "/settings/wa-flows" },
+  { icon: BookOpen, label: "Basis Pengetahuan", path: "/settings/knowledge" },
   { icon: Users, label: "Manajemen Pengguna", path: "/users" },
   { icon: Star, label: "Ulasan", path: "/reviews" },
 ];

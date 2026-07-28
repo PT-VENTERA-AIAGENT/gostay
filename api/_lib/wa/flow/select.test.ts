@@ -23,6 +23,17 @@ describe("scoreKeyword", () => {
     expect(scoreKeyword("boleh lihat menu", "menu")).toBe(2);
   });
 
+  it("is not defeated by punctuation the guest typed", () => {
+    // The regression this guards: "menu?" scored tier 1, which is BELOW the
+    // threshold to start a flow — so one of the most common messages a hotel
+    // receives got no reply at all.
+    expect(scoreKeyword("menu?", "menu")).toBe(3);
+    expect(scoreKeyword("menu!", "menu")).toBe(3);
+    expect(scoreKeyword("lihat menu, dong", "menu")).toBe(2);
+    expect(scoreKeyword("ada kamar yang kosong di reguler ?", "reguler")).toBe(2);
+    expect(scoreKeyword("mau pesan kamar!", "pesan kamar")).toBe(2);
+  });
+
   it("handles empty input and empty keyword", () => {
     expect(scoreKeyword("", "menu")).toBe(0);
     expect(scoreKeyword("menu", "")).toBe(0);

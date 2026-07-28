@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
@@ -13,6 +13,7 @@ import {
   checkReplyRateLimit,
   checkGreetCooldown,
   isReplyableMessage,
+  isAllowedGuest,
 } from "./inbound";
 
 const SECRET = "wa-webhook-secret-value-1234567890";
@@ -428,5 +429,49 @@ describe("checkGreetCooldown", () => {
     delete process.env.SUPABASE_URL;
     expect(await checkGreetCooldown(jid)).toBe(true);
     process.env.SUPABASE_URL = saved;
+  });
+});
+
+describe("isAllowedGuest — the testing seatbelt", () => {
+  const jid = (d: string) => `${d}@s.whatsapp.net`;
+
+  afterEach(() => {
+    delete process.env.WA_ALLOWED_GUESTS;
+  });
+
+  it("allows everyone when unset — production must be untouched", () => {
+    expect(isAllowedGuest(jid("628111000001"))).toBe(true);
+    expect(isAllowedGuest(jid("628999999999"))).toBe(true);
+  });
+
+  it("allows everyone when set to blank or whitespace", () => {
+    process.env.WA_ALLOWED_GUESTS = "   ";
+    expect(isAllowedGuest(jid("628999999999"))).toBe(true);
+  });
+
+  it("answers only the listed numbers once set", () => {
+    process.env.WA_ALLOWED_GUESTS = "628111000001,628111000002";
+    expect(isAllowedGuest(jid("628111000001"))).toBe(true);
+    expect(isAllowedGuest(jid("628111000002"))).toBe(true);
+    // The case this exists for: a contact of the linked phone.
+    expect(isAllowedGuest(jid("628777123456"))).toBe(false);
+  });
+
+  it("ignores formatting so +62, spaces and dashes all match", () => {
+    process.env.WA_ALLOWED_GUESTS = " +62 811-100-0001 , 628111000002 ";
+    expect(isAllowedGuest(jid("628111000001"))).toBe(true);
+    expect(isAllowedGuest(jid("628111000002"))).toBe(true);
+  });
+
+  it("stays silent for a @lid sender while the seatbelt is on", () => {
+    // A LID is a privacy alias, not a phone number — it cannot be matched
+    // against an allowlisted number, so the safe answer is silence.
+    process.env.WA_ALLOWED_GUESTS = "628111000001";
+    expect(isAllowedGuest("209384756@lid")).toBe(false);
+  });
+
+  it("stays silent for a JID with no digits at all", () => {
+    process.env.WA_ALLOWED_GUESTS = "628111000001";
+    expect(isAllowedGuest("@s.whatsapp.net")).toBe(false);
   });
 });

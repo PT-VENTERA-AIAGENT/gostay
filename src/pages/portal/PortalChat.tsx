@@ -19,6 +19,7 @@ import {
 import { getOrCreateOwnCustomer } from "@/services/bookingService";
 import type { ChatThread, ChatMessage } from "@/types/database.types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import WaText from "@/components/shared/WaText";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -244,7 +245,7 @@ export default function PortalChat() {
                     {msg.attachment_url && (
                       <ChatAttachment value={msg.attachment_url} name={msg.content} onLight={isMine} />
                     )}
-                    {!msg.attachment_url && <p className="text-sm whitespace-pre-line">{msg.content}</p>}
+                    {!msg.attachment_url && <WaText>{msg.content}</WaText>}
                     <div className={cn("flex items-center gap-1 mt-1", isMine ? "justify-end" : "")}>
                       <span className={cn("text-xs", isMine ? "text-primary-foreground/60" : "text-muted-foreground")}>
                         {formatTime(msg.created_at)}

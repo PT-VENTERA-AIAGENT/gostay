@@ -49,6 +49,7 @@ import Reviews from "./pages/Reviews";
 import WhatsApp from "./pages/settings/WhatsApp";
 import WaFlows from "./pages/settings/WaFlows";
 import WaFlowEditor from "./pages/settings/WaFlowEditor";
+import Knowledge from "./pages/settings/Knowledge";
 import HotelProfile from "./pages/settings/HotelProfile";
 
 import Login from "./pages/Login";
@@ -209,6 +210,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "staff"]}>
                     <WaFlowEditor />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings/knowledge"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <Knowledge />
                   </ProtectedRoute>
                 }
               />

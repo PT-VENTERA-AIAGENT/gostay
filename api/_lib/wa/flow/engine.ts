@@ -50,8 +50,12 @@ export interface FlowActions {
    */
   startRoomService(): Promise<boolean>;
   showRoomTypes(): Promise<void>;
+  /** Answer an availability question from live booking data. */
+  checkAvailability(): Promise<void>;
   showMenu(): Promise<void>;
   sendPortalLink(): Promise<void>;
+  /** Answer a free-text question, grounded in real data. */
+  askConcierge(): Promise<void>;
 }
 
 export interface FlowRunContext {
@@ -355,11 +359,17 @@ async function runAction(action: string, actions: FlowActions): Promise<boolean>
     case "show_room_types":
       await actions.showRoomTypes();
       return false;
+    case "check_availability":
+      await actions.checkAvailability();
+      return false;
     case "show_menu":
       await actions.showMenu();
       return false;
     case "send_portal_link":
       await actions.sendPortalLink();
+      return false;
+    case "ask_concierge":
+      await actions.askConcierge();
       return false;
     default:
       return false;
