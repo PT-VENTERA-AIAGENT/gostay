@@ -21,6 +21,7 @@ import {
   isReplyableMessage,
   shouldAutoReply,
   checkReplyRateLimit,
+  isAllowedGuest,
 } from "../_lib/wa/inbound";
 import { handleGuestMessage } from "../_lib/wa/converse";
 
@@ -89,6 +90,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // auto-answer them — replying to old messages spams the greeting and risks
       // a WhatsApp ban. Only messages that arrived in real time get a reply.
       if (!shouldAutoReply(msg.timestamp, receivedAt, Date.now())) continue;
+
+      // Testing seatbelt: when WA_ALLOWED_GUESTS is set, stay silent for every
+      // other number. Only relevant when someone has linked a PERSONAL phone as
+      // a hotel's WhatsApp — their contacts are ordinary one-to-one chats and
+      // would otherwise be answered as guests. Unset in production, where this
+      // is a no-op. Placed after recordInbound so the message is still audited,
+      // just not replied to.
+      if (!isAllowedGuest(msg.phoneJid)) continue;
 
       // Tenant comes ONLY from the sessionId (destination), never the sender.
       const tenantId = await resolveTenant(sessionId);
