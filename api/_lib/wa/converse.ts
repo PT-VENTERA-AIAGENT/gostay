@@ -18,7 +18,7 @@
 // a thin shell. Provisioning is deferred to the "YA" step and FAILS CLOSED: if
 // the guest cannot be provisioned, no booking is written.
 
-import { extractBookingIntent, detectRoomServiceIntent, detectRoomNumberQuery, type BookingSlots, type RoomNumberQuery } from "./ai";
+import { extractBookingIntent, detectRoomServiceIntent, detectMenuKeyword, detectRoomNumberQuery, type BookingSlots, type RoomNumberQuery } from "./ai";
 import { getPending, setPending, clearPending } from "./pending";
 import {
   getInhouseStay,
@@ -27,6 +27,9 @@ import {
   type MenuProduct,
   type OrderLine,
 } from "./roomservice";
+import { paymentInstruction } from "./payment";
+import { routeFlow } from "./flow/route";
+import type { FlowActions } from "./flow/engine";
 import {
   findRoomType,
   listRoomTypes,
@@ -205,6 +208,27 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const word = trimmed.toLowerCase();
     const pending = await getPending(tenantId, phoneJid);
 
+    // ── 0. The hotel's own script, if it claims this message ────────────────
+    // Flows drawn in the console get first refusal. routeFlow declines — and
+    // costs nothing but the check — when the hotel has drawn none, when another
+    // conversation is already mid-flight, or when no keyword matches, so
+    // everything below is unchanged for a hotel that never opens the builder.
+    const routed = await routeFlow({
+      tenantId,
+      phoneJid,
+      input: trimmed,
+      pending,
+      vars: {
+        hotel_name: brand,
+        guest_name: (displayName ?? "").trim(),
+      },
+      reply,
+      actions: builtInActions(msg, reply, guest, brand),
+      // Lazy: only consulted when a flow actually gates on the guest staying.
+      isInhouse: async () => (await getInhouseStay(tenantId, guest.customerId)) !== null,
+    });
+    if (routed.handled) return;
+
     // ── 1. Awaiting a YES/NO on a priced quote ──────────────────────────────
     if (pending?.kind === "confirm_booking") {
       if (YES.has(word)) {
@@ -248,9 +272,21 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     }
 
     // ── 1d. Fresh room-service request (only when nothing else is pending) ───
-    if (!pending && detectRoomServiceIntent(trimmed)) {
-      await startRoomService(msg, reply, guest, brand);
-      return;
+    // "menu" is the word guests actually type, but it is ambiguous: from an
+    // in-house guest it means the room-service list, from a prospective one it
+    // means "what do you offer?". So it opens room service only when they are
+    // genuinely checked in — otherwise startRoomService declines to handle it
+    // and the message falls through to the greeting (room types + portal link),
+    // which is what "menu" has always answered with for a non-guest.
+    if (!pending) {
+      const rsIntent = detectRoomServiceIntent(trimmed);
+      const menuOnly = !rsIntent && detectMenuKeyword(trimmed);
+      if (rsIntent || menuOnly) {
+        const handled = await startRoomService(msg, reply, guest, brand, {
+          fallThroughWhenNotInhouse: menuOnly,
+        });
+        if (handled) return;
+      }
     }
 
     // ── 1e. "Is room 201 available?" — a specific room-number question ───────
@@ -513,13 +549,117 @@ async function confirmBooking(
     ? `\n\nPantau & kelola pesanan Anda di portal tamu:\n${portalLink(slug)}`
     : "";
 
+  // Payment, in the same chat. Best-effort by construction: the booking is
+  // already committed, so paymentInstruction never throws — it returns
+  // front-desk wording when this hotel is not on online payments and a
+  // "we'll follow up" line when the gateway could not be reached. Either way
+  // the guest is told what they owe, which is what the old copy promised and
+  // never delivered.
+  const payment = await paymentInstruction({
+    tenantId,
+    bookingReference: booking.reference ?? null,
+    total,
+    brand,
+  }).catch((e) => {
+    console.error("[wa/converse] payment instruction failed:", (e as Error).message);
+    return null;
+  });
+
   const ref = booking.reference ? ` *${booking.reference}*` : "";
   await reply(
     `Terima kasih! Pesanan Anda${ref} sudah kami terima.\n\n` +
-      "Status: *menunggu konfirmasi pembayaran*. Kami akan menginformasikan " +
-      `langkah pembayaran melalui chat ini sebentar lagi. Sampai jumpa di *${brand}*!` +
+      (payment ? `${payment.text}\n\n` : "") +
+      `Sampai jumpa di *${brand}*!` +
       portal,
   );
+}
+
+// ─── The capabilities a drawn flow can invoke ────────────────────────────────
+
+/**
+ * Bind the built-in hotel capabilities to this message.
+ *
+ * These are the ONLY things an `action` node can do. Each one wraps behaviour
+ * that already exists and is tested, so a hotel drawing a canvas chooses when
+ * something happens without being able to redraw how it happens — the booking
+ * conversation's slot-filling, pricing and confirmation stay in one place.
+ */
+function builtInActions(
+  msg: GuestMessage,
+  reply: (body: string) => Promise<unknown>,
+  guest: { profileId: string; customerId: string },
+  brand: string,
+): FlowActions {
+  const { tenantId, phoneJid } = msg;
+
+  return {
+    /**
+     * Enter the booking conversation with nothing gathered yet: park an empty
+     * "collecting" row and ask for every field at once. The guest's next
+     * message is then handled by step 3 of handleGuestMessage exactly as if
+     * they had opened with a booking request.
+     */
+    async startBooking() {
+      await setPending(tenantId, phoneJid, "collecting", {
+        check_in: null, check_out: null, guests: null,
+        room_type_hint: null, guest_name: null,
+      });
+      let body =
+        "Baik. Agar dapat langsung kami periksa ketersediaan & harga, mohon kirim " +
+        "*dalam satu pesan*:\n" +
+        "1. Nama pemesan\n2. Tanggal check-in\n3. Tanggal check-out\n" +
+        "4. Jumlah tamu\n5. Tipe kamar";
+      const types = await listRoomTypes(tenantId).catch(() => []);
+      if (types.length) {
+        body += `\n\nPilihan tipe kamar:\n${types
+          .map((t) => `   • *${t.name}* — ${formatIDR(t.base_rate)}/malam`)
+          .join("\n")}`;
+      }
+      body += "\n\n_Contoh: a/n Budi, 25–27 Juli, 2 orang, Deluxe_";
+      await reply(body);
+    },
+
+    /** Reuses the existing entry point, including its in-house check. */
+    startRoomService() {
+      return startRoomService(msg, reply, guest, brand, { fallThroughWhenNotInhouse: true });
+    },
+
+    async showRoomTypes() {
+      const types = await listRoomTypes(tenantId).catch(() => []);
+      if (types.length === 0) {
+        await reply("Mohon maaf, saat ini belum ada tipe kamar yang dapat dipesan.");
+        return;
+      }
+      const list = types
+        .map(
+          (t) =>
+            `*${t.name}*\n    ${formatIDR(t.base_rate)} / malam` +
+            (t.max_occupancy ? `  ·  maks. ${t.max_occupancy} tamu` : ""),
+        )
+        .join("\n\n");
+      await reply(`Pilihan kamar & tarif per malam di *${brand}*:\n\n${list}`);
+    },
+
+    /**
+     * Show the POS menu WITHOUT starting an order — the read-only twin of
+     * start_room_service, for a script that wants to display prices and then
+     * carry on asking its own questions.
+     */
+    async showMenu() {
+      const menu = await listMenuProducts(tenantId).catch(() => []);
+      if (menu.length === 0) {
+        await reply("Mohon maaf, menu belum tersedia saat ini.");
+        return;
+      }
+      await reply(roomServiceMenuText(brand, menu));
+    },
+
+    async sendPortalLink() {
+      const slug = await getTenantSlug(tenantId).catch(() => null);
+      if (!slug) return;
+      await reply(`Pantau & kelola pesanan Anda di portal tamu:\n${portalLink(slug)}`);
+    },
+  };
 }
 
 /** Add whole days to a YYYY-MM-DD date (UTC midnight, DST-safe). */
@@ -596,16 +736,26 @@ async function startRoomService(
   reply: (body: string) => Promise<unknown>,
   guest: { profileId: string; customerId: string },
   brand: string,
-): Promise<void> {
+  opts: {
+    /**
+     * Return false instead of answering when the guest has no active stay, so
+     * the caller can let the message continue down the normal path. Set for a
+     * bare "menu", where a not-checked-in guest is browsing rather than failing
+     * to order — see the call site in the router.
+     */
+    fallThroughWhenNotInhouse?: boolean;
+  } = {},
+): Promise<boolean> {
   const { tenantId, phoneJid } = msg;
 
   const stay = await getInhouseStay(tenantId, guest.customerId);
   if (!stay) {
+    if (opts.fallThroughWhenNotInhouse) return false;
     await reply(
       "Mohon maaf, layanan room service hanya tersedia untuk tamu yang sedang menginap (sudah check-in). " +
         "Bila Anda ingin melakukan pemesanan kamar, silakan sebutkan tanggal menginap, jumlah tamu, dan tipe kamar yang diinginkan.",
     );
-    return;
+    return true;
   }
 
   const menu = await listMenuProducts(tenantId);
@@ -613,7 +763,7 @@ async function startRoomService(
     await reply(
       "Mohon maaf, menu room service belum tersedia saat ini. Silakan hubungi kami secara langsung.",
     );
-    return;
+    return true;
   }
 
   await setPending(tenantId, phoneJid, "rs_collecting", {
@@ -623,6 +773,7 @@ async function startRoomService(
     menu,
   });
   await reply(roomServiceMenuText(brand, menu));
+  return true;
 }
 
 /**

@@ -135,6 +135,26 @@ export function detectRoomServiceIntent(text: string): boolean {
   return ROOM_SERVICE_HINTS.some((h) => lower.includes(h));
 }
 
+/**
+ * The bare word "menu" — an in-house guest asking to see the room-service list.
+ *
+ * Deliberately NOT an entry in ROOM_SERVICE_HINTS: those are matched as
+ * substrings, and "menu" is the prefix of everyday Indonesian words
+ * ("menunggu", "menuju", "menular", "menurut"), so a substring rule would fire
+ * the ordering flow on plainly unrelated sentences. Matched on word boundaries
+ * instead, which still catches "lihat menu", "menu dong", "boleh minta menu?".
+ *
+ * Kept separate from detectRoomServiceIntent because the two want different
+ * treatment when the guest is NOT checked in: "lapar" is a failed room-service
+ * request worth explaining, while a bare "menu" from a prospective guest just
+ * means "show me what you offer" and belongs to the greeting.
+ */
+const MENU_WORD = /(?:^|[^\p{L}])menu(?:[^\p{L}]|$)/u;
+
+export function detectMenuKeyword(text: string): boolean {
+  return MENU_WORD.test((text ?? "").toLowerCase());
+}
+
 // ── Specific-room availability question (deterministic, no model) ───────────────
 
 // Words that mark the guest ASKING about a room's status, so a bare "kamar 201"
