@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
-import { resolveOrProvisionGuest, WaRateLimitError, phoneDigits, callablePhone } from "./guest";
+import { resolveOrProvisionGuest, WaRateLimitError, phoneDigits, callablePhone, usableName } from "./guest";
 import { profileIdFor } from "../identity";
 
 const PHONE_JID = "628123456789@s.whatsapp.net";
@@ -305,5 +305,24 @@ describe("callablePhone — a number staff can actually dial", () => {
   it("rejects anything too short to be a phone number", () => {
     expect(callablePhone("123@s.whatsapp.net")).toBeNull();
     expect(callablePhone("@s.whatsapp.net")).toBeNull();
+  });
+});
+
+describe("usableName — a name worth showing staff", () => {
+  it("keeps a real pushName", () => {
+    expect(usableName("Ridho")).toBe("Ridho");
+    expect(usableName("  Juan P  ")).toBe("Juan P");
+    expect(usableName("Budi 2")).toBe("Budi 2");
+  });
+
+  it("rejects WhatsApp's placeholder, which reached CRM as a guest's name", () => {
+    expect(usableName("~")).toBeNull();
+    expect(usableName("...")).toBeNull();
+    expect(usableName("   ")).toBeNull();
+    expect(usableName(undefined)).toBeNull();
+  });
+
+  it("keeps a name that merely contains punctuation", () => {
+    expect(usableName("~Rifqi")).toBe("~Rifqi");
   });
 });

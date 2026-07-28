@@ -55,6 +55,20 @@ export class WaProvisionError extends Error {
  * apart from "a plausible-looking string that reaches nobody" — the failure this
  * exists to end.
  */
+/**
+ * A pushName worth showing to staff, or null.
+ *
+ * WhatsApp sometimes sends a placeholder rather than a name — "~" is the one
+ * seen in production, and it landed in CRM as the guest's name. Anything with
+ * no letter or digit in it is decoration, not a name, and the phone number is a
+ * more useful thing to show than a tilde.
+ */
+export function usableName(pushName?: string): string | null {
+  const n = (pushName ?? "").trim();
+  if (!n) return null;
+  return /[\p{L}\p{N}]/u.test(n) ? n : null;
+}
+
 export function callablePhone(phoneJid: string, replyJid?: string): string | null {
   const isLid = phoneJid.toLowerCase().includes("@lid");
   const candidate = isLid ? (replyJid ?? "") : phoneJid;
@@ -125,7 +139,7 @@ export async function resolveOrProvisionGuest(
   // real one.
   const digits = phoneDigits(phoneJid);
   const contactDigits = callablePhone(phoneJid, replyJid) ?? digits;
-  const fullName = displayName?.trim() || contactDigits;
+  const fullName = usableName(displayName) ?? contactDigits;
 
   // 1. Already provisioned? A complete identity row short-circuits everything —
   //    no rate-limit consult, no Ventera call, no duplicate profile/customer.
