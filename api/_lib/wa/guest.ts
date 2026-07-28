@@ -15,7 +15,7 @@
 
 import { profileIdFor } from "../identity";
 import { provisionProfileWithTenant } from "../provision";
-import { serviceConfig, serviceGet, serviceHeaders, serviceInsert } from "./client";
+import { serviceConfig, serviceGet, serviceHeaders, serviceInsert, serviceUpdate } from "./client";
 
 /**
  * Thrown when this number has provisioned too often in the window — the
@@ -47,6 +47,23 @@ export class WaProvisionError extends Error {
  * endpoint and our `customers.phone` want just the E.164-ish digits. Strips the
  * server suffix and anything non-numeric (a `:device` part, `+`, spaces).
  */
+/**
+ * A number staff can actually dial, or null when we do not have one.
+ *
+ * Returns the alternate's digits for a LID-addressed chat, and the chat's own
+ * digits otherwise. Null when neither is usable, so callers can tell "no phone"
+ * apart from "a plausible-looking string that reaches nobody" — the failure this
+ * exists to end.
+ */
+export function callablePhone(phoneJid: string, replyJid?: string): string | null {
+  const isLid = phoneJid.toLowerCase().includes("@lid");
+  const candidate = isLid ? (replyJid ?? "") : phoneJid;
+  const digits = phoneDigits(candidate);
+  // A LID with no alternate yields nothing rather than its own digits: storing
+  // those is precisely the bug.
+  return digits.length >= 8 ? digits : null;
+}
+
 export function phoneDigits(jid: string): string {
   // Strip ANY server suffix — @s.whatsapp.net, and also @lid (WhatsApp's privacy
   // "Linked ID" address, which is not a real phone number) — then keep digits.
@@ -89,12 +106,26 @@ export async function resolveOrProvisionGuest(
   phoneJid: string,
   tenantId: string,
   displayName?: string,
+  /**
+   * The guest's REAL phone JID, when the chat is LID-addressed.
+   *
+   * A WhatsApp LID (`1812…@lid`) is a privacy alias, not a number — dialling its
+   * digits reaches nobody. It is the right key for IDENTITY (it is stable), and
+   * the wrong thing to store as a contact number, which is exactly what used to
+   * happen: staff opened a guest in CRM and found an unreachable 15-digit
+   * string. WhatsApp sends the real number alongside as `remoteJidAlt`, and the
+   * webhook already parses it — it simply never reached this far.
+   */
+  replyJid?: string,
 ): Promise<{ profileId: string; customerId: string; ssoSub: string }> {
   const { url, serviceKey } = serviceConfig();
   if (!url || !serviceKey) throw new WaProvisionError("wa_service_not_configured");
 
+  // Identity still keys on phoneJid; only the stored contact number prefers the
+  // real one.
   const digits = phoneDigits(phoneJid);
-  const fullName = displayName?.trim() || digits;
+  const contactDigits = callablePhone(phoneJid, replyJid) ?? digits;
+  const fullName = displayName?.trim() || contactDigits;
 
   // 1. Already provisioned? A complete identity row short-circuits everything —
   //    no rate-limit consult, no Ventera call, no duplicate profile/customer.
@@ -105,6 +136,13 @@ export async function resolveOrProvisionGuest(
     // otherwise CRM thread creation fails and the guest receives a generic
     // WhatsApp apology instead of being repaired automatically.
     if (await identityReferencesExist(tenantId, existing)) {
+      // Self-heal the contact number. Guests provisioned before this stored a
+      // LID's digits as their phone — a 15-digit string that reaches nobody —
+      // and there is no way to derive the real number from a LID after the
+      // fact. But WhatsApp sends it alongside every message, so the next one
+      // repairs the record. That is cheaper and more reliable than a backfill
+      // that could only guess.
+      await repairContactPhone(existing.customer_id, contactDigits);
       return {
         profileId: existing.profile_id,
         customerId: existing.customer_id,
@@ -153,7 +191,7 @@ export async function resolveOrProvisionGuest(
   // 6. customers row — getOrCreateOwnCustomer's logic ported to service-role:
   //    find by profile_id first, else insert. profile_id is what ties a booking
   //    back to this person for every "own bookings" RLS policy.
-  const customerId = await getOrCreateCustomer(profileId, tenantId, fullName, digits, email);
+  const customerId = await getOrCreateCustomer(profileId, tenantId, fullName, contactDigits, email);
 
   // 7. Persist the resolution so the next message skips all of the above.
   await writeIdentity(tenantId, phoneJid, sub, profileId, customerId, existing);
@@ -236,6 +274,29 @@ async function provisionVentera(digits: string, displayName?: string): Promise<s
   const data = (await res.json().catch(() => ({}))) as { ok?: boolean; sub?: string };
   if (!data.sub) throw new WaProvisionError("ventera_no_sub");
   return data.sub;
+}
+
+/**
+ * Correct a customer's stored phone, but only when we have a real one and it
+ * differs from what is there.
+ *
+ * The `phone=neq.` filter does the comparison in the database, so the common
+ * case — already correct — is one write that touches no rows, rather than a
+ * read followed by a conditional write on the hot path of every message.
+ *
+ * Best-effort: never throws. A guest's conversation must not fail over a
+ * contact-detail tidy-up.
+ */
+async function repairContactPhone(customerId: string, phone: string): Promise<void> {
+  if (!phone || phone.length < 8) return;
+  try {
+    await serviceUpdate(
+      `customers?id=eq.${encodeURIComponent(customerId)}&phone=neq.${encodeURIComponent(phone)}`,
+      { phone },
+    );
+  } catch (e) {
+    console.error("[wa/guest] phone repair failed:", (e as Error).message);
+  }
 }
 
 async function getOrCreateCustomer(

@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
-import { resolveOrProvisionGuest, WaRateLimitError, phoneDigits } from "./guest";
+import { resolveOrProvisionGuest, WaRateLimitError, phoneDigits, callablePhone } from "./guest";
 import { profileIdFor } from "../identity";
 
 const PHONE_JID = "628123456789@s.whatsapp.net";
@@ -281,5 +281,29 @@ describe("resolveOrProvisionGuest", () => {
       profile_id: profileIdFor(SSO_SUB),
       customer_id: "cust-new-1",
     });
+  });
+});
+
+describe("callablePhone — a number staff can actually dial", () => {
+  it("uses the alternate for a LID chat", () => {
+    // A LID is a privacy alias. Storing its digits gave CRM a 15-digit string
+    // that reaches nobody, which is what staff hit when they tried to call back.
+    expect(callablePhone("181248240648388@lid", "628123456789@s.whatsapp.net")).toBe("628123456789");
+  });
+
+  it("returns null for a LID with no alternate, rather than its digits", () => {
+    expect(callablePhone("181248240648388@lid")).toBeNull();
+    expect(callablePhone("181248240648388@lid", "")).toBeNull();
+  });
+
+  it("uses the chat's own number when it is already a real one", () => {
+    expect(callablePhone("628123456789@s.whatsapp.net")).toBe("628123456789");
+    // An alternate is irrelevant when the chat is not LID-addressed.
+    expect(callablePhone("628123456789@s.whatsapp.net", "628999@s.whatsapp.net")).toBe("628123456789");
+  });
+
+  it("rejects anything too short to be a phone number", () => {
+    expect(callablePhone("123@s.whatsapp.net")).toBeNull();
+    expect(callablePhone("@s.whatsapp.net")).toBeNull();
   });
 });
