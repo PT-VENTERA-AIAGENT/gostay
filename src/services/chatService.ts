@@ -323,3 +323,28 @@ export async function deliverToWhatsApp(
     return { ok: false, error: (e as Error).message };
   }
 }
+
+/**
+ * Take a conversation off the bot, or give it back.
+ *
+ * `hours` null hands it back immediately. Staff already take over implicitly by
+ * replying (see deliverToWhatsApp), so this is mostly the way BACK — without
+ * it a takeover could only be ended by waiting it out, which is a strange thing
+ * to ask of someone who has just finished helping a guest.
+ */
+export async function setBotTakeover(threadId: string, hours: number | null): Promise<void> {
+  const bot_paused_until =
+    hours === null ? null : new Date(Date.now() + hours * 3_600_000).toISOString();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("chat_threads")
+    .update({ bot_paused_until })
+    .eq("id", threadId);
+  if (error) throw error;
+}
+
+/** True while a human owns the conversation. */
+export function isBotPaused(thread: { bot_paused_until?: string | null } | null | undefined): boolean {
+  const until = thread?.bot_paused_until;
+  return Boolean(until && new Date(until).getTime() > Date.now());
+}
