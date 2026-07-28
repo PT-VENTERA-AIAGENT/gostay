@@ -47,6 +47,8 @@ import CampaignsPage from "./pages/admin/Campaigns";
 import CRM from "./pages/CRM";
 import Reviews from "./pages/Reviews";
 import WhatsApp from "./pages/settings/WhatsApp";
+import WaFlows from "./pages/settings/WaFlows";
+import WaFlowEditor from "./pages/settings/WaFlowEditor";
 import HotelProfile from "./pages/settings/HotelProfile";
 
 import Login from "./pages/Login";
@@ -191,6 +193,22 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "staff"]}>
                     <WhatsApp />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings/wa-flows"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <WaFlows />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings/wa-flows/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                    <WaFlowEditor />
                   </ProtectedRoute>
                 }
               />

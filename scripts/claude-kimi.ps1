@@ -28,8 +28,8 @@ foreach ($n in $names) { $saved[$n] = [Environment]::GetEnvironmentVariable($n) 
 try {
     $env:ANTHROPIC_BASE_URL         = "https://api.moonshot.ai/anthropic"
     $env:ANTHROPIC_AUTH_TOKEN       = $env:MOONSHOT_KEY
-    $env:ANTHROPIC_MODEL            = "kimi-k2.7-code"
-    $env:CLAUDE_CODE_SUBAGENT_MODEL = "kimi-k2.7-code"
+    $env:ANTHROPIC_MODEL            = "kimi-k3"
+    $env:CLAUDE_CODE_SUBAGENT_MODEL = "kimi-k3"
 
     # ANTHROPIC_API_KEY would take precedence and send the wrong auth header.
     Remove-Item Env:\ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
