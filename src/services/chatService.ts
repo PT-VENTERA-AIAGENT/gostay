@@ -292,3 +292,34 @@ export function subscribeToThreadList(
     )
     .subscribe();
 }
+
+/**
+ * Deliver a staff reply to the guest over WhatsApp, after it has been saved.
+ *
+ * Saving and sending are separate on purpose. The insert is what the inbox
+ * renders, and it must not be undone when the gateway is unreachable — losing
+ * the staff member's words would be worse than a message that needs resending.
+ * So this reports whether it left the building and lets the caller say so.
+ *
+ * Returns a reason rather than throwing, because "this guest never used
+ * WhatsApp" is an ordinary state (portal-only guests) and not an error worth a
+ * red toast.
+ */
+export async function deliverToWhatsApp(
+  threadId: string,
+  text: string,
+  token: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!token) return { ok: false, error: "not_authenticated" };
+  try {
+    const res = await fetch("/api/wa/connect?action=reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ threadId, text }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    return { ok: res.ok && data.ok !== false, error: data.error };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}

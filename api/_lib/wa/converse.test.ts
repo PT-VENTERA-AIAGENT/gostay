@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // be built inside vi.hoisted() (also hoisted) rather than as plain top-level
 // consts — otherwise the factories run before those consts initialise
 // ("Cannot access 'ai' before initialization").
-const { ai, pending, booking, guest, send, crm, roomservice, WaRateLimitError } = vi.hoisted(() => {
+const { ai, pending, booking, guest, send, crm, roomservice, takeover, availability, concierge, WaRateLimitError } = vi.hoisted(() => {
   // A real error class so `instanceof WaRateLimitError` works inside converse.
   class WaRateLimitError extends Error {}
   return {
@@ -37,6 +37,9 @@ const { ai, pending, booking, guest, send, crm, roomservice, WaRateLimitError } 
     send: { sendText: vi.fn() },
     crm: { getOrCreateBotProfile: vi.fn(), getOrCreateThread: vi.fn(), logMessage: vi.fn() },
     roomservice: { getInhouseStay: vi.fn(), listMenuProducts: vi.fn(), createWaRoomServiceOrder: vi.fn() },
+    takeover: { isBotPaused: vi.fn(), pauseBot: vi.fn(), resumeBot: vi.fn() },
+    availability: { checkAvailability: vi.fn(), renderAvailability: vi.fn(), todayJakarta: vi.fn(() => "2026-07-28") },
+    concierge: { askConcierge: vi.fn() },
     WaRateLimitError,
   };
 });
@@ -48,6 +51,9 @@ vi.mock("./guest", () => guest);
 vi.mock("./send", () => send);
 vi.mock("./crm", () => crm);
 vi.mock("./roomservice", () => roomservice);
+vi.mock("./takeover", () => takeover);
+vi.mock("./availability", () => availability);
+vi.mock("./concierge", () => concierge);
 
 import { handleGuestMessage, isGreetingTrigger } from "./converse";
 
@@ -88,6 +94,13 @@ beforeEach(() => {
   roomservice.getInhouseStay.mockResolvedValue(null);
   roomservice.listMenuProducts.mockResolvedValue([]);
   roomservice.createWaRoomServiceOrder.mockResolvedValue({ id: "gr-1" });
+  // No human has taken over, and no availability question, unless a test says so.
+  takeover.isBotPaused.mockResolvedValue(false);
+  takeover.pauseBot.mockResolvedValue(undefined);
+  ai.detectAvailabilityQuery.mockReturnValue(false);
+  availability.checkAvailability.mockResolvedValue({ types: [], checkIn: "2026-07-28", checkOut: "2026-07-29", nights: 1, narrowed: false });
+  availability.renderAvailability.mockReturnValue("Ketersediaan: 2 kamar");
+  concierge.askConcierge.mockResolvedValue({ text: "", grounded: false, toolsUsed: [] });
 });
 
 describe("handleGuestMessage — intent routing", () => {
@@ -599,5 +612,111 @@ describe("isGreetingTrigger", () => {
     expect(isGreetingTrigger("ping")).toBe(true);
     expect(isGreetingTrigger("halo")).toBe(false); // no longer a trigger under the override
     delete process.env.WA_GREETING_TRIGGERS;
+  });
+});
+
+describe("handleGuestMessage — a guest is never trapped", () => {
+  it("answers an availability question in the MIDDLE of the booking form", async () => {
+    // Reported from production: a stale "collecting" row held a number for 47
+    // minutes. Its TTL refreshed on every turn, so waiting never freed them, and
+    // every question — including "hari ini ada kamar yang kosong?" — was
+    // answered with the same five-field form.
+    pending.getPending.mockResolvedValue({
+      kind: "collecting",
+      payload: { check_in: "2026-07-28", room_type_hint: "Reguler" },
+    });
+    ai.detectAvailabilityQuery.mockReturnValue(true);
+    availability.renderAvailability.mockReturnValue("Reguler: 2 kamar tersedia dari 3");
+
+    await handleGuestMessage({ ...BASE, text: "Hari ini ada kamar yang kosong ?" });
+
+    expect(repliesText()).toContain("2 kamar tersedia");
+    expect(repliesText()).not.toContain("Mohon lengkapi");
+    // The booking state survives: they asked a question mid-booking and can
+    // carry on afterwards.
+    expect(pending.clearPending).not.toHaveBeenCalled();
+  });
+
+  it("lets a guest abandon the form with one word", async () => {
+    pending.getPending.mockResolvedValue({ kind: "collecting", payload: { check_in: "2026-07-28" } });
+
+    await handleGuestMessage({ ...BASE, text: "batal" });
+
+    expect(pending.clearPending).toHaveBeenCalled();
+    expect(repliesText()).toContain("dibatalkan");
+  });
+
+  it("does not treat a sentence containing the word as an exit", async () => {
+    pending.getPending.mockResolvedValue({ kind: "collecting", payload: {} });
+    ai.extractBookingIntent.mockResolvedValue({
+      intent: "book", check_in: null, check_out: null, guests: null, room_type_hint: null, confidence: 0.5,
+    });
+
+    await handleGuestMessage({ ...BASE, text: "batalkan saja yang kemarin ya" });
+
+    expect(pending.clearPending).not.toHaveBeenCalled();
+  });
+
+  it("leaves a room-service order alone — its payload carries the menu", async () => {
+    pending.getPending.mockResolvedValue({
+      kind: "rs_collecting",
+      payload: { bookingId: "bk-1", menu: [{ id: "p-1", name: "Kopi", category: "fnb", price: 25000 }] },
+    });
+    ai.detectAvailabilityQuery.mockReturnValue(true);
+
+    await handleGuestMessage({ ...BASE, text: "kamar kosong?" });
+
+    expect(availability.checkAvailability).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleGuestMessage — staff takeover", () => {
+  it("says nothing at all while a human owns the conversation", async () => {
+    takeover.isBotPaused.mockResolvedValue(true);
+
+    await handleGuestMessage({ ...BASE, text: "halo" });
+
+    expect(send.sendText).not.toHaveBeenCalled();
+    // The guest's message is still logged, so staff see what was said.
+    expect(crm.logMessage).toHaveBeenCalled();
+  });
+});
+
+describe("handleGuestMessage — the assistant as a last resort", () => {
+  beforeEach(() => {
+    ai.extractBookingIntent.mockResolvedValue({
+      intent: "chat", check_in: null, check_out: null, guests: null, room_type_hint: null, confidence: 0.9,
+    });
+  });
+
+  it("answers a question no flow anticipated", async () => {
+    concierge.askConcierge.mockResolvedValue({
+      text: "Sarapan tersedia pukul 07.00–10.00.", grounded: true, toolsUsed: ["cari_informasi_hotel"],
+    });
+
+    await handleGuestMessage({ ...BASE, text: "sarapannya sampai jam berapa ya?" });
+
+    expect(repliesText()).toContain("07.00");
+  });
+
+  it("stays silent when the assistant did not actually look anything up", async () => {
+    // Ungrounded means it spoke from memory, or the guardrail replaced the
+    // answer. Neither is worth sending to a message we were unsure about.
+    concierge.askConcierge.mockResolvedValue({ text: "Tentu boleh!", grounded: false, toolsUsed: [] });
+
+    await handleGuestMessage({ ...BASE, text: "boleh bawa hewan tidak ya?" });
+
+    expect(send.sendText).not.toHaveBeenCalled();
+  });
+
+  it("does not spend a model call on an acknowledgement", async () => {
+    await handleGuestMessage({ ...BASE, text: "ok" });
+    expect(concierge.askConcierge).not.toHaveBeenCalled();
+  });
+
+  it("does not spend a model call on our own echoed reply", async () => {
+    const echo = "Ketersediaan kamar di *Lor Kali* untuk malam ini. ".repeat(10);
+    await handleGuestMessage({ ...BASE, text: echo });
+    expect(concierge.askConcierge).not.toHaveBeenCalled();
   });
 });

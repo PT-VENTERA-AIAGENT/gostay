@@ -3,6 +3,7 @@
 //
 //   POST   /api/wa/connect  → create/refresh the gateway session for my hotel (pair)
 //   POST   /api/wa/connect?action=reset-chat → clear one chat's automation state
+//   POST   /api/wa/connect?action=reply      → deliver a staff reply to WhatsApp
 //   GET    /api/wa/connect  → poll: { status, qr?, connected, linkedNumber? }
 //   DELETE /api/wa/connect  → unlink (logout the gateway session, deactivate mapping)
 //
@@ -15,6 +16,7 @@ import { requireTenantMember } from "../_lib/admin/tenant-auth";
 import { serviceConfig, serviceHeaders, serviceGet } from "../_lib/wa/client";
 import { createSession, getSessionQr, getSessionStatus, deleteSession } from "../_lib/wa/gateway";
 import resetChatHandler from "../_lib/wa/reset-chat";
+import { deliverStaffReply } from "../_lib/wa/staff-reply";
 import { authHeader, readJson, type VercelReq, type VercelRes } from "../_lib/admin/http";
 
 /**
@@ -86,6 +88,46 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   const action = Array.isArray(rawAction) ? rawAction[0] : rawAction;
   if (action === "reset-chat") {
     await resetChatHandler(req, res);
+    return;
+  }
+
+  // Deliver a staff reply to the guest over WhatsApp.
+  //
+  // Lives on this route rather than its own file because api/ is at Vercel
+  // Hobby's 12-function cap (see api/payment/[action].ts). It is guarded by the
+  // same tenant membership check as everything else below, and the thread's own
+  // tenant is verified against the caller's before anything is sent.
+  if (action === "reply") {
+    if ((req.method ?? "GET") !== "POST") {
+      res.status(405).json({ ok: false, error: "method_not_allowed" });
+      return;
+    }
+    const guardReply = await requireTenantMember(authHeader(req), undefined);
+    if (guardReply.ok === false) {
+      res.status(guardReply.status).json({ ok: false, error: guardReply.error });
+      return;
+    }
+    const body = readJson(req);
+    const threadId = typeof body.threadId === "string" ? body.threadId : "";
+    const text = typeof body.text === "string" ? body.text : "";
+    if (!threadId || !text.trim()) {
+      res.status(400).json({ ok: false, error: "missing_thread_or_text" });
+      return;
+    }
+
+    // The thread must belong to the caller's hotel. Without this a staff member
+    // could message another hotel's guest by guessing a thread id.
+    const owns = await serviceGet(
+      `chat_threads?id=eq.${encodeURIComponent(threadId)}` +
+        `&tenant_id=eq.${encodeURIComponent(guardReply.member.tenantId)}&select=id&limit=1`,
+    );
+    if (!owns.ok || ((await owns.json()) as unknown[]).length === 0) {
+      res.status(404).json({ ok: false, error: "thread_not_found" });
+      return;
+    }
+
+    const result = await deliverStaffReply({ threadId, text });
+    res.status(result.ok ? 200 : 502).json(result);
     return;
   }
 

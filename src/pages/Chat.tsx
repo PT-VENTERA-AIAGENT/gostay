@@ -13,6 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import WaText from "@/components/shared/WaText";
+import { deliverToWhatsApp } from "@/services/chatService";
 
 export default function Chat() {
   const t = useT();
@@ -24,7 +25,7 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { toast } = useToast();
 
   const { data: threads = [], isLoading: threadsLoading } = useChatThreads();
@@ -91,7 +92,29 @@ export default function Chat() {
     setMessageText("");
     sendMessage.mutate(
       { thread_id: selectedThreadId, sender_id: user.id, content, attachment_url: null, is_read: false },
-      { onError: () => toast({ title: tr("Failed to send message"), variant: "destructive" }) }
+      {
+        onError: () => toast({ title: tr("Failed to send message"), variant: "destructive" }),
+        // Saving and sending are separate steps. Until now only the save
+        // happened, so a reply looked delivered in the inbox and never reached
+        // the guest. Tell staff plainly when it does not leave the building —
+        // the message is kept either way, so it can simply be resent.
+        onSuccess: async () => {
+          const r = await deliverToWhatsApp(selectedThreadId, content, session?.supabase_token ?? null);
+          if (r.ok) return;
+          if (r.error === "guest_not_on_whatsapp") {
+            toast({
+              title: "Tersimpan, tidak dikirim ke WhatsApp",
+              description: "Tamu ini belum pernah menghubungi lewat WhatsApp.",
+            });
+            return;
+          }
+          toast({
+            title: "Gagal mengirim ke WhatsApp",
+            description: `Pesan tersimpan di sini, tetapi belum sampai ke tamu (${r.error ?? "tidak diketahui"}).`,
+            variant: "destructive",
+          });
+        },
+      }
     );
   }
 
