@@ -17,6 +17,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import type { Customer, Booking, BookingStatus } from "@/types/database.types";
+import { statusLabel } from "@/lib/bookingStatus";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,13 +60,14 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-const statusConfig: Record<BookingStatus, { label: string; cls: string }> = {
-  pending: { label: "Pending", cls: "bg-warning/10 text-warning border-warning/20" },
-  confirmed: { label: "Confirmed", cls: "bg-info/10 text-info border-info/20" },
-  checked_in: { label: "Checked In", cls: "bg-success/10 text-success border-success/20" },
-  checked_out: { label: "Checked Out", cls: "bg-secondary text-secondary-foreground border-transparent" },
-  cancelled: { label: "Cancelled", cls: "bg-destructive/10 text-destructive border-destructive/20" },
-  no_show: { label: "No Show", cls: "bg-muted text-muted-foreground border-transparent" },
+// Colours only; the words come from statusLabel() — see lib/bookingStatus.ts.
+const statusConfig: Record<BookingStatus, { cls: string }> = {
+  pending: { cls: "bg-warning/10 text-warning border-warning/20" },
+  confirmed: { cls: "bg-info/10 text-info border-info/20" },
+  checked_in: { cls: "bg-success/10 text-success border-success/20" },
+  checked_out: { cls: "bg-secondary text-secondary-foreground border-transparent" },
+  cancelled: { cls: "bg-destructive/10 text-destructive border-destructive/20" },
+  no_show: { cls: "bg-muted text-muted-foreground border-transparent" },
 };
 
 function isVIP(customer: CustomerWithBookings) {
@@ -207,7 +209,7 @@ function GuestPanel({
                         </p>
                       </div>
                       <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full border shrink-0", sc.cls)}>
-                        {t(sc.label)}
+                        {statusLabel(booking.status, t)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1.5">
