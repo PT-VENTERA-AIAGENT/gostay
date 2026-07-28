@@ -8,6 +8,7 @@ import { useWalkInCheckIn } from "@/hooks/useBookings";
 import { useToast } from "@/hooks/use-toast";
 import type { PaymentMethod } from "@/services/frontDeskService";
 import { tr } from "@/lib/i18n";
+import { nightsLabel } from "@/lib/nights";
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "Tunai", transfer: "Transfer", card: "Kartu", qris: "QRIS", other: "Lainnya",
@@ -192,7 +193,7 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
             <div className="text-sm">
               <span className="text-muted-foreground">Total </span>
               <span className="font-bold text-foreground">{total ? formatIDR(total) : "—"}</span>
-              {nights > 0 && <span className="text-xs text-muted-foreground"> · {nights} malam</span>}
+              {nights > 0 && <span className="text-xs text-muted-foreground"> · {nightsLabel(nights, t)}</span>}
             </div>
             <button
               onClick={submit}

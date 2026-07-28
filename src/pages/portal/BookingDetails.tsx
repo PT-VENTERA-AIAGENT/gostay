@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, User, Mail, Phone, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition from "@/components/shared/PageTransition";
 import type { RoomType } from "@/types/database.types";
+import { nightsLabel } from "@/lib/nights";
 
 interface BookingState {
   roomType: RoomType;
@@ -104,7 +105,7 @@ export default function BookingDetails() {
               <p className="font-semibold text-foreground">{roomType.name}</p>
               {checkIn && checkOut && (
                 <p className="text-muted-foreground mt-0.5">
-                  {checkIn} → {checkOut} · {nights} night{nights !== 1 ? "s" : ""} · {guests} guest{guests !== 1 ? "s" : ""}
+                  {checkIn} → {checkOut} · {nightsLabel(nights, t)} · {guests} guest{guests !== 1 ? "s" : ""}
                 </p>
               )}
             </div>

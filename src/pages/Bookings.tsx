@@ -12,23 +12,22 @@ import CopyButton from "@/components/shared/CopyButton";
 import { useBookings } from "@/hooks/useBookings";
 import { exportCSV } from "@/components/analytics/ExportUtils";
 import type { BookingStatus } from "@/types/database.types";
+import { statusLabel } from "@/lib/bookingStatus";
 
-const statusConfig: Record<string, { label: string; cls: string }> = {
-  pending:     { label: "Pending",     cls: "badge-warning" },
-  confirmed:   { label: "Confirmed",   cls: "badge-info" },
-  checked_in:  { label: "Checked In",  cls: "badge-primary" },
-  checked_out: { label: "Checked Out", cls: "badge-muted" },
-  cancelled:   { label: "Cancelled",   cls: "badge-destructive" },
-  no_show:     { label: "No Show",     cls: "badge-destructive" },
+// Colours only; the words come from statusLabel() — see lib/bookingStatus.ts.
+const statusConfig: Record<string, { cls: string }> = {
+  pending:     { cls: "badge-warning" },
+  confirmed:   { cls: "badge-info" },
+  checked_in:  { cls: "badge-primary" },
+  checked_out: { cls: "badge-muted" },
+  cancelled:   { cls: "badge-destructive" },
+  no_show:     { cls: "badge-destructive" },
 };
 
-const statusTabs = [
-  { key: "all",         label: "All" },
-  { key: "pending",     label: "Pending" },
-  { key: "confirmed",   label: "Confirmed" },
-  { key: "checked_in",  label: "Checked In" },
-  { key: "checked_out", label: "Checked Out" },
-  { key: "cancelled",   label: "Cancelled" },
+// "all" is a filter, not a status, so it keeps its own key.
+const statusTabs: Array<{ key: string }> = [
+  { key: "all" }, { key: "pending" }, { key: "confirmed" },
+  { key: "checked_in" }, { key: "checked_out" }, { key: "cancelled" },
 ];
 
 function formatIDR(n: number) {
@@ -163,7 +162,7 @@ export default function Bookings() {
             <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
               {statusTabs.map((tab) => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-3 md:px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap touch-target", activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-                  {t(tab.label)}
+                  {tab.key === "all" ? t("All") : statusLabel(tab.key, t)}
                 </button>
               ))}
             </div>
@@ -208,7 +207,7 @@ export default function Bookings() {
                         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.rooms?.number} · {b.rooms?.room_types?.name}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.check_in}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">{b.check_out}</td>
-                        <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap inline-block", sc.cls)}>{t(sc.label)}</span></td>
+                        <td className="px-4 py-3"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap inline-block", sc.cls)}>{statusLabel(b.status, t)}</span></td>
                         <td className="px-4 py-3 text-sm font-medium text-foreground tabular-nums">{formatIDR(b.total_amount)}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground capitalize whitespace-nowrap">{b.source.replace("_", " ")}</td>
                         <td className="px-4 py-3">
@@ -245,7 +244,7 @@ export default function Bookings() {
                           <p className="text-sm font-semibold text-foreground">{b.customers?.full_name}</p>
                           <p className="text-xs font-mono text-primary">{b.reference}</p>
                         </div>
-                        <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap inline-block", sc.cls)}>{t(sc.label)}</span>
+                        <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap inline-block", sc.cls)}>{statusLabel(b.status, t)}</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>{b.rooms?.number} · {b.rooms?.room_types?.name}</span>

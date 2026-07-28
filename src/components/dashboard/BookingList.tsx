@@ -8,14 +8,18 @@ import { staggerContainer, staggerItem } from "@/components/shared/PageTransitio
 import CopyButton from "@/components/shared/CopyButton";
 import { useBookings } from "@/hooks/useBookings";
 import type { BookingStatus, BookingWithRelations } from "@/types/database.types";
+import { nightsLabel } from "@/lib/nights";
+import { statusLabel, BOOKING_STATUSES } from "@/lib/bookingStatus";
 
-const statusLabels: Record<BookingStatus, { label: string; cls: string }> = {
-  pending: { label: "Pending", cls: "badge-warning" },
-  confirmed: { label: "Confirmed", cls: "badge-info" },
-  checked_in: { label: "Checked-In", cls: "badge-success" },
-  checked_out: { label: "Checked-Out", cls: "badge-info" },
-  cancelled: { label: "Cancelled", cls: "badge-destructive" },
-  no_show: { label: "No Show", cls: "badge-destructive" },
+// Colours only — the words come from statusLabel() so every screen says the
+// same thing in the reader's language.
+const statusStyles: Record<BookingStatus, string> = {
+  pending: "badge-warning",
+  confirmed: "badge-info",
+  checked_in: "badge-success",
+  checked_out: "badge-info",
+  cancelled: "badge-destructive",
+  no_show: "badge-destructive",
 };
 
 // Colour by room type name, so the badge stays stable as types are added.
@@ -73,8 +77,8 @@ export default function BookingList() {
             className="text-sm bg-muted rounded-lg px-3 py-2 text-foreground border-none outline-none cursor-pointer shrink-0"
           >
             <option value="all">{t("All Status")}</option>
-            {Object.entries(statusLabels).map(([key, s]) => (
-              <option key={key} value={key}>{t(s.label)}</option>
+            {BOOKING_STATUSES.map((key) => (
+              <option key={key} value={key}>{statusLabel(key, t)}</option>
             ))}
           </select>
         </div>
@@ -113,7 +117,7 @@ export default function BookingList() {
               <motion.tbody variants={staggerContainer} initial="hidden" animate="show">
                 {bookings.map((b) => {
                   const type = b.rooms?.room_types?.name ?? "—";
-                  const s = statusLabels[b.status];
+                  const cls = statusStyles[b.status];
                   return (
                     <motion.tr key={b.id} variants={staggerItem} className="border-b border-border last:border-0 table-row-hover">
                       <td className="py-3 font-medium text-foreground">
@@ -129,10 +133,10 @@ export default function BookingList() {
                         </span>
                       </td>
                       <td className="py-3 text-foreground whitespace-nowrap">{b.rooms?.number ? t("Room") + " " + b.rooms.number : "—"}</td>
-                      <td className="py-3 text-muted-foreground whitespace-nowrap">{nightsOf(b.check_in, b.check_out)} {t("nights")}</td>
+                      <td className="py-3 text-muted-foreground whitespace-nowrap">{nightsLabel(nightsOf(b.check_in, b.check_out), t)}</td>
                       <td className="py-3 text-muted-foreground whitespace-nowrap">{fmtDate(b.check_in)} - {fmtDate(b.check_out)}</td>
                       <td className="py-3">
-                        <span className={cn("inline-block text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap", s.cls)}>{s.label}</span>
+                        <span className={cn("inline-block text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap", cls)}>{statusLabel(b.status, t)}</span>
                       </td>
                       <td className="py-3">
                         <Link to={"/bookings/" + b.id} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="View details">
@@ -149,7 +153,7 @@ export default function BookingList() {
           {/* Mobile cards */}
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="md:hidden space-y-3">
             {bookings.map((b) => {
-              const s = statusLabels[b.status];
+              const cls = statusStyles[b.status];
               return (
                 <motion.div key={b.id} variants={staggerItem}>
                   <Link to={"/bookings/" + b.id} className="block bg-muted/30 rounded-xl p-4 hover:bg-muted/50 transition-colors">
@@ -158,11 +162,11 @@ export default function BookingList() {
                         <p className="text-sm font-semibold text-foreground">{b.customers?.full_name ?? "—"}</p>
                         <p className="text-xs font-mono text-muted-foreground">{b.reference}</p>
                       </div>
-                      <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", s.cls)}>{s.label}</span>
+                      <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", cls)}>{statusLabel(b.status, t)}</span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span>{b.rooms?.number ? t("Room") + " " + b.rooms.number : "—"} · {b.rooms?.room_types?.name ?? "—"}</span>
-                      <span>{nightsOf(b.check_in, b.check_out)} {t("nights")}</span>
+                      <span>{nightsLabel(nightsOf(b.check_in, b.check_out), t)}</span>
                     </div>
                   </Link>
                 </motion.div>

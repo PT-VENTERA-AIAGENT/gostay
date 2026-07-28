@@ -23,6 +23,8 @@ import type {
 } from "@/services/frontDeskService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { nightsLabel } from "@/lib/nights";
+import { statusLabel } from "@/lib/bookingStatus";
 
 const CATEGORY_LABELS: Record<PosCategory, string> = {
   fnb: "Makanan & Minuman",
@@ -40,13 +42,14 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
   other: "Lainnya",
 };
 
-const statusConfig: Record<string, { label: string; cls: string }> = {
-  pending:     { label: "Pending",     cls: "bg-warning/10 text-warning" },
-  confirmed:   { label: "Confirmed",   cls: "bg-info/10 text-info" },
-  checked_in:  { label: "Checked In",  cls: "bg-primary/10 text-primary" },
-  checked_out: { label: "Checked Out", cls: "bg-muted text-muted-foreground" },
-  cancelled:   { label: "Cancelled",   cls: "bg-destructive/10 text-destructive" },
-  no_show:     { label: "No Show",     cls: "bg-destructive/10 text-destructive" },
+// Colours only; the words come from statusLabel() — see lib/bookingStatus.ts.
+const statusConfig: Record<string, { cls: string }> = {
+  pending:     { cls: "bg-warning/10 text-warning" },
+  confirmed:   { cls: "bg-info/10 text-info" },
+  checked_in:  { cls: "bg-primary/10 text-primary" },
+  checked_out: { cls: "bg-muted text-muted-foreground" },
+  cancelled:   { cls: "bg-destructive/10 text-destructive" },
+  no_show:     { cls: "bg-destructive/10 text-destructive" },
 };
 
 function formatIDR(n: number) {
@@ -119,7 +122,7 @@ export default function BookingDetail() {
                 <h1 className="text-xl md:text-2xl font-bold text-foreground">{booking.reference}</h1>
                 <CopyButton text={booking.reference} />
               </div>
-              <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", sc.cls)}>{sc.label}</span>
+              <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", sc.cls)}>{statusLabel(booking.status, t)}</span>
             </div>
             <p className="text-sm text-muted-foreground">Booking for {booking.customers?.full_name}</p>
           </div>
@@ -153,7 +156,7 @@ export default function BookingDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="lg:col-span-2 space-y-4 md:space-y-6">
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><User className="w-4 h-4" /> Guest Information</h2>
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><User className="w-4 h-4" /> {t("Guest Information")}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 text-sm">
                 <div><span className="text-muted-foreground">{t("Name")}</span><p className="font-medium text-foreground mt-0.5">{booking.customers?.full_name}</p></div>
                 <div><span className="text-muted-foreground">{t("Email")}</span><p className="font-medium text-foreground mt-0.5">{booking.customers?.email}</p></div>
@@ -163,10 +166,10 @@ export default function BookingDetail() {
             </motion.div>
 
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><MapPin className="w-4 h-4" /> Stay Details</h2>
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><MapPin className="w-4 h-4" /> {t("Stay Details")}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 text-sm">
                 <div><span className="text-muted-foreground">{t("Room")}</span><p className="font-medium text-foreground mt-0.5">{booking.rooms?.number} · {booking.rooms?.room_types?.name} (Floor {booking.rooms?.floor})</p></div>
-                <div><span className="text-muted-foreground">{t("Dates")}</span><p className="font-medium text-foreground mt-0.5">{formatDate(booking.check_in)} → {formatDate(booking.check_out)} ({nights} nights)</p></div>
+                <div><span className="text-muted-foreground">{t("Dates")}</span><p className="font-medium text-foreground mt-0.5">{formatDate(booking.check_in)} → {formatDate(booking.check_out)} ({nightsLabel(nights, t)})</p></div>
                 <div><span className="text-muted-foreground">{t("Guests")}</span><p className="font-medium text-foreground mt-0.5">{booking.num_adults} adults, {booking.num_children} children</p></div>
                 <div><span className="text-muted-foreground">{t("Source")}</span><p className="font-medium text-foreground mt-0.5 capitalize">{booking.source.replace("_", " ")}</p></div>
               </div>
@@ -205,7 +208,7 @@ export default function BookingDetail() {
 
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-4 md:space-y-6">
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Payment</h2>
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4" /> {t("Payment")}</h2>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">{t("Status")}</span><span className={cn("font-medium", booking.payment_status === "paid" ? "text-success" : "text-warning")}>{booking.payment_status}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">{t("Total")}</span><span className="font-semibold text-foreground">{formatIDR(booking.total_amount)}</span></div>
@@ -363,7 +366,7 @@ function FolioCard({ bookingId, roomTotal, amountPaid }: { bookingId: string; ro
       <div className="mt-4 pt-3 border-t border-border space-y-2 text-sm">
         <div className="flex justify-between"><span className="text-muted-foreground">Kamar</span><span className="font-medium text-foreground">{formatIDR(roomTotal)}</span></div>
         <div className="flex justify-between"><span className="text-muted-foreground">Biaya lain</span><span className="font-medium text-foreground">{formatIDR(chargesTotal)}</span></div>
-        <div className="flex justify-between pt-2 border-t border-border"><span className="font-semibold text-foreground">Total tagihan</span><span className="font-semibold text-foreground">{formatIDR(totalTagihan)}</span></div>
+        <div className="flex justify-between pt-2 border-t border-border"><span className="font-semibold text-foreground">{t("Total tagihan")}</span><span className="font-semibold text-foreground">{formatIDR(totalTagihan)}</span></div>
         <div className="flex justify-between"><span className="text-muted-foreground">Terbayar</span><span className="font-medium text-success">{formatIDR(amountPaid)}</span></div>
         <div className="flex justify-between"><span className="text-muted-foreground">Sisa</span><span className={cn("font-semibold", sisa > 0 ? "text-warning" : "text-success")}>{formatIDR(sisa)}</span></div>
       </div>

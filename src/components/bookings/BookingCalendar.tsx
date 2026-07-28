@@ -153,8 +153,8 @@ export default function BookingCalendar() {
           {[
             { label: t("Pending"), cls: "bg-warning/80" },
             { label: t("Confirmed"), cls: "bg-info/80" },
-            { label: "Checked In", cls: "bg-primary/80" },
-            { label: "Checked Out", cls: "bg-muted" },
+            { label: t("Checked In"), cls: "bg-primary/80" },
+            { label: t("Checked Out"), cls: "bg-muted" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-1.5">
               <span className={cn("w-3 h-3 rounded-sm", s.cls)} />
