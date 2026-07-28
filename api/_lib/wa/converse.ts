@@ -187,7 +187,7 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     // Idempotent: only a number's first message actually hits Ventera.
     let guest: { profileId: string; customerId: string };
     try {
-      guest = await resolveOrProvisionGuest(phoneJid, tenantId, displayName);
+      guest = await resolveOrProvisionGuest(phoneJid, tenantId, displayName, replyJid);
     } catch (e) {
       if (e instanceof WaRateLimitError) {
         await rawReply("Terlalu banyak pesan dari nomor ini. Mohon coba lagi beberapa saat lagi.");

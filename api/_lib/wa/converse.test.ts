@@ -340,7 +340,12 @@ describe("handleGuestMessage — confirmation", () => {
 
     await handleGuestMessage({ ...BASE, text: "YA", displayName: "Budi" });
 
-    expect(guest.resolveOrProvisionGuest).toHaveBeenCalledWith(BASE.phoneJid, "tenant-x", "Budi");
+    // The 4th argument is the PN alternate, which carries the guest's real
+    // number when WhatsApp addressed the chat by LID. Undefined here because
+    // this fixture is a plain @s.whatsapp.net chat.
+    expect(guest.resolveOrProvisionGuest).toHaveBeenCalledWith(
+      BASE.phoneJid, "tenant-x", "Budi", undefined,
+    );
     expect(booking.createWaBooking).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: "tenant-x", customerId: "cust-1", roomId: "room-1", createdBy: "prof-1", total: 1000000 }),
     );
