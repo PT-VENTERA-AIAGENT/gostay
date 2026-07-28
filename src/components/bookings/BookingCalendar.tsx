@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRooms } from "@/hooks/useRooms";
 import { useBookingsInRange } from "@/hooks/useBookings";
+import { stayBar } from "@/lib/stayBar";
 
 const statusColors: Record<string, string> = {
   pending: "bg-warning/80 border-warning",
@@ -222,11 +223,16 @@ export default function BookingCalendar() {
 
                     if (bEnd <= rangeStart || bStart > rangeEnd) return null;
 
-                    const startOffset = Math.max(0, daysBetween(rangeStart, bStart));
-                    const endOffset = Math.min(numDays, daysBetween(rangeStart, bEnd));
-                    const barWidth = (endOffset - startOffset) * cellWidth;
-
-                    if (barWidth <= 0) return null;
+                    // A night is not a day: the bar is offset half a cell so it
+                    // reads as afternoon-arrival to midday-departure. See
+                    // src/lib/stayBar.ts for why.
+                    const bar = stayBar({
+                      startOffset: daysBetween(rangeStart, bStart),
+                      endOffset: daysBetween(rangeStart, bEnd),
+                      cellWidth,
+                      numDays,
+                    });
+                    if (!bar) return null;
 
                     const guest = booking.customers?.full_name ?? "Guest";
 
@@ -238,7 +244,7 @@ export default function BookingCalendar() {
                           "absolute top-1 bottom-1 rounded-md border flex items-center px-2 cursor-pointer hover:opacity-90 transition-opacity z-10",
                           statusColors[booking.status],
                         )}
-                        style={{ left: startOffset * cellWidth + 2, width: barWidth - 4 }}
+                        style={{ left: bar.left, width: bar.width }}
                         title={`${guest} — ${booking.check_in} to ${booking.check_out} (${booking.reference})`}
                       >
                         <span className={cn("text-xs font-medium truncate", statusTextColors[booking.status])}>{guest}</span>
