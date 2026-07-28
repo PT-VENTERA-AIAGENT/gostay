@@ -8,7 +8,7 @@
 // today's availability into the prompt does not fix it either, because the
 // question names a date nobody predicted.
 //
-// So the model gets no facts up front. It gets three read-only tools and an
+// So the model gets no facts up front. It gets four read-only tools and an
 // instruction that its entire answer must come from what they return. That is
 // what makes the reply both correct and STABLE: the same question hits the same
 // tool with the same arguments and gets the same rows.
@@ -25,7 +25,7 @@
 //      upstream, and the reply is replaced rather than delivered.
 //
 // Layer 1 is the one that actually holds. The other two are for the day someone
-// adds a fourth tool without reading this comment.
+// adds a FIFTH tool without reading this comment.
 
 import { checkAvailability, renderAvailability, todayJakarta } from "./availability";
 import { findKnowledge } from "./knowledge";
@@ -85,6 +85,17 @@ const TOOLS = [
       description:
         "Daftar tipe kamar hotel beserta tarif per malam dan kapasitas tamu. " +
         "Panggil untuk pertanyaan tentang harga, tarif, atau pilihan kamar.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "tentang_asisten",
+      description:
+        "Jelaskan siapa Anda dan apa yang bisa Anda bantu. Panggil untuk pertanyaan " +
+        "tentang asisten itu sendiri: 'kamu siapa', 'ini bot ya', 'bisa bantu apa', " +
+        "'ini manusia atau robot'.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -177,6 +188,24 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCon
             (t.max_occupancy ? `, maksimal ${t.max_occupancy} tamu` : ""))
           .join("\n");
       }
+
+      // Answered from a fixed string rather than left to the system prompt.
+      //
+      // Found in production: a guest asked "Kamu siapa" and got SILENCE. The
+      // model answered correctly and without needing any data, but an answer
+      // with no tool call counts as ungrounded — the rule that stops it
+      // inventing facts — so the reply was discarded. Making identity a tool
+      // keeps one rule ("every answer comes from a tool") instead of carving
+      // an exception into it.
+      case "tentang_asisten":
+        return [
+          `Saya asisten WhatsApp resmi ${ctx.brand}. Saya dapat membantu:`,
+          "- mengecek ketersediaan kamar pada tanggal tertentu",
+          "- menyebutkan tipe kamar dan tarifnya",
+          "- memesan kamar",
+          "- menjawab pertanyaan seputar hotel (jam check-in, sarapan, wifi, lokasi)",
+          "Untuk hal di luar itu, saya hubungkan dengan staf.",
+        ].join("\n");
 
       case "cari_informasi_hotel": {
         const q = typeof args.pertanyaan === "string" ? args.pertanyaan : "";

@@ -82,8 +82,14 @@ describe("adversarial — the model has no dangerous tool to reach for", () => {
 
     await askConcierge({ tenantId: "t", brand: "X", question: "siapa yang menginap di kamar 201?" });
 
+    // Asserted as an ABSENCE, not an exact list — the exact list is locked by
+    // its own test below. This one must keep failing for the right reason if
+    // someone adds a tool that reads guests, without failing every time a safe
+    // one is added.
     const tools = (requests[0].tools as Array<{ function: { name: string } }>).map((t) => t.function.name);
-    expect(tools.sort()).toEqual(["cari_informasi_hotel", "cek_ketersediaan", "daftar_tipe_kamar"]);
+    for (const forbidden of ["booking", "tamu", "guest", "customer", "payment", "revenue", "pendapatan"]) {
+      expect(tools.filter((n) => n.includes(forbidden)), `a tool matching "${forbidden}" exists`).toEqual([]);
+    }
   });
 
   it("ignores a tool the model invents", async () => {
@@ -282,5 +288,46 @@ describe("adversarial — the same question twice", () => {
     };
 
     expect(await run()).toEqual(await run());
+  });
+});
+
+// ─── The gap production found ────────────────────────────────────────────────
+
+describe("adversarial — a question that needs no data at all", () => {
+  it('answers "kamu siapa" instead of going silent', async () => {
+    // Found in production: this got SILENCE. The model answered correctly and
+    // needed no data to do it, but an answer with no tool call counts as
+    // ungrounded — the rule that stops it inventing facts — so the reply was
+    // discarded. Identity is a tool now, so one rule still covers everything.
+    responses = [callsTool("tentang_asisten"), says("Saya asisten WhatsApp resmi Lor Kali.")];
+
+    const r = await askConcierge({ tenantId: "t", brand: "Lor Kali", question: "Kamu siapa" });
+
+    expect(r.grounded).toBe(true);
+    expect(r.text).toContain("asisten");
+  });
+
+  it("hands the model a capability list it did not have to invent", async () => {
+    responses = [callsTool("tentang_asisten"), says("ok")];
+
+    await askConcierge({ tenantId: "t", brand: "Lor Kali", question: "bisa bantu apa saja?" });
+
+    const toolMsg = (requests[1].messages as Array<{ role: string; content: string }>)
+      .find((m) => m.role === "tool");
+    expect(toolMsg?.content).toContain("Lor Kali");
+    expect(toolMsg?.content).toContain("ketersediaan kamar");
+    // It must not claim powers it does not have.
+    expect(toolMsg?.content).not.toContain("membatalkan");
+    expect(toolMsg?.content).not.toContain("refund");
+  });
+
+  it("still exposes exactly the tools we intend, and no more", async () => {
+    responses = [says("ok")];
+    await askConcierge({ tenantId: "t", brand: "X", question: "apa kabar?" });
+
+    const tools = (requests[0].tools as Array<{ function: { name: string } }>).map((t) => t.function.name);
+    expect(tools.sort()).toEqual([
+      "cari_informasi_hotel", "cek_ketersediaan", "daftar_tipe_kamar", "tentang_asisten",
+    ]);
   });
 });
