@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import WaText from "@/components/shared/WaText";
 
 export default function Chat() {
   const t = useT();
@@ -236,7 +237,7 @@ export default function Chat() {
                           {msg.attachment_url && (
                             <ChatAttachment value={msg.attachment_url} name={msg.content} onLight={isStaff} />
                           )}
-                          {!msg.attachment_url && <p className="text-sm">{msg.content}</p>}
+                          {!msg.attachment_url && <WaText>{msg.content}</WaText>}
                           <div className={cn("flex items-center gap-1 mt-1", isStaff ? "justify-end" : "")}>
                             <span className={cn("text-xs", isStaff ? "text-primary-foreground/70" : "text-muted-foreground")}>
                               {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

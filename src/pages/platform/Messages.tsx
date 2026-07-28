@@ -5,6 +5,7 @@ import { ChatAttachment } from "@/components/shared/ChatAttachment";
 import { cn } from "@/lib/utils";
 import { tr } from "@/lib/i18n";
 import { usePlatformThreads, usePlatformThreadMessages } from "@/hooks/usePlatform";
+import WaText from "@/components/shared/WaText";
 
 // Percakapan SELURUH hotel — tempatnya di konsol platform, bukan di inbox hotel.
 // Halaman Pesan milik hotel kini tenant-scoped untuk semua orang (035), jadi ini
@@ -136,7 +137,7 @@ export default function PlatformMessages() {
                             {m.attachment_url && (
                               <ChatAttachment value={m.attachment_url} name={m.content} onLight={!fromGuest} />
                             )}
-                            {!m.attachment_url && <p className="text-sm whitespace-pre-line">{m.content}</p>}
+                            {!m.attachment_url && <WaText>{m.content}</WaText>}
                             <span className={cn("block text-[11px] mt-1", fromGuest ? "text-muted-foreground" : "text-primary-foreground/70")}>
                               {new Date(m.created_at).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                             </span>
