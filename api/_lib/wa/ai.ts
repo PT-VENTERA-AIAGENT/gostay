@@ -319,7 +319,7 @@ function coerceIntent(parsed: Record<string, unknown>): BookingIntent {
  * availability with a bogus date and answer "penuh" instead of flagging the date.
  * A round-trip through Date rejects any day that rolled over into another month.
  */
-function isoOrNull(v: unknown): string | null {
+export function isoOrNull(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const m = ISO_DATE.exec(v.trim());
   if (!m) return null;

@@ -8,7 +8,7 @@
 // today's availability into the prompt does not fix it either, because the
 // question names a date nobody predicted.
 //
-// So the model gets no facts up front. It gets three read-only tools and an
+// So the model gets no facts up front. It gets four read-only tools and an
 // instruction that its entire answer must come from what they return. That is
 // what makes the reply both correct and STABLE: the same question hits the same
 // tool with the same arguments and gets the same rows.
@@ -25,10 +25,11 @@
 //      upstream, and the reply is replaced rather than delivered.
 //
 // Layer 1 is the one that actually holds. The other two are for the day someone
-// adds a fourth tool without reading this comment.
+// adds a FIFTH tool without reading this comment.
 
 import { checkAvailability, renderAvailability, todayJakarta } from "./availability";
 import { findKnowledge } from "./knowledge";
+import { isoOrNull } from "./ai";
 import { listRoomTypes } from "./booking";
 
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
@@ -90,6 +91,17 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "tentang_asisten",
+      description:
+        "Jelaskan siapa Anda dan apa yang bisa Anda bantu. Panggil untuk pertanyaan " +
+        "tentang asisten itu sendiri: 'kamu siapa', 'ini bot ya', 'bisa bantu apa', " +
+        "'ini manusia atau robot'.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "cari_informasi_hotel",
       description:
         "Cari informasi resmi hotel yang ditulis stafnya: jam check-in/out, sarapan, " +
@@ -138,8 +150,15 @@ interface ToolContext {
   brand: string;
 }
 
-const isoDate = (v: unknown): string | null =>
-  typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+/**
+ * A real calendar date, or null.
+ *
+ * Reuses the booking extractor's validator rather than re-checking the SHAPE
+ * here. A shape check alone passes "2026-13-45" and "2026-02-30" — both look
+ * like dates and neither exists — and forwarding one built a PostgREST filter
+ * on a day that never happened, which comes back empty and reads as "penuh".
+ */
+const isoDate = (v: unknown): string | null => isoOrNull(v);
 
 /**
  * Run one tool call and return what the model should see.
@@ -169,6 +188,24 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCon
             (t.max_occupancy ? `, maksimal ${t.max_occupancy} tamu` : ""))
           .join("\n");
       }
+
+      // Answered from a fixed string rather than left to the system prompt.
+      //
+      // Found in production: a guest asked "Kamu siapa" and got SILENCE. The
+      // model answered correctly and without needing any data, but an answer
+      // with no tool call counts as ungrounded — the rule that stops it
+      // inventing facts — so the reply was discarded. Making identity a tool
+      // keeps one rule ("every answer comes from a tool") instead of carving
+      // an exception into it.
+      case "tentang_asisten":
+        return [
+          `Saya asisten WhatsApp resmi ${ctx.brand}. Saya dapat membantu:`,
+          "- mengecek ketersediaan kamar pada tanggal tertentu",
+          "- menyebutkan tipe kamar dan tarifnya",
+          "- memesan kamar",
+          "- menjawab pertanyaan seputar hotel (jam check-in, sarapan, wifi, lokasi)",
+          "Untuk hal di luar itu, saya hubungkan dengan staf.",
+        ].join("\n");
 
       case "cari_informasi_hotel": {
         const q = typeof args.pertanyaan === "string" ? args.pertanyaan : "";
@@ -201,7 +238,19 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCon
  * redacted, because a partially-scrubbed answer still carries the claim.
  */
 const FORBIDDEN = [
-  /\b(?:\+?62|0)8\d{7,12}\b/,          // an Indonesian mobile number
+  // An Indonesian mobile number, tolerating the separators people actually
+  // type. The first version required unbroken digits, so "0812-3456-7890" —
+  // the form a staff member writes into a knowledge entry, and the form a model
+  // reaches for when it formats — walked straight past a guardrail that looked
+  // like it was working.
+  //
+  // Two bounds keep it from over-firing, which matters because a tripped
+  // guardrail replaces the WHOLE answer:
+  //   • the number must begin at a token boundary, so the "085" inside a price
+  //     like "Rp 1.085.000.000" is not read as the start of a phone number;
+  //   • separators are capped at two characters, so the pattern cannot wander
+  //     across a sentence stitching unrelated digits together.
+  /(?:^|[\s(])\+?(?:62|0)[\s.()-]{0,2}8[\s.()-]{0,2}(?:\d[\s.()-]{0,2}){7,12}/,
   /\b[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}\b/, // an email address
   /\bBK-\d{8}-[A-Z0-9]{4}\b/,          // a booking reference
 ];
