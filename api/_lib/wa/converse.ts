@@ -29,6 +29,7 @@ import {
 } from "./roomservice";
 import { paymentInstruction } from "./payment";
 import { checkAvailability as queryAvailability, renderAvailability } from "./availability";
+import { askConcierge } from "./concierge";
 import { routeFlow } from "./flow/route";
 import type { FlowActions } from "./flow/engine";
 import {
@@ -678,6 +679,15 @@ function builtInActions(
         return;
       }
       await reply(roomServiceMenuText(brand, menu));
+    },
+
+    /**
+     * Answer whatever the guest asked, from real data plus the hotel's own
+     * knowledge base. See concierge.ts — it refuses rather than inventing.
+     */
+    async askConcierge() {
+      const r = await askConcierge({ tenantId, brand, question: msg.text ?? "" });
+      await reply(r.text);
     },
 
     async sendPortalLink() {

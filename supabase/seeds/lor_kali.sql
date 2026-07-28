@@ -176,6 +176,46 @@ insert into hotel_payment_config (tenant_id, mode, is_active, updated_by)
 select s.tenant, 'test', true, 'seed:lor_kali' from _seed s
 on conflict (tenant_id) do nothing;
 
+-- ─── 8. Basis pengetahuan ─────────────────────────────────────────────────────
+-- What the AI concierge is allowed to say. Without entries here it can only
+-- answer about rooms, rates and availability — every other question gets
+-- "belum ada informasinya", which is correct but unhelpful for a test hotel.
+--
+-- Written as complete replies, because the assistant quotes them close to
+-- verbatim rather than summarising.
+insert into hotel_knowledge (tenant_id, topic, content, keywords, is_active)
+select s.tenant, v.topic, v.content, v.keywords::text[], true
+from _seed s,
+  (values
+    ('Jam check-in & check-out',
+     'Check-in mulai pukul 14.00 dan check-out paling lambat pukul 12.00. Mohon membawa KTP asli saat check-in.',
+     array['check in','checkin','check out','checkout','jam berapa','jam masuk','ktp']),
+    ('Sarapan',
+     'Sarapan tersedia pukul 07.00–10.00 di ruang makan lantai 1, sudah termasuk untuk kamar Deluxe dan Family.',
+     array['sarapan','breakfast','makan pagi']),
+    ('Wifi & internet',
+     'Wifi gratis tersedia di seluruh area hotel. Kata sandinya diberikan petugas saat check-in.',
+     array['wifi','wi-fi','internet','password wifi','sandi wifi']),
+    ('Parkir',
+     'Parkir mobil dan motor tersedia gratis untuk tamu yang menginap.',
+     array['parkir','parking','mobil','motor']),
+    ('Lokasi & alamat',
+     'Lor Kali berada di tepi utara sungai, sekitar 10 menit dari pusat kota. Alamat lengkap dan tautan peta dikirim petugas setelah pemesanan dikonfirmasi.',
+     array['alamat','lokasi','dimana','maps','arah','patokan']),
+    ('Kebijakan pembatalan',
+     'Pembatalan H-3 sebelum check-in mendapat pengembalian penuh, H-1 sebesar 50%, dan di hari-H tidak ada pengembalian.',
+     array['pembatalan','refund','batalkan pesanan','uang kembali']),
+    ('Hewan peliharaan',
+     'Mohon maaf, untuk kenyamanan bersama kami belum dapat menerima hewan peliharaan.',
+     array['hewan','peliharaan','kucing','anjing','pet']),
+    ('Extra bed & tamu tambahan',
+     'Extra bed tersedia seharga Rp 75.000 per malam untuk kamar Deluxe dan Family, dengan pemberitahuan sebelumnya.',
+     array['extra bed','kasur tambahan','tamu tambahan','anak'])
+  ) as v(topic, content, keywords)
+where not exists (
+  select 1 from hotel_knowledge k where k.tenant_id = s.tenant and k.topic = v.topic
+);
+
 commit;
 
 -- ─── Summary ──────────────────────────────────────────────────────────────────

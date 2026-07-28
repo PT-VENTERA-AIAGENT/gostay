@@ -19,6 +19,7 @@ beforeEach(() => {
     showRoomTypes: vi.fn().mockResolvedValue(undefined),
     showMenu: vi.fn().mockResolvedValue(undefined),
     sendPortalLink: vi.fn().mockResolvedValue(undefined),
+    askConcierge: vi.fn().mockResolvedValue(undefined),
   };
   ctx = {
     reply: async (t: string) => { sent.push(t); },

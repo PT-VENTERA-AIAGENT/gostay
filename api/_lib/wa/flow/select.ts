@@ -26,6 +26,25 @@ import type { FlowRequirement } from "./store";
 export type KeywordTier = 0 | 1 | 2 | 3;
 
 /**
+ * Fold a message down to lowercase words separated by single spaces.
+ *
+ * Punctuation becomes a separator rather than part of a word. Without this the
+ * boundary tests below are anchored on spaces alone, so "menu?" — a guest
+ * typing one word and a question mark — fails both the exact and whole-word
+ * tests and falls to tier 1, which is BELOW the threshold to start a flow. The
+ * result was silence for one of the most common messages a hotel receives.
+ * Indonesian guests punctuate freely ("menu dong!", "…di reguler ?"), so this
+ * is the normal case, not an edge one.
+ */
+function normalise(s: string): string {
+  return (s ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
  * How strongly `keyword` matches `input`:
  *
  *   3  exact       the guest typed exactly this ("menu" === "menu")
@@ -33,17 +52,21 @@ export type KeywordTier = 0 | 1 | 2 | 3;
  *   1  substring   it appears anywhere ("menunggu") — last resort only
  *   0  no match
  *
- * `input` is expected already lowercased and trimmed; the keyword is normalised
- * here so raw database values are safe to pass.
+ * Both sides are normalised, so callers may pass raw guest text and raw database
+ * values. Multi-word keywords ("pesan kamar") still work: normalising both sides
+ * to single-spaced words keeps the phrase contiguous.
  */
 export function scoreKeyword(input: string, keyword: string): KeywordTier {
-  const k = keyword.toLowerCase().trim();
-  if (!k || !input) return 0;
-  if (input === k) return 3;
-  if (input.startsWith(k + " ") || input.endsWith(" " + k) || input.includes(" " + k + " ")) {
+  const k = normalise(keyword);
+  const i = normalise(input);
+  if (!k || !i) return 0;
+  if (i === k) return 3;
+  if (i.startsWith(k + " ") || i.endsWith(" " + k) || i.includes(" " + k + " ")) {
     return 2;
   }
-  if (input.includes(k)) return 1;
+  // Substring is checked on the normalised form too, so a keyword never matches
+  // across a punctuation boundary it should not have crossed.
+  if (i.includes(k)) return 1;
   return 0;
 }
 

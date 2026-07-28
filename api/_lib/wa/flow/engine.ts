@@ -54,6 +54,8 @@ export interface FlowActions {
   checkAvailability(): Promise<void>;
   showMenu(): Promise<void>;
   sendPortalLink(): Promise<void>;
+  /** Answer a free-text question, grounded in real data. */
+  askConcierge(): Promise<void>;
 }
 
 export interface FlowRunContext {
@@ -365,6 +367,9 @@ async function runAction(action: string, actions: FlowActions): Promise<boolean>
       return false;
     case "send_portal_link":
       await actions.sendPortalLink();
+      return false;
+    case "ask_concierge":
+      await actions.askConcierge();
       return false;
     default:
       return false;

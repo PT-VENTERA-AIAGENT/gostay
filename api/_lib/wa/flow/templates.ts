@@ -351,9 +351,14 @@ const CHECKIN_INFO: FlowTemplate = {
   description:
     "Jam check-in dan check-out, syarat identitas, dan deposit. Ubah teksnya sesuai " +
     "kebijakan hotel Anda — ini template, bukan aturan sistem.",
+  // NOT a bare "jam berapa". It is a generic question word that belongs to
+  // whatever noun follows it — "sarapan jam berapa" is a breakfast question and
+  // was landing here, answering with check-in times. Same lesson as "berapa" on
+  // the price flow: a broad keyword on a high-priority flow silently swallows
+  // the specific ones below it.
   triggerKeywords: [
-    "check in", "checkin", "check out", "checkout", "jam berapa",
-    "jam check", "deposit", "syarat", "ktp", "bawa apa",
+    "check in", "checkin", "check out", "checkout",
+    "jam check", "jam masuk", "deposit", "syarat", "ktp", "bawa apa",
   ],
   requires: "none",
   priority: 55,
@@ -515,6 +520,30 @@ const ULASAN: FlowTemplate = {
   },
 };
 
+
+// ─── 14. Tanya apa saja (AI, berpijak pada data) ─────────────────────────────
+
+const TANYA_AI: FlowTemplate = {
+  key: "tanya_ai",
+  name: "80 Tanya Apa Saja (AI)",
+  category: "informasi",
+  description:
+    "Menjawab pertanyaan bebas memakai data asli hotel: ketersediaan kamar pada tanggal " +
+    "tertentu, tarif, dan informasi yang staf tulis di Basis Pengetahuan. Bila tidak ada " +
+    "yang mencakupnya, AI mengatakan belum tahu dan menawarkan staf — tidak mengarang.",
+  // Question words, not statements. Placed just above the greeting so every
+  // specific flow still wins; this is the net that catches what they miss.
+  triggerKeywords: [
+    "apakah", "apa itu", "bagaimana", "gimana", "bisakah", "boleh tidak",
+    "boleh gak", "tanya dong", "mau tanya", "izin bertanya",
+  ],
+  requires: "none",
+  priority: 80,
+  definition: linear([
+    { act: "ask_concierge" },
+  ]),
+};
+
 // ─── 12. Sapaan + menu utama (jaring pengaman) ───────────────────────────────
 
 const SAPAAN: FlowTemplate = {
@@ -585,6 +614,7 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
   FASILITAS,
   PEMBATALAN,
   ULASAN,
+  TANYA_AI,
   SAPAAN,
 ];
 

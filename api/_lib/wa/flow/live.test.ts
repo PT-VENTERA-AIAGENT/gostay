@@ -66,6 +66,7 @@ import { pickFlow } from "./select";
 import { runFlow, type FlowActions } from "./engine";
 import { listRoomTypes } from "../booking";
 import { getInhouseStay, listMenuProducts } from "../roomservice";
+import { askConcierge, violatesGuardrail } from "../concierge";
 
 const TENANT = process.env.WA_LIVE_TENANT ?? "";
 const run = TENANT ? describe : describe.skip;
@@ -112,6 +113,9 @@ function liveActions(brand: string, sent: string[]): FlowActions {
       const menu = await listMenuProducts(TENANT);
       sent.push(`[menu: ${menu.length} item]`);
     },
+    async askConcierge() {
+      sent.push("→ [AI menjawab dari data hotel + basis pengetahuan]");
+    },
     async sendPortalLink() {
       sent.push("Pantau & kelola pesanan Anda di portal tamu: [tautan]");
     },
@@ -150,15 +154,19 @@ run("LIVE — flows as they are stored for this hotel", () => {
 
   it("routes the same word differently depending on whether the guest is staying", async () => {
     const flows = await listActiveFlows(TENANT);
-    const probe = ["halo", "menu", "booking", "mau pesan kamar", "lapar", "saya menunggu konfirmasi"];
+    const probe = [
+      "halo", "menu", "menu?", "booking", "ada kamar yang kosong di reguler ?",
+      "lapar", "sarapan jam berapa", "apakah boleh bawa kucing",
+      "saya menunggu konfirmasi",
+    ];
 
     console.log("\n── Routing ──");
-    console.log("  pesan                          | belum menginap        | sedang menginap");
-    console.log("  " + "-".repeat(78));
+    console.log("  pesan                                | belum menginap                 | sedang menginap");
+    console.log("  " + "-".repeat(100));
     for (const p of probe) {
       const out = pickFlow(flows, p, { isInhouse: false })?.name ?? "(tidak ada — balasan bawaan)";
       const inn = pickFlow(flows, p, { isInhouse: true })?.name ?? "(tidak ada — balasan bawaan)";
-      console.log(`  ${p.padEnd(30)} | ${out.padEnd(21)} | ${inn}`);
+      console.log(`  ${p.padEnd(36)} | ${out.padEnd(30)} | ${inn}`);
     }
 
     // The behaviour this whole change exists for.
@@ -238,4 +246,26 @@ run("LIVE — transcripts from real data", () => {
 
     expect(r.status).toBe("waiting");
   });
+});
+
+run("LIVE — asisten berpijak data (knowledge base + tool)", () => {
+  it("answers real questions, and refuses the ones nothing covers", async () => {
+    const questions = [
+      "ada kamar kosong tanggal 5 agustus?",
+      "sarapan jam berapa ya?",
+      "boleh bawa kucing tidak?",
+      "berapa harga kamar deluxe?",
+      "apakah ada helipad di hotel ini?",
+    ];
+
+    console.log("\n── Asisten (data asli) ──");
+    for (const q of questions) {
+      const r = await askConcierge({ tenantId: TENANT, brand: "Lor Kali", question: q });
+      console.log(`\n  T: ${q}`);
+      console.log(`  J: ${r.text.replace(/\n/g, "\n     ")}`);
+      console.log(`     [tool: ${r.toolsUsed.join(", ") || "-"}  grounded: ${r.grounded}]`);
+      // Whatever it said, it must never carry these.
+      expect(violatesGuardrail(r.text), `guardrail tripped on: ${q}`).toBe(false);
+    }
+  }, 90_000);
 });

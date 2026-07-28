@@ -36,6 +36,9 @@ beforeEach(() => {
       sent.push("Pilihan kamar & tarif per malam di *Hotel Uji*:\n\n*Deluxe*\n    Rp 500.000 / malam");
     }),
     showMenu: vi.fn().mockResolvedValue(undefined),
+    askConcierge: vi.fn().mockImplementation(async () => {
+      sent.push("[AI menjawab dari data hotel]");
+    }),
     sendPortalLink: vi.fn().mockImplementation(async () => {
       sent.push("Pantau & kelola pesanan Anda di portal tamu:\nhttps://app.gostay.id/portal?hotel=hotel-uji");
     }),
@@ -112,10 +115,10 @@ describe("templates are well-formed", () => {
 // ─── Routing: the reservation-vs-menu question, on the real templates ────────
 
 describe("the shipped set is coherent", () => {
-  it("ships thirteen templates with unique keys and names", () => {
-    expect(FLOW_TEMPLATES).toHaveLength(13);
-    expect(new Set(FLOW_TEMPLATES.map((t) => t.key)).size).toBe(13);
-    expect(new Set(FLOW_TEMPLATES.map((t) => t.name)).size).toBe(13);
+  it("ships fourteen templates with unique keys and names", () => {
+    expect(FLOW_TEMPLATES).toHaveLength(14);
+    expect(new Set(FLOW_TEMPLATES.map((t) => t.key)).size).toBe(14);
+    expect(new Set(FLOW_TEMPLATES.map((t) => t.name)).size).toBe(14);
   });
 
   it("gives every template a known category, and every category a template", () => {
@@ -215,7 +218,7 @@ describe("routing across the installed templates", () => {
 
   it("routes the new question templates to their own flows", () => {
     expect(pick("berapa harga kamarnya", false)).toBe("harga");
-    expect(pick("jam berapa check in", false)).toBe("checkin_info");
+    expect(pick("jam check in berapa", false)).toBe("checkin_info");
     expect(pick("alamat hotelnya dimana", false)).toBe("lokasi");
     expect(pick("ada wifi tidak", false)).toBe("fasilitas");
     expect(pick("mau refund", false)).toBe("pembatalan");
@@ -236,6 +239,16 @@ describe("routing across the installed templates", () => {
     // Reservasi deliberately drops "check in": a guest asking the time is not
     // trying to book, and the booking flow outranks the info one.
     expect(pick("jam check in berapa ya", false)).toBe("checkin_info");
+  });
+
+  it("does not let a generic question word swallow the specific flows", () => {
+    // "jam berapa" and "berapa" are question words, not topics. Both used to sit
+    // on high-priority flows and quietly claimed sentences that belonged to
+    // others — "sarapan jam berapa" was answered with check-in times.
+    const info = findTemplate("checkin_info")!;
+    const harga = findTemplate("harga")!;
+    expect(info.triggerKeywords).not.toContain("jam berapa");
+    expect(harga.triggerKeywords).not.toContain("berapa");
   });
 });
 
