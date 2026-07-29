@@ -544,7 +544,7 @@ function ProductManager({ onClose }: { onClose: () => void }) {
                     >
                       {p.is_active ? "Aktif" : "Nonaktif"}
                     </button>
-                    <button onClick={() => startEdit(p)} title="Edit" className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <button onClick={() => startEdit(p)} title={t("Edit")} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => handleDelete(p)} disabled={deleteProduct.isPending} title="Hapus" className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">

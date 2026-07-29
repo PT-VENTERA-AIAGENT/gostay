@@ -203,7 +203,7 @@ export default function Analytics() {
               <select
                 value={rangeKey}
                 onChange={(e) => setRangeKey(e.target.value)}
-                aria-label="Date range"
+                aria-label={t("Date range")}
                 className="bg-transparent font-medium text-foreground focus:outline-none cursor-pointer"
               >
                 {Object.entries(RANGES).map(([key, r]) => (
@@ -360,12 +360,12 @@ export default function Analytics() {
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><LogIn className="w-4 h-4" /> Today's Arrivals</h2>
+            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><LogIn className="w-4 h-4" /> {t("Today's Arrivals")}</h2>
             <MovementList rows={data.arrivalsToday} empty={t("No arrivals today.")} />
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 md:p-5 card-hover">
-            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><LogOut className="w-4 h-4" /> Today's Departures</h2>
+            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><LogOut className="w-4 h-4" /> {t("Today's Departures")}</h2>
             <MovementList rows={data.departuresToday} empty={t("No departures today.")} />
             <div className="mt-4 pt-4 border-t border-border space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("Quick Stats")}</h3>
@@ -374,11 +374,11 @@ export default function Analytics() {
                 <span className="font-semibold text-foreground tabular-nums">{quickStats.unreadChats}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5"><Flag className="w-3.5 h-3.5" /> Follow-up Calls</span>
+                <span className="text-muted-foreground flex items-center gap-1.5"><Flag className="w-3.5 h-3.5" /> {t("Follow-up Calls")}</span>
                 <span className="font-semibold text-foreground tabular-nums">{quickStats.followUpCalls}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Today's Calls</span>
+                <span className="text-muted-foreground flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> {t("Today's Calls")}</span>
                 <span className="font-semibold text-foreground tabular-nums">{quickStats.callsToday}</span>
               </div>
             </div>

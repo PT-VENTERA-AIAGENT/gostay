@@ -129,12 +129,12 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5" /> Menginap</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground">Check-in</label>
-                <DatePicker value={checkIn} onChange={setCheckIn} placeholder="Check-in" />
+                <label className="text-xs text-muted-foreground">{t("Check-in")}</label>
+                <DatePicker value={checkIn} onChange={setCheckIn} placeholder={t("Check-in")} />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Check-out</label>
-                <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder="Check-out" />
+                <label className="text-xs text-muted-foreground">{t("Check-out")}</label>
+                <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder={t("Check-out")} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -191,7 +191,7 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
           {/* Summary + submit */}
           <div className="flex items-center justify-between pt-3 border-t border-border">
             <div className="text-sm">
-              <span className="text-muted-foreground">Total </span>
+              <span className="text-muted-foreground">{t("Total")} </span>
               <span className="font-bold text-foreground">{total ? formatIDR(total) : "—"}</span>
               {nights > 0 && <span className="text-xs text-muted-foreground"> · {nightsLabel(nights, t)}</span>}
             </div>

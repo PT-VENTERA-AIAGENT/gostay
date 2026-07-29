@@ -67,7 +67,7 @@ export default function GlobalSearch() {
         className="hidden lg:flex items-center gap-2 bg-muted rounded-lg px-4 py-2.5 w-56 xl:w-72 shrink-0 text-left text-muted-foreground hover:bg-accent transition-colors"
       >
         <Search className="w-4 h-4 shrink-0" />
-        <span className="text-sm flex-1 truncate">Search room, guest, book…</span>
+        <span className="text-sm flex-1 truncate">{t("Search room, guest, book…")}</span>
         <kbd className="hidden xl:inline-flex items-center text-[10px] border border-border rounded px-1.5 py-0.5 font-mono shrink-0">/</kbd>
       </button>
       {/* Compact trigger (mobile + tablet) */}

@@ -75,7 +75,7 @@ export default function StatCards({ data }: { data: AnalyticsData }) {
               <span className={`text-xs font-semibold ${stat.delta >= 0 ? "text-success" : "text-destructive"}`}>
                 {stat.delta >= 0 ? "+" : ""}{stat.delta.toFixed(1)}%
               </span>
-              <span className="text-xs text-muted-foreground hidden sm:inline">vs last month</span>
+              <span className="text-xs text-muted-foreground hidden sm:inline">{t("vs last month")}</span>
             </div>
           )}
         </motion.div>

@@ -71,9 +71,9 @@ export default function RecentActivities() {
           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
         </div>
       ) : error ? (
-        <p className="text-xs text-destructive py-6 text-center">Could not load activity.</p>
+        <p className="text-xs text-destructive py-6 text-center">{t("Could not load activity.")}</p>
       ) : activities.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-6 text-center">No booking activity yet.</p>
+        <p className="text-xs text-muted-foreground py-6 text-center">{t("No booking activity yet.")}</p>
       ) : (
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="flex flex-col gap-4">
           {activities.map((a) => {
