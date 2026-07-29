@@ -14,6 +14,7 @@
 import { serviceGet } from "./client";
 import { sendText } from "./send";
 import { pauseBot } from "./takeover";
+import { recordIncident } from "./incidents";
 
 export interface StaffReplyResult {
   ok: boolean;
@@ -99,7 +100,22 @@ export async function deliverStaffReply(params: {
     if (!dest) return { ok: false, error: "guest_not_on_whatsapp" };
 
     const sent = await sendText(dest.sessionId, dest.jid, body);
-    if (!sent.ok) return { ok: false, error: sent.error ?? "send_failed", jid: dest.jid };
+    if (!sent.ok) {
+      // Staff get the error back in the UI immediately, but it is recorded too:
+      // the platform console needs the same picture the hotel has, and a guest
+      // who cannot be reached at all is a pattern only visible across attempts.
+      await recordIncident({
+        tenantId: thread.tenant_id,
+        kind: "delivery",
+        customerId: thread.customer_id,
+        threadId: params.threadId,
+        targetJid: dest.jid,
+        sessionId: dest.sessionId,
+        reason: sent.error ?? "send_failed",
+        message: body,
+      });
+      return { ok: false, error: sent.error ?? "send_failed", jid: dest.jid };
+    }
 
     // A human just spoke. Silence the bot so it does not answer the guest's
     // next message over them. Best-effort: the reply is already delivered, and

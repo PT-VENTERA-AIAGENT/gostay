@@ -1,10 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   listHotels, listAllReservations, listAllGuestRequests, listRoomAvailability,
   listAllThreads, listThreadMessages, listAllBalances, getPlatformCalendar,
   getHotelDetail, getPlatformRoomBoard, getPlatformRoomCalendar,
+  listAllIncidents, resolveIncident,
 } from "@/services/platformService";
 
 /**
@@ -35,6 +36,7 @@ export const platformKeys = {
   hotels: () => ["platform", "hotels"] as const,
   reservations: () => ["platform", "reservations"] as const,
   requests: () => ["platform", "requests"] as const,
+  incidents: () => ["platform", "incidents"] as const,
   rooms: (date: string) => ["platform", "rooms", date] as const,
   threads: () => ["platform", "threads"] as const,
   thread: (id: string) => ["platform", "thread", id] as const,
@@ -54,6 +56,20 @@ export function usePlatformReservations() {
 export function usePlatformGuestRequests() {
   return useQuery({ queryKey: platformKeys.requests(), queryFn: () => listAllGuestRequests(150) });
 }
+/** Kegagalan layanan WhatsApp di semua hotel, beserta tamu yang mengalaminya. */
+export function usePlatformIncidents() {
+  return useQuery({ queryKey: platformKeys.incidents(), queryFn: () => listAllIncidents(150) });
+}
+
+/** Tandai satu insiden sudah ditindaklanjuti. */
+export function useResolveIncident() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => resolveIncident(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: platformKeys.incidents() }),
+  });
+}
+
 export function usePlatformRoomAvailability(date: string) {
   return useQuery({ queryKey: platformKeys.rooms(date), queryFn: () => listRoomAvailability(date) });
 }

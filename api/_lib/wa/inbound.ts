@@ -107,6 +107,27 @@ export function isDirectChat(jid: string): boolean {
   return server === "s.whatsapp.net" || server === "c.us" || server === "lid";
 }
 
+/**
+ * A JID that carries a real phone number, so it can be REPLIED to.
+ *
+ * Deliberately narrower than isDirectChat, which answers a different question —
+ * "is this a person rather than a group?" — and rightly counts `@lid` as a
+ * direct chat. A LID is a privacy alias: fine as an identity, useless as a
+ * destination, because the gateway cannot route a message to it.
+ *
+ * Conflating the two is what broke replies to LID guests. The outbound target
+ * was validated with isDirectChat, so an alternate that was ITSELF a LID passed
+ * the check and the reply went to a LID anyway — the very thing the alternate
+ * exists to avoid. Guests addressed this way received nothing at all, while the
+ * hotel's inbox showed the replies as sent.
+ */
+export function isPhoneNumberJid(jid: string): boolean {
+  const at = (jid ?? "").lastIndexOf("@");
+  if (at < 0) return false;
+  const server = jid.slice(at + 1).toLowerCase();
+  return server === "s.whatsapp.net" || server === "c.us";
+}
+
 /** The session id (hotel selector) from the request body, "" when absent. */
 export function sessionIdOf(body: unknown): string {
   const b = (body ?? {}) as InboundBody;
@@ -140,10 +161,13 @@ export function parseMessages(body: unknown): ParsedMessage[] {
     return {
       waMessageId: typeof key.id === "string" ? key.id : "",
       phoneJid,
-      // LID is ideal for identity/session state, but the PN alternate is the
-      // most interoperable target for Baileys' outbound send API.
+      // LID is ideal for identity/session state, but a reply can only be routed
+      // to a phone number, so the alternate is taken ONLY when it actually is
+      // one. isDirectChat used to stand here and counts `@lid` as valid, which
+      // let a LID alternate through and sent the reply straight back to an
+      // unroutable address.
       replyJid:
-        phoneJid.toLowerCase().endsWith("@lid") && isDirectChat(alternateJid)
+        phoneJid.toLowerCase().endsWith("@lid") && isPhoneNumberJid(alternateJid)
           ? alternateJid
           : undefined,
       text,

@@ -19,6 +19,9 @@ const mint = (sub) => {
 
 const T = "00000000-0000-4000-8000-000000000001"; // Kopi Rintik
 const STAFF = "b0000000-0000-4000-8000-00000000ab02";
+// Operator platform (ada di daftar putih platform_admins) — halaman /platform/*
+// menolak sesi staf biasa, jadi ujinya butuh sesi ini.
+const PLATFORM_ADMIN = "bfb2b309-c525-5136-bca7-1b9767c5fff2";
 
 async function main() {
   // 1) Fee 7%
@@ -48,5 +51,16 @@ async function main() {
   fs.mkdirSync(new URL("../e2e/__fixtures__/", import.meta.url), { recursive: true });
   fs.writeFileSync(new URL("../e2e/__fixtures__/session.staff.json", import.meta.url), JSON.stringify(session, null, 2));
   console.log("sesi staff ditulis → e2e/__fixtures__/session.staff.json");
+
+  const adminSession = {
+    claims: { sub: "ab|rafli", name: "Rafli Ventera", email: "rafli.ventera@gmail.com" },
+    access_token: "x",
+    expires_at: Date.now() + 30 * 24 * 3600 * 1000,
+    supabase_token: mint(PLATFORM_ADMIN),
+    role: "admin",
+    profile_id: PLATFORM_ADMIN,
+  };
+  fs.writeFileSync(new URL("../e2e/__fixtures__/session.platform.json", import.meta.url), JSON.stringify(adminSession, null, 2));
+  console.log("sesi operator platform ditulis → e2e/__fixtures__/session.platform.json");
 }
 main().catch((e) => { console.error("ERROR:", e.message); process.exit(1); });

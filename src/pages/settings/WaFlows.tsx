@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Loader2, Plus, Workflow, Sparkles, Trash2, Pencil, AlertTriangle, CheckCircle2, MoonStar,
@@ -22,6 +22,9 @@ import TemplatePicker from "@/components/waflow/TemplatePicker";
 // single definition serves both the installer and the engine's transcript
 // tests. A copy would drift the first time anyone edited one side.
 import { FLOW_TEMPLATES, type FlowTemplate } from "../../../api/_lib/wa/flow/templates";
+// The same routine the bot's selection uses, so the console can never disagree
+// with what actually happens to a message.
+import { findKeywordClashes } from "../../../api/_lib/wa/flow/select";
 
 /**
  * The hotel's WhatsApp script: every flow, in the order the engine evaluates
@@ -137,6 +140,26 @@ export default function WaFlows() {
 
   const activeCount = flows.filter((f) => f.is_active).length;
 
+  // Only ACTIVE flows can shadow one another; an inactive flow never competes,
+  // so warning about it would be noise. Precedence order must match what the
+  // bot uses, or the warning would name the wrong winner.
+  const clashes = useMemo(
+    () =>
+      findKeywordClashes(
+        flows
+          .filter((f) => f.is_active)
+          .map((f) => ({
+            id: f.id,
+            name: f.name,
+            triggerKeywords: f.trigger_keywords ?? [],
+            requires: f.requires,
+            priority: f.priority,
+          }))
+          .sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name)),
+      ),
+    [flows],
+  );
+
   return (
     <PageTransition>
       <div className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6">
@@ -172,6 +195,31 @@ export default function WaFlows() {
           <EmptyState onBrowse={() => setPickerOpen(true)} />
         ) : (
           <>
+            {clashes.length > 0 && (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium">
+                    {clashes.length} kata pemicu dipakai lebih dari satu alur
+                  </p>
+                  <p className="mt-1">
+                    Bot memakai alur berprioritas terkecil yang cocok, jadi alur di bawah ini
+                    tidak akan pernah terpicu oleh kata tersebut. Hapus kata itu dari alur yang
+                    merebutnya, atau ubah prioritasnya.
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {clashes.map((c) => (
+                      <li key={`${c.keyword}-${c.shadowedName}`}>
+                        <code className="rounded bg-amber-100 px-1 py-0.5">{c.keyword}</code>{" "}
+                        direbut <strong>{c.ownerName}</strong>, sehingga{" "}
+                        <strong>{c.shadowedName}</strong> tidak terpakai untuk kata ini.
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             {activeCount === 0 && (
               <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

@@ -666,3 +666,66 @@ export async function getHotelDetail(tenantId: string): Promise<HotelDetail | nu
     })),
   };
 }
+
+// ─── Insiden WhatsApp (kegagalan layanan, lintas hotel) ───────────────────────
+
+export interface PlatformIncident {
+  id: string;
+  hotel: string;
+  kind: "delivery" | "conversation";
+  /** Tamu yang mengalami — inti dari laporan ini. */
+  guest: string | null;
+  /** Nama akun WhatsApp tamu, bila berbeda dari nama reservasinya. */
+  guestWa: string | null;
+  target_jid: string | null;
+  reason: string;
+  message_preview: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  /** True bila sebabnya alamat @lid — mustahil dikirimi pesan, bukan gangguan sesaat. */
+  unroutable: boolean;
+}
+
+/**
+ * Kegagalan layanan WhatsApp di semua hotel, terbaru dulu.
+ *
+ * Ini yang menutup celah "balasan tidak sampai tapi tidak ada yang tahu":
+ * sebelumnya kegagalan hanya jadi console.error di serverless, jadi inbox hotel
+ * menampilkan balasan seolah terkirim sementara tamunya tidak menerima apa pun.
+ */
+export async function listAllIncidents(limit = 100): Promise<PlatformIncident[]> {
+  const { data, error } = await db
+    .from("wa_incidents")
+    .select(
+      "id,kind,target_jid,reason,message_preview,resolved_at,created_at," +
+        "tenants(name),customers(full_name,wa_push_name)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    hotel: r.tenants?.name ?? "—",
+    kind: r.kind,
+    guest: r.customers?.full_name ?? null,
+    guestWa:
+      r.customers?.wa_push_name && r.customers.wa_push_name !== r.customers.full_name
+        ? r.customers.wa_push_name
+        : null,
+    target_jid: r.target_jid ?? null,
+    reason: r.reason,
+    message_preview: r.message_preview ?? null,
+    resolved_at: r.resolved_at ?? null,
+    created_at: r.created_at,
+    unroutable: String(r.reason ?? "").startsWith("unroutable_lid"),
+  }));
+}
+
+/** Tandai satu insiden sudah ditindaklanjuti (mis. tamu dihubungi manual). */
+export async function resolveIncident(id: string): Promise<void> {
+  const { error } = await db
+    .from("wa_incidents")
+    .update({ resolved_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}

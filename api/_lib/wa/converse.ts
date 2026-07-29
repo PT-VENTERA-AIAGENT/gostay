@@ -49,6 +49,7 @@ import {
   WaRateLimitError,
 } from "./guest";
 import { sendText } from "./send";
+import { recordIncident } from "./incidents";
 import { getOrCreateBotProfile, getOrCreateThread, logMessage } from "./crm";
 import { checkGreetCooldown, checkFlowStartBudget } from "./inbound";
 import { isBotPaused, pauseBot } from "./takeover";
@@ -164,6 +165,9 @@ function knownFromPending(
 export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
   const { tenantId, sessionId, phoneJid, replyJid, text, displayName } = msg;
   const outboundJid = replyJid ?? phoneJid;
+  // Filled in once the guest is provisioned, so a failure recorded after that
+  // point names the guest instead of just a JID.
+  let failureCtx: { customerId?: string | null; threadId?: string | null } = {};
   const deliver = async (body: string) => {
     const result = await sendText(sessionId, outboundJid, body);
     if (!result.ok) {
@@ -172,6 +176,19 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
         guestJid: phoneJid,
         outboundJid,
         error: result.error,
+      });
+      // Persist it too. A console line in a serverless log is invisible to the
+      // people who need it: the hotel sees the reply sitting in its inbox and
+      // has no way to know the guest never got it.
+      await recordIncident({
+        tenantId,
+        kind: "delivery",
+        customerId: failureCtx.customerId,
+        threadId: failureCtx.threadId,
+        targetJid: outboundJid,
+        sessionId,
+        reason: result.error ?? "unknown",
+        message: body,
       });
     }
     return result;
@@ -208,6 +225,8 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     // The guest is chatting the hotel's OWN WhatsApp, so the bot speaks AS the
     // hotel. Fall back to a neutral phrase when the name can't be read.
     const brand = hotelName ?? "hotel kami";
+    // From here on a delivery failure can name the guest and the conversation.
+    failureCtx = { customerId: guest.customerId, threadId };
     await logMessage(tenantId, threadId, guest.profileId, trimmed, true); // inbound
     const reply = async (body: string) => {
       await logMessage(tenantId, threadId, botId, body, false); // outbound
@@ -555,7 +574,25 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     );
   } catch (err) {
     console.error("[wa/converse] error:", (err as Error).message);
-    await rawReply("Mohon maaf, terjadi kendala. Silakan coba beberapa saat lagi.").catch(() => {});
+    // The guest gets a plain apology — they cannot act on a stack trace, and a
+    // technical string would only alarm them. The detail goes to the incident
+    // log instead, where staff and the platform console can see WHICH guest hit
+    // it and what broke, which is the part that was missing entirely.
+    await recordIncident({
+      tenantId,
+      kind: "conversation",
+      customerId: failureCtx.customerId,
+      threadId: failureCtx.threadId,
+      targetJid: outboundJid,
+      sessionId,
+      reason: `exception:${(err as Error).message}`,
+      message: (text ?? "").trim(),
+    }).catch(() => {});
+    await rawReply(
+      "Mohon maaf, terjadi kendala pada sistem kami sehingga pesan Anda belum bisa diproses. " +
+        "Tim kami sudah menerima laporannya. Silakan coba beberapa saat lagi, " +
+        "atau balas *staf* untuk berbicara langsung dengan kami.",
+    ).catch(() => {});
   }
 }
 
