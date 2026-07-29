@@ -2,8 +2,10 @@ import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Home, ArrowLeft } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 const NotFound = () => {
+  const t = useT();
   const location = useLocation();
 
   useEffect(() => {

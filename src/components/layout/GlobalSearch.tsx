@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/command";
 import { getBookings, searchCustomers } from "@/services/bookingService";
 import { useRooms, useRoomTypes } from "@/hooks/useRooms";
+import { useT } from "@/lib/i18n";
 
 /**
  * App-wide search over the real data: bookings, guests, rooms and room types.
@@ -15,6 +16,7 @@ import { useRooms, useRoomTypes } from "@/hooks/useRooms";
  * room types are small enough to filter from the already-cached lists.
  */
 export default function GlobalSearch() {
+  const t = useT();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");

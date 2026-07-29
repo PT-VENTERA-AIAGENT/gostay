@@ -8,7 +8,7 @@ import { useCreateCallLog, useCallerLookup } from "@/hooks/useCallLogs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { CallDirection } from "@/types/database.types";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 function parseDuration(mmss: string): number {
   const parts = mmss.split(":").map(Number);
@@ -17,6 +17,7 @@ function parseDuration(mmss: string): number {
 }
 
 export default function NewCallLog() {
+  const t = useT();
   const [phone, setPhone] = useState("");
   const [direction, setDirection] = useState<CallDirection>("inbound");
   const [datetime, setDatetime] = useState(() => new Date().toISOString().slice(0, 16));

@@ -9,6 +9,7 @@ import { staggerContainer, staggerItem } from "@/components/shared/PageTransitio
 import DatePicker from "@/components/shared/DatePicker";
 import { getRoomTypeBySlug } from "@/services/roomService";
 import { useAvailableRooms } from "@/hooks/useRooms";
+import { useT } from "@/lib/i18n";
 
 const today = format(new Date(), "yyyy-MM-dd");
 
@@ -38,6 +39,7 @@ function addDays(iso: string, n: number): string {
 }
 
 export default function PortalRoomDetail() {
+  const t = useT();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

@@ -17,7 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { RoomType, Room, SeasonalPricing } from "@/types/database.types";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 const amenityIcons: Record<string, React.ElementType> = {
   WiFi: Wifi, AC: Wind, TV: Tv, "Mini Bar": Coffee, Bathtub: Bath, "Sea View": Mountain,
@@ -28,6 +28,7 @@ function formatIDR(n: number) {
 }
 
 export default function RoomTypeDetail() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();

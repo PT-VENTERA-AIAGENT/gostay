@@ -7,6 +7,7 @@ import { createBooking, getOrCreateOwnCustomer } from "@/services/bookingService
 import { getAvailableRooms } from "@/services/roomService";
 import { useAuth } from "@/contexts/AuthContext";
 import type { RoomType } from "@/types/database.types";
+import { useT } from "@/lib/i18n";
 
 interface GuestInfo {
   firstName: string;
@@ -43,6 +44,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function BookingReview() {
+  const t = useT();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signIn } = useAuth();

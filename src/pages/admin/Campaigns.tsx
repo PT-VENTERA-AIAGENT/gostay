@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface Campaign {
   id: string;
@@ -97,6 +98,7 @@ function CampaignCard({ campaign, onClick }: { campaign: Campaign; onClick: () =
 }
 
 export default function Campaigns() {
+  const t = useT();
   const { session } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();

@@ -4,6 +4,7 @@ import PageTransition, { scaleIn } from "@/components/shared/PageTransition";
 import CopyButton from "@/components/shared/CopyButton";
 import { motion } from "framer-motion";
 import type { Booking, RoomType } from "@/types/database.types";
+import { useT } from "@/lib/i18n";
 
 interface ConfirmationState {
   booking: Booking;
@@ -26,6 +27,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function BookingConfirmation() {
+  const t = useT();
   const location = useLocation();
   const state = location.state as ConfirmationState | null;
 

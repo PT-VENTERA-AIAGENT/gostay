@@ -13,7 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 function formatIDR(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -42,6 +42,7 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 const CANCELLABLE = new Set(["pending", "confirmed"]);
 
 export default function PortalBookingDetail() {
+  const t = useT();
   const { id } = useParams();
   const { data: booking, isLoading, error } = useBooking(id ?? "");
   const cancelBooking = useUpdateBookingStatus();

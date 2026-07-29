@@ -1,6 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useT } from "@/lib/i18n";
 
 /**
  * Floating launcher for the real conversation at /portal/chat.
@@ -18,6 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
  * to the conversation, not to be one.
  */
 export default function ChatWidget() {
+  const t = useT();
   const location = useLocation();
 
   // Hiding on the chat page itself: a button that reloads the page you are

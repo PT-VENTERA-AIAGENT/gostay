@@ -7,7 +7,7 @@ import { useRoomTypes, useAvailableRooms } from "@/hooks/useRooms";
 import { useWalkInCheckIn } from "@/hooks/useBookings";
 import { useToast } from "@/hooks/use-toast";
 import type { PaymentMethod } from "@/services/frontDeskService";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 import { nightsLabel } from "@/lib/nights";
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -31,6 +31,7 @@ function nightsBetween(a: string, b: string) {
  * chosen type, and can take the first payment inline.
  */
 export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const navigate = useNavigate();
   const { toast } = useToast();
 

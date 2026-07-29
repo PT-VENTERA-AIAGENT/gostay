@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import PageTransition from "@/components/shared/PageTransition";
 import type { RoomType } from "@/types/database.types";
 import { nightsLabel } from "@/lib/nights";
+import { useT } from "@/lib/i18n";
 
 interface BookingState {
   roomType: RoomType;
@@ -32,6 +33,7 @@ function diffNights(checkIn: string, checkOut: string): number {
 }
 
 export default function BookingDetails() {
+  const t = useT();
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as BookingState | null;
