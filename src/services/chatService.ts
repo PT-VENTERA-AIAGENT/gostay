@@ -20,7 +20,7 @@ export async function getChatThreads(
     .select(
       `
       *,
-      customers ( id, full_name, email, phone, profile_id ),
+      customers ( id, full_name, email, phone, profile_id, wa_push_name ),
       messages:chat_messages ( content, created_at, is_read, sender_id )
     `
     )

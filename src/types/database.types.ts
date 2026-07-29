@@ -224,14 +224,26 @@ export type AvailabilityBlockUpdate = Partial<AvailabilityBlockInsert>;
 export interface Customer {
   id: string;
   profile_id: string | null;
+  /** The name a reservation is filed under — what CRM, the folio and check-in use. */
   full_name: string;
   email: string;
   phone: string | null;
   nationality: string | null;
+  /**
+   * WhatsApp display name of the number this contact writes from, when known.
+   * Display-only: booking overwrites full_name with the guest's stated name, so
+   * this is what still ties the row to a WhatsApp account.
+   */
+  wa_push_name: string | null;
   created_at: string;
   updated_at: string;
 }
-export type CustomerInsert = Omit<Customer, "id" | "created_at" | "updated_at">;
+// wa_push_name is optional on insert: only the WhatsApp path knows it, and it is
+// set there explicitly. Every other caller (portal sign-up, walk-in, CRM) creates
+// a contact that simply has no WhatsApp account attached yet.
+export type CustomerInsert =
+  Omit<Customer, "id" | "created_at" | "updated_at" | "wa_push_name"> &
+  { wa_push_name?: string | null };
 export type CustomerUpdate = Partial<CustomerInsert>;
 
 // ─── Bookings ─────────────────────────────────────────────────────────────────
@@ -297,7 +309,7 @@ export type ChatThreadInsert = Omit<
 export type ChatThreadUpdate = Partial<ChatThreadInsert>;
 
 export interface ChatThreadWithRelations extends ChatThread {
-  customers: Pick<Customer, "id" | "full_name" | "email" | "phone" | "profile_id">;
+  customers: Pick<Customer, "id" | "full_name" | "email" | "phone" | "profile_id" | "wa_push_name">;
   last_message?: Pick<ChatMessage, "content" | "created_at"> | null;
   unread_count?: number;
 }

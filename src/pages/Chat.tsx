@@ -16,6 +16,21 @@ import { Bot, UserRound } from "lucide-react";
 import WaText from "@/components/shared/WaText";
 import { deliverToWhatsApp, setBotTakeover, isBotPaused } from "@/services/chatService";
 
+/**
+ * The WhatsApp account label to show beside a contact, or null when it would add
+ * nothing.
+ *
+ * A WA contact starts out named after its pushName, then booking overwrites
+ * full_name with the name the guest gave for the reservation — so the two only
+ * diverge once someone has booked, which is precisely when staff need to see
+ * both. Identical names (or a missing pushName) get no second line.
+ */
+function waAccountLabel(customer?: { full_name?: string | null; wa_push_name?: string | null } | null): string | null {
+  const push = customer?.wa_push_name?.trim();
+  if (!push) return null;
+  return push === customer?.full_name?.trim() ? null : push;
+}
+
 export default function Chat() {
   const t = useT();
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -200,6 +215,14 @@ export default function Chat() {
                       {thread.last_message ? new Date(thread.last_message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                     </span>
                   </div>
+                  {/* The WhatsApp account behind the number. Only worth a line when
+                      it differs from the reservation name — which is exactly the case
+                      booking rewrites away (a "Sellora" number booking as "Ridho"). */}
+                  {waAccountLabel(thread.customers) && (
+                    <p className="text-xs text-muted-foreground truncate mb-1">
+                      WA: {waAccountLabel(thread.customers)}
+                    </p>
+                  )}
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground truncate pr-4">{thread.last_message?.content ?? t("No messages yet")}</p>
                     {(thread.unread_count ?? 0) > 0 && (
