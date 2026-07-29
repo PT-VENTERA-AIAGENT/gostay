@@ -90,6 +90,27 @@ export async function setCustomerName(
  * The hotel's display name, for branding the WA replies (greeting, confirmation).
  * Null when the tenant row can't be read — callers fall back to a generic phrase.
  */
+/**
+ * The phone recorded for a contact, or null.
+ *
+ * Read when the inbound address is a LID: WhatsApp withheld the number, but the
+ * hotel may have typed it into CRM, and that is the only route back to a guest
+ * WhatsApp would otherwise keep unreachable. Best-effort — a lookup failure just
+ * means we fall back to the LID.
+ */
+export async function getCustomerPhone(customerId: string): Promise<string | null> {
+  try {
+    const res = await serviceGet(
+      `customers?id=eq.${encodeURIComponent(customerId)}&select=phone&limit=1`,
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ phone?: string | null }>;
+    return rows[0]?.phone ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getTenantName(tenantId: string): Promise<string | null> {
   const res = await serviceGet(`tenants?id=eq.${encodeURIComponent(tenantId)}&select=name`);
   if (!res.ok) return null;
