@@ -365,6 +365,100 @@ export const EN: Record<string, string> = {
   "Tipe kamar dinonaktifkan": "Room type deactivated",
   "Tipe kamar diperbarui": "Room type updated",
   "Ukuran logo maksimal 2 MB": "Logo must be at most 2 MB",
+
+  // ── Platform console ─────────────────────────────────────────────────────
+  // Operator-facing screens: the cross-hotel views only Ventera staff reach.
+  "Konsol Platform": "Platform Console",
+  "Akses Penuh": "Full Access",
+  "Mode Staf Hotel": "Hotel Staff Mode",
+  "Saldo Semua Hotel": "All Hotel Balances",
+  "Saldo berjalan tiap hotel dan penarikan yang masih menunggu diproses.":
+    "Running balance per hotel and payouts still awaiting processing.",
+  "Total saldo hotel": "Total hotel balance",
+  "Saldo semua hotel": "All hotel balances",
+  "Menunggu penarikan": "Awaiting payout",
+  "menunggu penarikan": "awaiting payout",
+  "Total masuk (akumulatif)": "Total received (cumulative)",
+  "Total masuk": "Total received",
+  "Kalender Hunian": "Occupancy Calendar",
+  "Kalender hunian": "Occupancy calendar",
+  "Status tiap kamar (nomor & tipe) per malam, seluruh hotel. Hijau = kosong, oranye = terisi.":
+    "Each room's status (number & type) per night, across all hotels. Green = vacant, orange = occupied.",
+  "Mundur": "Back",
+  "Maju": "Forward",
+  "kamar": "rooms",
+  "Belum ada kamar": "No rooms yet",
+  "Kosong": "Vacant",
+  "Kembali ke daftar hotel": "Back to hotel list",
+  "Hotel tidak ditemukan": "Hotel not found",
+  "Pemilik": "Owner",
+  "staf": "staff",
+  "Portal tamu": "Guest portal",
+  "Off menonaktifkan pembayaran online. Live memproses uang asli lewat Xendit.":
+    "Off disables online payment. Live processes real money through Xendit.",
+  "Terisi malam ini": "Occupied tonight",
+  "terisi malam ini": "occupied tonight",
+  "Total reservasi": "Total reservations",
+  "Total tamu": "Total guests",
+  "menunggu": "pending",
+  "Reservasi Terbaru": "Latest Reservations",
+  "Lihat semua": "View all",
+  "Belum ada reservasi": "No reservations yet",
+  "Percakapan Terbaru": "Latest Conversations",
+  "Belum ada percakapan": "No conversations yet",
+  "Terakhir": "Last",
+  "Klik hotel untuk detail & kontrol. Atur mode pembayaran Off/Test/Live langsung dari sini.":
+    "Click a hotel for detail & controls. Set payment mode Off/Test/Live from here.",
+  "Semua Pesan": "All Messages",
+  "Percakapan tamu dari seluruh hotel. Hanya baca — balasan dilakukan oleh staf hotelnya.":
+    "Guest conversations across all hotels. Read only — replies are sent by that hotel's staff.",
+  "Cari tamu / hotel / nomor...": "Search guest / hotel / number...",
+  "Tidak ada percakapan": "No conversations",
+  "Pilih percakapan untuk melihat isinya": "Pick a conversation to read it",
+  "Belum ada pesan": "No messages yet",
+  "Distribusi Mode Pembayaran": "Payment Mode Distribution",
+  "Permintaan Tamu Terbaru": "Latest Guest Requests",
+  "Belum ada permintaan": "No requests yet",
+  "Kamar kosong vs terisi per tanggal, di semua hotel. Klik hotel untuk melihat nomor & tipe tiap kamar.":
+    "Vacant vs occupied rooms by date, across all hotels. Click a hotel to see each room's number & type.",
+
+  // ── Floor plan ───────────────────────────────────────────────────────────
+  "Denah tersimpan": "Floor plan saved",
+  "Gagal menyimpan denah": "Could not save the floor plan",
+  "Anda tidak punya izin mengubah denah.": "You do not have permission to change the floor plan.",
+  "Desain denah diekspor": "Floor plan design exported",
+  "Desain denah diimpor": "Floor plan design imported",
+  "Periksa lalu tekan Simpan untuk menerapkannya.": "Review it, then press Save to apply.",
+  "Gagal mengimpor denah": "Could not import the floor plan",
+  "Grid": "Grid",
+  "Denah": "Floor plan",
+  "Edit Denah": "Edit Floor Plan",
+
+  // ── Chat ─────────────────────────────────────────────────────────────────
+  "Chat berhasil direset": "Chat reset",
+  "Nomor ini bisa menerima balasan otomatis lagi sekarang.":
+    "This number can receive automated replies again.",
+  "State chat direset; nomor WhatsApp belum terhubung ke identitas tamu.":
+    "Chat state reset; the WhatsApp number is not linked to a guest identity yet.",
+  "Gagal mereset chat": "Could not reset the chat",
+  "Terjadi kesalahan. Coba lagi.": "Something went wrong. Try again.",
+
+  // ── Hotel onboarding ─────────────────────────────────────────────────────
+  "Buat Hotel Anda": "Create Your Hotel",
+  "Buat Hotel": "Create Hotel",
+  "Nama hotel wajib diisi.": "The hotel name is required.",
+  "Menyiapkan dasbor hotel Anda…": "Setting up your hotel dashboard…",
+  "Gagal membuat hotel": "Could not create the hotel",
+  "Daftarkan hotel Anda dan mulai kelola booking. Anda akan menjadi pemilik (staff) hotel ini.":
+    "Register your hotel and start managing bookings. You will become its owner (staff).",
+  "Slug": "Slug",
+  "Dibuat otomatis dari nama; bisa diubah. Hanya huruf kecil, angka, dan tanda hubung.":
+    "Generated from the name; editable. Lowercase letters, digits and hyphens only.",
+  "Akun Anda sudah terhubung ke sebuah hotel.": "Your account is already linked to a hotel.",
+
+  // ── Guest portal ─────────────────────────────────────────────────────────
+  "Punya hotel? Daftarkan dan kelola sendiri.": "Own a hotel? Register and manage it yourself.",
+  "Kamar tersedia untuk tanggal pilihanmu": "Rooms available for your chosen dates",
 };
 
 // English → Indonesian, for the staff pages (which are authored in English).
