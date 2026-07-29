@@ -139,7 +139,11 @@ export async function resolveOrProvisionGuest(
   // real one.
   const digits = phoneDigits(phoneJid);
   const contactDigits = callablePhone(phoneJid, replyJid) ?? digits;
-  const fullName = usableName(displayName) ?? contactDigits;
+  // The WhatsApp account label, kept apart from the name a booking is filed
+  // under. Null when WhatsApp sent nothing usable — the digits fallback below is
+  // fine as a display name but would be a lie as a "WhatsApp name".
+  const pushName = usableName(displayName);
+  const fullName = pushName ?? contactDigits;
 
   // 1. Already provisioned? A complete identity row short-circuits everything —
   //    no rate-limit consult, no Ventera call, no duplicate profile/customer.
@@ -157,6 +161,7 @@ export async function resolveOrProvisionGuest(
       // repairs the record. That is cheaper and more reliable than a backfill
       // that could only guess.
       await repairContactPhone(existing.customer_id, contactDigits);
+      await rememberPushName(existing.customer_id, pushName);
       return {
         profileId: existing.profile_id,
         customerId: existing.customer_id,
@@ -205,7 +210,10 @@ export async function resolveOrProvisionGuest(
   // 6. customers row — getOrCreateOwnCustomer's logic ported to service-role:
   //    find by profile_id first, else insert. profile_id is what ties a booking
   //    back to this person for every "own bookings" RLS policy.
-  const customerId = await getOrCreateCustomer(profileId, tenantId, fullName, contactDigits, email);
+  const customerId = await getOrCreateCustomer(profileId, tenantId, fullName, contactDigits, email, pushName);
+  // An existing row (this profile already had a customer at this hotel) keeps its
+  // full_name but still deserves a current WhatsApp label.
+  await rememberPushName(customerId, pushName);
 
   // 7. Persist the resolution so the next message skips all of the above.
   await writeIdentity(tenantId, phoneJid, sub, profileId, customerId, existing);
@@ -313,12 +321,44 @@ async function repairContactPhone(customerId: string, phone: string): Promise<vo
   }
 }
 
+/**
+ * Keep the contact's WhatsApp display name current, without touching full_name.
+ *
+ * full_name is the RESERVATION name: once a guest books, the bot overwrites it
+ * with the name they gave ("atas nama Ridho"), which is what CRM, the folio and
+ * check-in need. That used to erase every trace of which WhatsApp account the
+ * number belongs to. Storing the pushName separately keeps both, and refreshing
+ * it here means contacts created before this column existed pick it up on their
+ * next message rather than needing a backfill that could only guess.
+ *
+ * Best-effort: never throws. A guest's conversation must not fail over a label.
+ */
+async function rememberPushName(customerId: string, pushName: string | null): Promise<void> {
+  if (!pushName) return;
+  try {
+    // Only write when it is missing or has actually changed, so a chatty guest
+    // does not rewrite the same row on every message. A bare `neq` would skip
+    // NULL rows (NULL <> 'x' is NULL, not true), hence the OR. The value is
+    // double-quoted because a pushName may contain a comma or parenthesis, which
+    // would otherwise terminate the filter.
+    const quoted = `"${pushName.replace(/"/g, '\\"')}"`;
+    await serviceUpdate(
+      `customers?id=eq.${encodeURIComponent(customerId)}` +
+        `&or=(wa_push_name.is.null,wa_push_name.neq.${encodeURIComponent(quoted)})`,
+      { wa_push_name: pushName },
+    );
+  } catch (e) {
+    console.error("[wa/guest] push-name update failed:", (e as Error).message);
+  }
+}
+
 async function getOrCreateCustomer(
   profileId: string,
   tenantId: string,
   fullName: string,
   phone: string,
   email: string,
+  pushName: string | null,
 ): Promise<string> {
   // Scoped to the tenant, not just the profile. The same phone is ONE profile
   // across every hotel (profileIdFor derives it from the Ventera subject), so a
@@ -342,7 +382,7 @@ async function getOrCreateCustomer(
 
   const insert = await serviceInsert(
     "customers",
-    { profile_id: profileId, tenant_id: tenantId, full_name: fullName, phone, email },
+    { profile_id: profileId, tenant_id: tenantId, full_name: fullName, phone, email, wa_push_name: pushName },
     "return=representation",
   );
   if (!insert.ok) throw new WaProvisionError(`customer_insert_${insert.status}`);
