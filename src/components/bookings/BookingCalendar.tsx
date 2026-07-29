@@ -136,13 +136,13 @@ export default function BookingCalendar() {
     <div className="bg-card rounded-xl border border-border overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate(-1)} aria-label="Previous week" className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
+          <button onClick={() => navigate(-1)} aria-label={t("Previous week")} className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-sm font-semibold text-foreground min-w-[180px] text-center">
             {dates[0].toLocaleDateString(lang === "en" ? "en-US" : "id-ID", { month: "long", year: "numeric" })}
           </span>
-          <button onClick={() => navigate(1)} aria-label="Next week" className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
+          <button onClick={() => navigate(1)} aria-label={t("Next week")} className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
             <ChevronRight className="w-4 h-4" />
           </button>
           <button onClick={() => setStartDate(startOfToday())} className="text-xs text-primary font-medium hover:underline ml-1">

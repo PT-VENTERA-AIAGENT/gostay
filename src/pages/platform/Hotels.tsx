@@ -5,7 +5,7 @@ import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 import { usePlatformHotels, useSetHotelPayment } from "@/hooks/usePlatform";
 import type { HotelOverview } from "@/services/platformService";
 import { PageHeader, Table, Th, Td, EmptyState, SearchBox } from "@/components/platform/widgets";
@@ -13,6 +13,7 @@ import { PageHeader, Table, Th, Td, EmptyState, SearchBox } from "@/components/p
 type PayState = "off" | "test" | "live";
 
 export default function PlatformHotels() {
+  const t = useT();
   const { user } = useAuth();
   const { toast } = useToast();
   const by = user?.email ?? user?.id ?? "admin";
@@ -73,7 +74,7 @@ export default function PlatformHotels() {
               <tr>
                 <Th>{tr("Hotel")}</Th>
                 <Th>{tr("Pemilik akun")}</Th>
-                <Th>WhatsApp</Th>
+                <Th>{t("WhatsApp")}</Th>
                 <Th className="text-center">{tr("Pembayaran")}</Th>
                 <Th></Th>
               </tr>

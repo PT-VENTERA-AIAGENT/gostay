@@ -5,6 +5,7 @@ import type { RoomStatus } from "@/lib/roomStatus";
 import {
   CATEGORY_META, coercePlan, type PlanElement, type SitePlan,
 } from "@/types/floorPlan";
+import { useT } from "@/lib/i18n";
 
 // Status → how a linked "room" element is coloured and labelled on the map.
 // Mirrors the Room Status Board so the denah reads the same way the grid does.
@@ -42,6 +43,7 @@ interface Props {
 export default function FloorPlanViewer({
   plan: rawPlan, rooms, statusByRoom, occupantByRoom, mode, onPickRoom, caption,
 }: Props) {
+  const t = useT();
   const plan = useMemo(() => coercePlan(rawPlan), [rawPlan]);
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
@@ -137,8 +139,8 @@ export default function FloorPlanViewer({
       <div className="w-full h-full rounded-xl border border-border overflow-hidden bg-[#fafaf9] dark:bg-neutral-900 flex items-center justify-center text-center px-6">
         <div>
           <MapPin className="w-9 h-9 text-muted-foreground/40 mx-auto mb-2" />
-          <p className="text-sm font-medium text-foreground">Denah belum tersedia</p>
-          <p className="text-xs text-muted-foreground">Hotel ini belum membuat denah lokasi.</p>
+          <p className="text-sm font-medium text-foreground">{t("Denah belum tersedia")}</p>
+          <p className="text-xs text-muted-foreground">{t("Hotel ini belum membuat denah lokasi.")}</p>
         </div>
       </div>
     );
@@ -148,15 +150,15 @@ export default function FloorPlanViewer({
     <div className="relative w-full h-full rounded-xl border border-border overflow-hidden bg-[#fafaf9] dark:bg-neutral-900">
       {/* Zoom controls */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-card/90 backdrop-blur rounded-lg border border-border p-1 shadow-sm">
-        <button onClick={() => { interactedRef.current = true; setZoom((z) => Math.max(0.15, z / 1.15)); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Perkecil"><ZoomOut className="w-4 h-4" /></button>
+        <button onClick={() => { interactedRef.current = true; setZoom((z) => Math.max(0.15, z / 1.15)); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title={t("Perkecil")}><ZoomOut className="w-4 h-4" /></button>
         <span className="text-xs text-muted-foreground tabular-nums w-9 text-center">{Math.round(zoom * 100)}%</span>
-        <button onClick={() => { interactedRef.current = true; setZoom((z) => Math.min(4, z * 1.15)); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Perbesar"><ZoomIn className="w-4 h-4" /></button>
-        <button onClick={() => { interactedRef.current = false; fitView(); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Paskan ke layar"><Maximize className="w-4 h-4" /></button>
+        <button onClick={() => { interactedRef.current = true; setZoom((z) => Math.min(4, z * 1.15)); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title={t("Perbesar")}><ZoomIn className="w-4 h-4" /></button>
+        <button onClick={() => { interactedRef.current = false; fitView(); }} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title={t("Paskan ke layar")}><Maximize className="w-4 h-4" /></button>
       </div>
 
       {/* Legend */}
       <div className="absolute top-3 left-3 z-10 bg-card/90 backdrop-blur rounded-lg border border-border p-2.5 shadow-sm max-w-[13rem]">
-        <p className="text-[11px] font-semibold text-foreground mb-1.5">Status kamar</p>
+        <p className="text-[11px] font-semibold text-foreground mb-1.5">{t("Status kamar")}</p>
         <div className="grid grid-cols-2 gap-x-2 gap-y-1">
           {STATUS_ORDER.filter((s) => mode === "staff" || s === "available" || s === "reserved").map((s) => (
             <div key={s} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -214,10 +216,10 @@ export default function FloorPlanViewer({
               </div>
               <p className="text-sm text-muted-foreground">{selectedRoom.room_types?.name}</p>
               {selectedRoom.room_types?.base_rate != null && (
-                <p className="text-sm font-semibold text-foreground">{formatIDR(selectedRoom.room_types.base_rate)} <span className="font-normal text-muted-foreground text-xs">/ malam</span></p>
+                <p className="text-sm font-semibold text-foreground">{formatIDR(selectedRoom.room_types.base_rate)} <span className="font-normal text-muted-foreground text-xs">{t("/ malam")}</span></p>
               )}
               {mode === "staff" && occupantByRoom?.get(selectedRoom.id) && (
-                <p className="text-xs text-muted-foreground">Tamu: <span className="text-foreground font-medium">{occupantByRoom.get(selectedRoom.id)}</span></p>
+                <p className="text-xs text-muted-foreground">{t("Tamu:")} <span className="text-foreground font-medium">{occupantByRoom.get(selectedRoom.id)}</span></p>
               )}
               {onPickRoom && (
                 <button
@@ -234,7 +236,7 @@ export default function FloorPlanViewer({
             <div className="space-y-1">
               <span className="text-base font-bold text-foreground">{selected.label || CATEGORY_META[selected.category].label}</span>
               <p className="text-sm text-muted-foreground">{CATEGORY_META[selected.category].label}</p>
-              {selected.category === "room" && <p className="text-xs text-muted-foreground">Belum ditautkan ke kamar.</p>}
+              {selected.category === "room" && <p className="text-xs text-muted-foreground">{t("Belum ditautkan ke kamar.")}</p>}
             </div>
           )}
         </div>

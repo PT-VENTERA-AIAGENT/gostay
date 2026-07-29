@@ -203,7 +203,7 @@ export default function GuestRequests() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">
-                  No. Kamar <span className="font-normal">(opsional)</span>
+                  No. Kamar <span className="font-normal">{t("(opsional)")}</span>
                 </label>
                 <input
                   value={roomNumber}

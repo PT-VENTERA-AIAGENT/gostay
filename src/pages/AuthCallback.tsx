@@ -2,8 +2,10 @@ import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { handleCallback, getSession } from "@/lib/sso";
 import { useSsoAuth, roleHome } from "@/contexts/AuthContext";
+import { useT } from "@/lib/i18n";
 
 export default function AuthCallback() {
+  const t = useT();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { refreshSession } = useSsoAuth();
@@ -46,7 +48,7 @@ export default function AuthCallback() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-muted-foreground">Memverifikasi sesi…</p>
+        <p className="text-sm text-muted-foreground">{t("Memverifikasi sesi…")}</p>
       </div>
     </div>
   );

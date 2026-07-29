@@ -4,6 +4,7 @@ import PageTransition, { scaleIn } from "@/components/shared/PageTransition";
 import CopyButton from "@/components/shared/CopyButton";
 import { motion } from "framer-motion";
 import type { Booking, RoomType } from "@/types/database.types";
+import { useT } from "@/lib/i18n";
 
 interface ConfirmationState {
   booking: Booking;
@@ -26,6 +27,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function BookingConfirmation() {
+  const t = useT();
   const location = useLocation();
   const state = location.state as ConfirmationState | null;
 
@@ -45,8 +47,8 @@ export default function BookingConfirmation() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <h1 className="text-2xl font-bold text-foreground">Booking Confirmed!</h1>
-          <p className="text-muted-foreground mt-2">Your reservation has been successfully created</p>
+          <h1 className="text-2xl font-bold text-foreground">{t("Booking Confirmed!")}</h1>
+          <p className="text-muted-foreground mt-2">{t("Your reservation has been successfully created")}</p>
         </motion.div>
 
         <motion.div
@@ -56,7 +58,7 @@ export default function BookingConfirmation() {
           className="bg-card rounded-xl border border-border p-5 md:p-6 text-left space-y-3"
         >
           <div className="text-center mb-4">
-            <p className="text-sm text-muted-foreground">Booking Reference</p>
+            <p className="text-sm text-muted-foreground">{t("Booking Reference")}</p>
             {booking?.reference ? (
               <div className="flex items-center justify-center gap-1">
                 <p className="text-2xl font-bold font-mono text-primary">{booking.reference}</p>
@@ -67,16 +69,16 @@ export default function BookingConfirmation() {
             )}
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><span className="text-muted-foreground">Room</span><p className="font-medium text-foreground mt-0.5">{roomType?.name ?? "—"}</p></div>
+            <div><span className="text-muted-foreground">{t("Room")}</span><p className="font-medium text-foreground mt-0.5">{roomType?.name ?? "—"}</p></div>
             <div>
-              <span className="text-muted-foreground">Dates</span>
+              <span className="text-muted-foreground">{t("Dates")}</span>
               <p className="font-medium text-foreground mt-0.5">
                 {checkIn && checkOut ? `${formatDate(checkIn)} – ${formatDate(checkOut)}` : "—"}
               </p>
             </div>
-            <div><span className="text-muted-foreground">Guests</span><p className="font-medium text-foreground mt-0.5">{guests} Adult{guests !== 1 ? "s" : ""}</p></div>
+            <div><span className="text-muted-foreground">{t("Guests")}</span><p className="font-medium text-foreground mt-0.5">{guests} Adult{guests !== 1 ? "s" : ""}</p></div>
             <div>
-              <span className="text-muted-foreground">Total</span>
+              <span className="text-muted-foreground">{t("Total")}</span>
               <p className="font-medium text-primary mt-0.5 tabular-nums">{total > 0 ? formatIDR(total) : "—"}</p>
             </div>
           </div>

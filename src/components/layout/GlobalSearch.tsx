@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/command";
 import { getBookings, searchCustomers } from "@/services/bookingService";
 import { useRooms, useRoomTypes } from "@/hooks/useRooms";
+import { useT } from "@/lib/i18n";
 
 /**
  * App-wide search over the real data: bookings, guests, rooms and room types.
@@ -15,6 +16,7 @@ import { useRooms, useRoomTypes } from "@/hooks/useRooms";
  * room types are small enough to filter from the already-cached lists.
  */
 export default function GlobalSearch() {
+  const t = useT();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -67,22 +69,22 @@ export default function GlobalSearch() {
         className="hidden lg:flex items-center gap-2 bg-muted rounded-lg px-4 py-2.5 w-56 xl:w-72 shrink-0 text-left text-muted-foreground hover:bg-accent transition-colors"
       >
         <Search className="w-4 h-4 shrink-0" />
-        <span className="text-sm flex-1 truncate">Search room, guest, book…</span>
+        <span className="text-sm flex-1 truncate">{t("Search room, guest, book…")}</span>
         <kbd className="hidden xl:inline-flex items-center text-[10px] border border-border rounded px-1.5 py-0.5 font-mono shrink-0">/</kbd>
       </button>
       {/* Compact trigger (mobile + tablet) */}
-      <button onClick={() => setOpen(true)} aria-label="Cari" className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors touch-target btn-press">
+      <button onClick={() => setOpen(true)} aria-label={t("Cari")} className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors touch-target btn-press">
         <Search className="w-5 h-5" />
       </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Cari booking, tamu, kamar, tipe…" value={term} onValueChange={setTerm} />
+        <CommandInput placeholder={t("Cari booking, tamu, kamar, tipe…")} value={term} onValueChange={setTerm} />
         <CommandList>
           {debounced.length < 2 && roomHits.length === 0 && typeHits.length === 0 && (
-            <CommandEmpty>Ketik minimal 2 huruf…</CommandEmpty>
+            <CommandEmpty>{t("Ketik minimal 2 huruf…")}</CommandEmpty>
           )}
           {debounced.length >= 2 && bookings.length === 0 && customers.length === 0 && roomHits.length === 0 && typeHits.length === 0 && (
-            <CommandEmpty>Tidak ada hasil.</CommandEmpty>
+            <CommandEmpty>{t("Tidak ada hasil.")}</CommandEmpty>
           )}
 
           {bookings.length > 0 && (

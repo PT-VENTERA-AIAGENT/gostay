@@ -228,14 +228,14 @@ export default function Pos() {
                       <p className="text-xs text-muted-foreground">{formatIDR(l.unit_price)}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={() => bumpQty(l.key, -1)} className="w-6 h-6 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-foreground" aria-label="Kurangi">
+                      <button onClick={() => bumpQty(l.key, -1)} className="w-6 h-6 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-foreground" aria-label={t("Kurangi")}>
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="w-6 text-center font-medium text-foreground">{l.quantity}</span>
-                      <button onClick={() => bumpQty(l.key, 1)} className="w-6 h-6 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-foreground" aria-label="Tambah">
+                      <button onClick={() => bumpQty(l.key, 1)} className="w-6 h-6 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-foreground" aria-label={t("Tambah")}>
                         <Plus className="w-3 h-3" />
                       </button>
-                      <button onClick={() => removeLine(l.key)} className="text-muted-foreground hover:text-destructive ml-1" aria-label="Hapus">
+                      <button onClick={() => removeLine(l.key)} className="text-muted-foreground hover:text-destructive ml-1" aria-label={t("Hapus")}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -360,10 +360,10 @@ function DailyRecap({ onClose }: { onClose: () => void }) {
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div>
-            <h2 className="font-semibold text-foreground flex items-center gap-2"><Receipt className="w-4 h-4" /> Rekap kasir</h2>
+            <h2 className="font-semibold text-foreground flex items-center gap-2"><Receipt className="w-4 h-4" /> {t("Rekap kasir")}</h2>
             <p className="text-xs text-muted-foreground mt-0.5">{today}</p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Tutup"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t("Tutup")}><X className="w-5 h-5" /></button>
         </div>
 
         {isLoading ? (
@@ -481,7 +481,7 @@ function ProductManager({ onClose }: { onClose: () => void }) {
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-semibold text-foreground flex items-center gap-2"><Package className="w-4 h-4" /> {t("Kelola produk")}</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Tutup"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t("Tutup")}><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-4 space-y-2 border-b border-border">
@@ -544,10 +544,10 @@ function ProductManager({ onClose }: { onClose: () => void }) {
                     >
                       {p.is_active ? "Aktif" : "Nonaktif"}
                     </button>
-                    <button onClick={() => startEdit(p)} title="Edit" className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <button onClick={() => startEdit(p)} title={t("Edit")} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => handleDelete(p)} disabled={deleteProduct.isPending} title="Hapus" className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
+                    <button onClick={() => handleDelete(p)} disabled={deleteProduct.isPending} title={t("Hapus")} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>

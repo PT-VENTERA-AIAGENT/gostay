@@ -255,7 +255,7 @@ export default function Chat() {
                     {botPaused ? <UserRound className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
                     {botPaused ? "Mode CS" : "Bot aktif"}
                   </button>
-                  <button onClick={callCustomer} title="Telepon tamu" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"><Phone className="w-4 h-4" /></button>
+                  <button onClick={callCustomer} title={t("Telepon tamu")} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"><Phone className="w-4 h-4" /></button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"><MoreVertical className="w-4 h-4" /></button>
@@ -263,8 +263,8 @@ export default function Chat() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={toggleThreadStatus}>
                         {selectedThread.status === "active"
-                          ? <><CheckCircle className="w-4 h-4 mr-2" /> Tandai selesai</>
-                          : <><RotateCcw className="w-4 h-4 mr-2" /> Buka lagi</>}
+                          ? <><CheckCircle className="w-4 h-4 mr-2" /> {t("Tandai selesai")}</>
+                          : <><RotateCcw className="w-4 h-4 mr-2" /> {t("Buka lagi")}</>}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={resetChat} disabled={resetWaChat.isPending}>
                         <RotateCcw className="w-4 h-4 mr-2" /> Reset chat
@@ -317,7 +317,7 @@ export default function Chat() {
               <form onSubmit={handleSend} className="px-4 md:px-6 py-3 md:py-4 border-t border-border bg-card shrink-0">
                 <div className="flex items-center gap-2 md:gap-3">
                   <input ref={fileRef} type="file" className="hidden" onChange={handleAttach} />
-                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} title="Lampirkan file" className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors border border-border disabled:opacity-50">
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} title={t("Lampirkan file")} className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors border border-border disabled:opacity-50">
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
                   </button>
                   <input

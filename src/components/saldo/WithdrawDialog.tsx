@@ -5,7 +5,7 @@ import {
 } from "@/components/ui/dialog";
 import { useRequestPayout } from "@/hooks/useSaldo";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -24,6 +24,7 @@ function formatIDR(n: number): string {
 const empty = { amount: "", bankName: "", bankAccount: "", accountHolder: "", note: "" };
 
 export default function WithdrawDialog({ open, onOpenChange, available }: Props) {
+  const t = useT();
   const request = useRequestPayout();
   const { toast } = useToast();
   const [form, setForm] = useState(empty);

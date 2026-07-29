@@ -30,6 +30,20 @@ if (typeof window !== "undefined") {
     globalThis.ResizeObserver = (window as unknown as { ResizeObserver: typeof ResizeObserver }).ResizeObserver;
   }
 
+  if (!("IntersectionObserver" in window)) {
+    class FakeIntersectionObserver {
+      readonly root = null;
+      readonly rootMargin = "";
+      readonly thresholds: number[] = [];
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      takeRecords() { return []; }
+    }
+    (window as unknown as Record<string, unknown>).IntersectionObserver = FakeIntersectionObserver;
+    globalThis.IntersectionObserver = FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+  }
+
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
   }

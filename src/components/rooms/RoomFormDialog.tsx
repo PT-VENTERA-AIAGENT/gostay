@@ -6,7 +6,7 @@ import {
 import { useCreateRoom, useUpdateRoom, useDeleteRoom, useRoomTypes } from "@/hooks/useRooms";
 import { useToast } from "@/hooks/use-toast";
 import type { Room } from "@/types/database.types";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -20,6 +20,7 @@ interface Props {
 const emptyForm = { number: "", floor: "1", room_type_id: "", is_active: true };
 
 export default function RoomFormDialog({ open, onOpenChange, room, defaultTypeId }: Props) {
+  const t = useT();
   const { data: roomTypes = [] } = useRoomTypes();
   const create = useCreateRoom();
   const update = useUpdateRoom();
@@ -100,21 +101,21 @@ export default function RoomFormDialog({ open, onOpenChange, room, defaultTypeId
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Nomor Kamar</label>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t("Nomor Kamar")}</label>
               <input className={field} value={form.number}
                 onChange={(e) => setForm((f) => ({ ...f, number: e.target.value }))} placeholder="101" />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Lantai</label>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t("Lantai")}</label>
               <input className={field} type="number" min={0} value={form.floor}
                 onChange={(e) => setForm((f) => ({ ...f, floor: e.target.value }))} />
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">Tipe Kamar</label>
+            <label className="text-sm font-medium text-foreground mb-1 block">{t("Tipe Kamar")}</label>
             <select className={field} value={form.room_type_id}
               onChange={(e) => setForm((f) => ({ ...f, room_type_id: e.target.value }))}>
-              <option value="">Pilih tipe...</option>
+              <option value="">{t("Pilih tipe...")}</option>
               {roomTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>

@@ -88,7 +88,7 @@ export default function TopBar() {
         <DropdownMenu>
           <DropdownMenuTrigger
             className="hidden sm:flex items-center gap-3 ml-1 rounded-full pr-1 md:pr-2 hover:bg-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-            aria-label="Account menu"
+            aria-label={t("Account menu")}
           >
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-primary/20 flex items-center justify-center font-semibold text-sm text-primary">
               {initialsOf(displayName)}

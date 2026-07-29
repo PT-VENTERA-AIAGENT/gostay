@@ -2,6 +2,7 @@ import { LayoutDashboard, Building2, BedDouble, CalendarCheck, CalendarRange, Co
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n";
 
 // Platform console = Ventera super-admin, cross-hotel. Deliberately a SEPARATE
 // shell (its own dark-slate sidebar, "Platform Ventera" brand) so it never reads
@@ -20,6 +21,7 @@ const items = [
 ];
 
 export default function PlatformSidebar() {
+  const t = useT();
   const { pathname } = useLocation();
   const isActive = (path: string) =>
     path === "/platform" ? pathname === "/platform" : pathname.startsWith(path);
@@ -27,8 +29,8 @@ export default function PlatformSidebar() {
   return (
     <aside className="hidden md:flex flex-col sticky top-0 h-screen self-start w-60 shrink-0 bg-slate-900 text-slate-100 px-3 py-6 overflow-y-auto">
       <div className="px-2 mb-8 leading-tight">
-        <p className="text-sm font-bold tracking-tight">Platform Ventera</p>
-        <p className="text-[11px] text-slate-400">Super Admin</p>
+        <p className="text-sm font-bold tracking-tight">{t("Platform Ventera")}</p>
+        <p className="text-[11px] text-slate-400">{t("Super Admin")}</p>
       </div>
 
       <nav className="flex-1 flex flex-col gap-1">

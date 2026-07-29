@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { useT } from "@/lib/i18n";
 
 /** Title + optional description and right-aligned action (search, button). */
 export function PageHeader({
@@ -71,13 +72,14 @@ export function StatCard({
 
 /** Payment mode of a hotel: Off / Test / Live — the single control's three states. */
 export function ModeBadge({ mode, active }: { mode: "live" | "test"; active: boolean }) {
+  const t = useT();
   if (!active) {
     return <Badge variant="outline" className="text-muted-foreground">Off</Badge>;
   }
   return mode === "live" ? (
-    <Badge className="bg-success text-success-foreground hover:bg-success/90">Live</Badge>
+    <Badge className="bg-success text-success-foreground hover:bg-success/90">{t("Live")}</Badge>
   ) : (
-    <Badge variant="secondary">Test</Badge>
+    <Badge variant="secondary">{t("Test")}</Badge>
   );
 }
 

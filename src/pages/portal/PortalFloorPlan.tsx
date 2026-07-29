@@ -9,8 +9,10 @@ import { useRooms, useAvailableRooms } from "@/hooks/useRooms";
 import { useTenant } from "@/hooks/useTenant";
 import type { RoomStatus } from "@/lib/roomStatus";
 import type { RoomWithType } from "@/types/database.types";
+import { useT } from "@/lib/i18n";
 
 export default function PortalFloorPlan() {
+  const t = useT();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { name: hotelName } = useTenant();
@@ -69,15 +71,15 @@ export default function PortalFloorPlan() {
         {/* Optional date filter — colours the map by availability for those nights. */}
         <div className="flex flex-wrap items-end gap-3 bg-card border border-border rounded-xl p-3">
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-in</label>
-            <div className="w-40"><DatePicker value={checkIn} onChange={(v) => setParam("checkIn", v || "")} placeholder="Pilih tanggal" /></div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Check-in")}</label>
+            <div className="w-40"><DatePicker value={checkIn} onChange={(v) => setParam("checkIn", v || "")} placeholder={t("Pilih tanggal")} /></div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-out</label>
-            <div className="w-40"><DatePicker value={checkOut} onChange={(v) => setParam("checkOut", v || "")} placeholder="Pilih tanggal" /></div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Check-out")}</label>
+            <div className="w-40"><DatePicker value={checkOut} onChange={(v) => setParam("checkOut", v || "")} placeholder={t("Pilih tanggal")} /></div>
           </div>
           {hasDates && (
-            <p className="text-xs text-muted-foreground pb-2">Warna hijau = tersedia untuk tanggal ini.</p>
+            <p className="text-xs text-muted-foreground pb-2">{t("Warna hijau = tersedia untuk tanggal ini.")}</p>
           )}
         </div>
 

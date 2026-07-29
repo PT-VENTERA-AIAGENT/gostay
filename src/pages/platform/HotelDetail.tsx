@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { usePlatformHotelDetail, useSetHotelPayment } from "@/hooks/usePlatform";
@@ -29,6 +29,7 @@ const PAY_OPTIONS: { key: PayState; label: string; icon: typeof Ban }[] = [
 ];
 
 export default function PlatformHotelDetail() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -153,7 +154,7 @@ export default function PlatformHotelDetail() {
               <EmptyState message={tr("Belum ada reservasi")} />
             ) : (
               <Table>
-                <thead><tr><Th>{tr("Tamu")}</Th><Th>{tr("Menginap")}</Th><Th className="text-right">{tr("Total")}</Th><Th>Status</Th></tr></thead>
+                <thead><tr><Th>{tr("Tamu")}</Th><Th>{tr("Menginap")}</Th><Th className="text-right">{tr("Total")}</Th><Th>{t("Status")}</Th></tr></thead>
                 <tbody>
                   {hotel.recent_reservations.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/30">
@@ -180,7 +181,7 @@ export default function PlatformHotelDetail() {
               <EmptyState message={tr("Belum ada percakapan")} />
             ) : (
               <Table>
-                <thead><tr><Th>{tr("Tamu")}</Th><Th>Status</Th><Th>{tr("Terakhir")}</Th></tr></thead>
+                <thead><tr><Th>{tr("Tamu")}</Th><Th>{t("Status")}</Th><Th>{tr("Terakhir")}</Th></tr></thead>
                 <tbody>
                   {hotel.recent_threads.map((t) => (
                     <tr key={t.id} className="hover:bg-muted/30">

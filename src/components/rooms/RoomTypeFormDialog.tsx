@@ -6,7 +6,7 @@ import {
 import { useCreateRoomType, useUpdateRoomType } from "@/hooks/useRooms";
 import { useToast } from "@/hooks/use-toast";
 import type { RoomType } from "@/types/database.types";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -22,6 +22,7 @@ function slugify(s: string) {
 const emptyForm = { name: "", slug: "", description: "", base_rate: "", max_occupancy: "2", amenities: "", is_active: true };
 
 export default function RoomTypeFormDialog({ open, onOpenChange, roomType }: Props) {
+  const t = useT();
   const create = useCreateRoomType();
   const update = useUpdateRoomType();
   const { toast } = useToast();
@@ -106,38 +107,38 @@ export default function RoomTypeFormDialog({ open, onOpenChange, roomType }: Pro
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Nama</label>
-              <input className={field} value={form.name} onChange={(e) => setName(e.target.value)} placeholder="Deluxe Room" />
+              <label className="text-sm font-medium text-foreground mb-1 block">{t("Nama")}</label>
+              <input className={field} value={form.name} onChange={(e) => setName(e.target.value)} placeholder={t("Deluxe Room")} />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Slug</label>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t("Slug")}</label>
               <input className={field} value={form.slug}
                 onChange={(e) => { setSlugTouched(true); setForm((f) => ({ ...f, slug: e.target.value })); }}
                 placeholder="deluxe" />
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">Deskripsi</label>
+            <label className="text-sm font-medium text-foreground mb-1 block">{t("Deskripsi")}</label>
             <textarea className={`${field} resize-none`} rows={2} value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Kamar luas dengan pemandangan kota..." />
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder={t("Kamar luas dengan pemandangan kota...")} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Harga / malam (IDR)</label>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t("Harga / malam (IDR)")}</label>
               <input className={field} type="number" min={0} value={form.base_rate}
                 onChange={(e) => setForm((f) => ({ ...f, base_rate: e.target.value }))} placeholder="850000" />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Kapasitas (tamu)</label>
+              <label className="text-sm font-medium text-foreground mb-1 block">{t("Kapasitas (tamu)")}</label>
               <input className={field} type="number" min={1} value={form.max_occupancy}
                 onChange={(e) => setForm((f) => ({ ...f, max_occupancy: e.target.value }))} />
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1 block">Fasilitas</label>
+            <label className="text-sm font-medium text-foreground mb-1 block">{t("Fasilitas")}</label>
             <input className={field} value={form.amenities}
-              onChange={(e) => setForm((f) => ({ ...f, amenities: e.target.value }))} placeholder="WiFi, AC, TV, Mini Bar" />
-            <p className="text-xs text-muted-foreground mt-1">Pisahkan dengan koma.</p>
+              onChange={(e) => setForm((f) => ({ ...f, amenities: e.target.value }))} placeholder={t("WiFi, AC, TV, Mini Bar")} />
+            <p className="text-xs text-muted-foreground mt-1">{t("Pisahkan dengan koma.")}</p>
           </div>
           <label className="flex items-center gap-2 text-sm text-foreground">
             <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />

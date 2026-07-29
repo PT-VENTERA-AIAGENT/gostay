@@ -7,7 +7,7 @@ import { useRoomTypes, useAvailableRooms } from "@/hooks/useRooms";
 import { useWalkInCheckIn } from "@/hooks/useBookings";
 import { useToast } from "@/hooks/use-toast";
 import type { PaymentMethod } from "@/services/frontDeskService";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 import { nightsLabel } from "@/lib/nights";
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -31,6 +31,7 @@ function nightsBetween(a: string, b: string) {
  * chosen type, and can take the first payment inline.
  */
 export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -110,40 +111,40 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
           <h2 className="font-semibold text-foreground flex items-center gap-2">
             <Zap className="w-4 h-4 text-primary" /> Walk-in check-in kilat
           </h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Tutup"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t("Tutup")}><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-4 space-y-4">
           {/* Guest */}
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Tamu</p>
-            <input className={inputCls} placeholder="Nama tamu *" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {t("Tamu")}</p>
+            <input className={inputCls} placeholder={t("Nama tamu *")} value={fullName} onChange={(e) => setFullName(e.target.value)} />
             <div className="grid grid-cols-2 gap-2">
-              <input className={inputCls} placeholder="No. HP (opsional)" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <input className={inputCls} placeholder="Email (opsional)" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input className={inputCls} placeholder={t("No. HP (opsional)")} value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input className={inputCls} placeholder={t("Email (opsional)")} value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
           </div>
 
           {/* Stay */}
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5" /> Menginap</p>
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5" /> {t("Menginap")}</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground">Check-in</label>
-                <DatePicker value={checkIn} onChange={setCheckIn} placeholder="Check-in" />
+                <label className="text-xs text-muted-foreground">{t("Check-in")}</label>
+                <DatePicker value={checkIn} onChange={setCheckIn} placeholder={t("Check-in")} />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Check-out</label>
-                <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder="Check-out" />
+                <label className="text-xs text-muted-foreground">{t("Check-out")}</label>
+                <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder={t("Check-out")} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground">Dewasa</label>
+                <label className="text-xs text-muted-foreground">{t("Dewasa")}</label>
                 <input className={inputCls} type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))} />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Anak</label>
+                <label className="text-xs text-muted-foreground">{t("Anak")}</label>
                 <input className={inputCls} type="number" min={0} value={children} onChange={(e) => setChildren(Math.max(0, Number(e.target.value)))} />
               </div>
             </div>
@@ -152,13 +153,13 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
           {/* Room */}
           <div className="space-y-2">
             <select className={inputCls} value={roomTypeId} onChange={(e) => { setRoomTypeId(e.target.value); setRoomId(""); }}>
-              <option value="">Pilih tipe kamar *…</option>
+              <option value="">{t("Pilih tipe kamar *…")}</option>
               {roomTypes?.map((t) => (
                 <option key={t.id} value={t.id}>{t.name} — {formatIDR(Number(t.base_rate))}/malam</option>
               ))}
             </select>
             <select className={inputCls} value={roomId} onChange={(e) => setRoomId(e.target.value)} disabled={!datesValid || !roomTypeId}>
-              <option value="">Kamar otomatis (pertama yang kosong)</option>
+              <option value="">{t("Kamar otomatis (pertama yang kosong)")}</option>
               {rooms.map((r) => (
                 <option key={r.id} value={r.id}>Kamar {r.number} (lantai {r.floor})</option>
               ))}
@@ -191,7 +192,7 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
           {/* Summary + submit */}
           <div className="flex items-center justify-between pt-3 border-t border-border">
             <div className="text-sm">
-              <span className="text-muted-foreground">Total </span>
+              <span className="text-muted-foreground">{t("Total")} </span>
               <span className="font-bold text-foreground">{total ? formatIDR(total) : "—"}</span>
               {nights > 0 && <span className="text-xs text-muted-foreground"> · {nightsLabel(nights, t)}</span>}
             </div>

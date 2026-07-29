@@ -155,7 +155,7 @@ export default function UserManagement() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 flex-1 max-w-sm">
             <Search className="w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users..." className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search users...")} className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full" />
           </div>
         </div>
 
@@ -197,7 +197,7 @@ export default function UserManagement() {
                             <div>
                               <p className="text-sm font-medium text-foreground">
                                 {u.full_name || "—"}
-                                {isMe && <span className="ml-2 text-xs text-muted-foreground font-normal">(you)</span>}
+                                {isMe && <span className="ml-2 text-xs text-muted-foreground font-normal">{t("(you)")}</span>}
                               </p>
                               <p className="text-xs text-muted-foreground">{u.email}</p>
                             </div>
@@ -267,7 +267,7 @@ export default function UserManagement() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">
                           {u.full_name || "—"}
-                          {isMe && <span className="ml-1.5 text-xs text-muted-foreground font-normal">(you)</span>}
+                          {isMe && <span className="ml-1.5 text-xs text-muted-foreground font-normal">{t("(you)")}</span>}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                       </div>

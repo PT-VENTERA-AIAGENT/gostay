@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface Lead {
   id: string;
@@ -55,6 +56,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function LeadDetail() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const { session } = useAuth();
   const { toast } = useToast();
@@ -166,7 +168,7 @@ export default function LeadDetail() {
     );
   }
 
-  if (!lead) return <div className="p-6 text-muted-foreground">Lead tidak ditemukan.</div>;
+  if (!lead) return <div className="p-6 text-muted-foreground">{t("Lead tidak ditemukan.")}</div>;
 
   const pendingDraft = drafts.find((d) => !d.sent);
 
@@ -189,7 +191,7 @@ export default function LeadDetail() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-card rounded-lg border p-4 space-y-3 text-sm">
-            <div className="font-medium text-muted-foreground uppercase text-xs tracking-wide">Info Properti</div>
+            <div className="font-medium text-muted-foreground uppercase text-xs tracking-wide">{t("Info Properti")}</div>
             {lead.phone_wa && (
               <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-green-600" />{lead.phone_wa}</div>
             )}
@@ -213,7 +215,7 @@ export default function LeadDetail() {
           </div>
 
           <div className="bg-card rounded-lg border p-4 space-y-3">
-            <div className="font-medium text-muted-foreground uppercase text-xs tracking-wide">Generate & Kirim WA</div>
+            <div className="font-medium text-muted-foreground uppercase text-xs tracking-wide">{t("Generate & Kirim WA")}</div>
             {!pendingDraft ? (
               <Button size="sm" onClick={handleGenerate} disabled={generating}>
                 {generating
@@ -242,7 +244,7 @@ export default function LeadDetail() {
                   </Button>
                 </div>
                 {pendingDraft.approved && !pendingDraft.sent && (
-                  <p className="text-xs text-muted-foreground">Draft sudah disetujui — klik Kirim untuk dispatch ke WA.</p>
+                  <p className="text-xs text-muted-foreground">{t("Draft sudah disetujui — klik Kirim untuk dispatch ke WA.")}</p>
                 )}
               </div>
             )}
@@ -256,7 +258,7 @@ export default function LeadDetail() {
             Riwayat Percakapan WA
           </div>
           {conversations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada percakapan.</p>
+            <p className="text-sm text-muted-foreground">{t("Belum ada percakapan.")}</p>
           ) : (
             <div className="space-y-3">
               {conversations.map((c) => (

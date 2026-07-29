@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import { ConciergeBell, Loader2 } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 import { usePlatformGuestRequests } from "@/hooks/usePlatform";
 import { PageHeader, Table, Th, Td, EmptyState, StatusBadge, SearchBox } from "@/components/platform/widgets";
 
 function fmtDate(s: string) { return new Date(s).toLocaleDateString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); }
 
 export default function PlatformGuestRequests() {
+  const t = useT();
   const { data: rows = [], isLoading } = usePlatformGuestRequests();
   const [q, setQ] = useState("");
   const [hotel, setHotel] = useState("");
@@ -53,7 +54,7 @@ export default function PlatformGuestRequests() {
                 <Th>{tr("Hotel")}</Th>
                 <Th>{tr("Permintaan")}</Th>
                 <Th>{tr("Tamu")}</Th>
-                <Th>Status</Th>
+                <Th>{t("Status")}</Th>
                 <Th>{tr("Waktu")}</Th>
               </tr>
             </thead>

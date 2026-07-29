@@ -9,6 +9,7 @@ import { staggerContainer, staggerItem } from "@/components/shared/PageTransitio
 import DatePicker from "@/components/shared/DatePicker";
 import { getRoomTypeBySlug } from "@/services/roomService";
 import { useAvailableRooms } from "@/hooks/useRooms";
+import { useT } from "@/lib/i18n";
 
 const today = format(new Date(), "yyyy-MM-dd");
 
@@ -38,6 +39,7 @@ function addDays(iso: string, n: number): string {
 }
 
 export default function PortalRoomDetail() {
+  const t = useT();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -102,7 +104,7 @@ export default function PortalRoomDetail() {
           <p className="text-muted-foreground">
             {!room && !error ? "Room not found." : "Failed to load room details. Please try again."}
           </p>
-          <Link to="/portal" className="text-primary text-sm hover:underline">Back to rooms</Link>
+          <Link to="/portal" className="text-primary text-sm hover:underline">{t("Back to rooms")}</Link>
         </div>
       </PageTransition>
     );
@@ -112,7 +114,7 @@ export default function PortalRoomDetail() {
     <PageTransition>
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         <Link to="/portal" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to rooms
+          <ArrowLeft className="w-4 h-4" /> {t("Back to rooms")}
         </Link>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 rounded-xl overflow-hidden">
@@ -149,17 +151,17 @@ export default function PortalRoomDetail() {
               </div>
               <div className="flex items-center gap-3 md:gap-4 text-sm text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1"><Users className="w-4 h-4" /> Up to {room.max_occupancy} guests</span>
-                <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> Room</span>
+                <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {t("Room")}</span>
               </div>
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3">About this room</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">{t("About this room")}</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">{room.description}</p>
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3">Amenities</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">{t("Amenities")}</h2>
               <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {(room.amenities ?? []).map((a) => {
                   const Icon = amenityIcons[a] || Check;
@@ -173,7 +175,7 @@ export default function PortalRoomDetail() {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3">Policies</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">{t("Policies")}</h2>
               <ul className="space-y-2">
                 {policies.map((p, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -187,20 +189,20 @@ export default function PortalRoomDetail() {
           <div>
             <div className="bg-card rounded-xl border border-border p-5 sticky top-6">
               <p className="text-2xl font-bold text-primary mb-1">{formatIDR(room.base_rate)}</p>
-              <p className="text-sm text-muted-foreground mb-5">per night</p>
+              <p className="text-sm text-muted-foreground mb-5">{t("per night")}</p>
 
               <div className="space-y-3 mb-5">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-in</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Check-in")}</label>
                   <DatePicker
                     value={checkIn}
                     onChange={pickCheckIn}
                     min={today}
-                    placeholder="Pilih tanggal menginap"
+                    placeholder={t("Pilih tanggal menginap")}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-out</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Check-out")}</label>
                   <DatePicker
                     value={checkOut}
                     onChange={setCheckOut}
@@ -209,7 +211,7 @@ export default function PortalRoomDetail() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Guests</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Guests")}</label>
                   <select
                     value={guests}
                     onChange={(e) => setGuests(Number(e.target.value))}
@@ -258,7 +260,7 @@ export default function PortalRoomDetail() {
                     <span className="font-medium text-foreground">{formatIDR(room.base_rate * nights)}</span>
                   </div>
                   <div className="flex justify-between font-semibold">
-                    <span className="text-foreground">Total</span>
+                    <span className="text-foreground">{t("Total")}</span>
                     <span className="text-primary">{formatIDR(room.base_rate * nights)}</span>
                   </div>
                 </div>

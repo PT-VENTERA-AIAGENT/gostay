@@ -3,6 +3,7 @@ import { AnimatePresence, MotionConfig, motion, useInView, useScroll, useSpring 
 import { ArrowRight, CalendarPlus, ChevronLeft, ChevronRight, LogIn, LogOut, Menu, X } from "lucide-react";
 import { AppLink } from "@/lib/site";
 import { useAuth, roleHome } from "@/contexts/AuthContext";
+import { useT } from "@/lib/i18n";
 
 /* ──────────────────────────────────────────────────────────────────────────
  * GoStay landing page.
@@ -277,6 +278,7 @@ const navLinks = [
 ];
 
 function Navbar() {
+  const t = useT();
   const { session, role, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -491,6 +493,7 @@ function HeroStat({ label, value, icon: Icon, active }: (typeof heroStats)[numbe
 
 /** Dashboard mock modelled on the real Overview + Booking Calendar screens. */
 function HeroVisual() {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
@@ -540,7 +543,7 @@ function HeroVisual() {
               <span className="flex h-5 w-5 items-center justify-center rounded-md border border-black/15 text-black/50">
                 <ChevronLeft className="h-3 w-3" />
               </span>
-              <span className="text-[11px] font-semibold">Oktober 2026</span>
+              <span className="text-[11px] font-semibold">{t("Oktober 2026")}</span>
               <span className="flex h-5 w-5 items-center justify-center rounded-md border border-black/15 text-black/50">
                 <ChevronRight className="h-3 w-3" />
               </span>
@@ -558,7 +561,7 @@ function HeroVisual() {
           {/* reservation calendar */}
           <div>
             <div className="grid grid-cols-[92px_repeat(4,1fr)] border-b border-black/10 bg-[#FAFAF8]">
-              <div className="px-3 py-2 text-[10px] font-medium text-black/40">Kamar</div>
+              <div className="px-3 py-2 text-[10px] font-medium text-black/40">{t("Kamar")}</div>
               {heroDays.map((d) => (
                 <div
                   key={d.n}
@@ -611,8 +614,8 @@ function HeroVisual() {
               R
             </div>
             <div className="min-w-0">
-              <p className="truncate text-[11px] font-semibold">Reza Mahendra · 2 tamu</p>
-              <p className="truncate text-[10px] text-black/50">Lunas · WhatsApp · 3–5 Okt</p>
+              <p className="truncate text-[11px] font-semibold">{t("Reza Mahendra · 2 tamu")}</p>
+              <p className="truncate text-[10px] text-black/50">{t("Lunas · WhatsApp · 3–5 Okt")}</p>
             </div>
             <span className="ml-auto shrink-0 rounded-full border border-[#9BBED4] bg-[#C4DBEA] px-2 py-1 text-[10px] font-semibold text-black/70">
               Terkonfirmasi
@@ -625,6 +628,7 @@ function HeroVisual() {
 }
 
 function Hero() {
+  const t = useT();
   return (
     <section id="top" className="bg-white pt-4 sm:pt-6">
       <Container>
@@ -662,7 +666,7 @@ function Hero() {
               </Child>
 
               <Child className="flex flex-wrap gap-3">
-                <Btn href="#demo">Jadwalkan Demo GoStay</Btn>
+                <Btn href="#demo">{t("Jadwalkan Demo GoStay")}</Btn>
                 <Btn href="#cara-kerja" variant="outline">
                   Lihat Cara Kerjanya
                 </Btn>
@@ -688,11 +692,12 @@ function Hero() {
 const propertyTypes = ["Hotel", "Villa", "Glamping", "Guest House", "Homestay"];
 
 function TrustStrip() {
+  const t = useT();
   return (
     <section className="bg-white py-14 sm:py-16">
       <Container>
         <Reveal className="flex flex-col items-center gap-3 text-center">
-          <h2 className="font-display text-xl font-bold tracking-[-0.01em] sm:text-2xl">Dibuat untuk Bisnis Akomodasi</h2>
+          <h2 className="font-display text-xl font-bold tracking-[-0.01em] sm:text-2xl">{t("Dibuat untuk Bisnis Akomodasi")}</h2>
           <p className="max-w-xl text-[0.9375rem] text-black/60">
             Membantu pengelola properti merapikan proses reservasi dan operasional harian.
           </p>
@@ -725,13 +730,14 @@ const problems = [
 ];
 
 function Problem() {
+  const t = useT();
   return (
     <section className="bg-[#FAF7EF] py-16 sm:py-24">
       <Container>
         <div className="grid gap-10 lg:grid-cols-[1fr_1.15fr] lg:gap-16">
           <div className="flex flex-col gap-5 lg:sticky lg:top-28 lg:self-start">
-            <Eyebrow className="text-black/45">Booking Ramai, Data Jangan Berantakan</Eyebrow>
-            <Heading>Semakin Banyak Reservasi, Semakin Sulit Dikelola Secara Manual</Heading>
+            <Eyebrow className="text-black/45">{t("Booking Ramai, Data Jangan Berantakan")}</Eyebrow>
+            <Heading>{t("Semakin Banyak Reservasi, Semakin Sulit Dikelola Secara Manual")}</Heading>
             <Reveal delay={0.15}>
               <p className="max-w-lg text-[1.0625rem] leading-relaxed text-black/65">
                 Booking masuk melalui WhatsApp, telepon, media sosial, dan channel lainnya. Ketika semuanya dicatat
@@ -815,6 +821,7 @@ const values: { title: string; desc: string; bg: string; accent: string; shape: 
 ];
 
 function ValueProposition() {
+  const t = useT();
   return (
     <section className="bg-white py-16 sm:py-24">
       <Container>
@@ -822,8 +829,8 @@ function ValueProposition() {
             their natural height instead of stretching to match it. */}
         <div className="grid gap-8 lg:grid-cols-[1fr_1.85fr] lg:gap-12">
           <div className="flex flex-col gap-5 lg:sticky lg:top-28 lg:self-start">
-            <Eyebrow className="text-black/45">Kenapa GoStay</Eyebrow>
-            <Heading>Satu Dashboard untuk Mengelola Reservasi Properti</Heading>
+            <Eyebrow className="text-black/45">{t("Kenapa GoStay")}</Eyebrow>
+            <Heading>{t("Satu Dashboard untuk Mengelola Reservasi Properti")}</Heading>
             <Reveal delay={0.15}>
               <p className="text-[1.0625rem] leading-relaxed text-black/65">
                 Tidak perlu lagi berpindah-pindah antara chat, buku catatan, dan spreadsheet hanya untuk memastikan
@@ -934,16 +941,17 @@ const features: {
 ];
 
 function Features() {
+  const t = useT();
   return (
     <section id="fitur" className="bg-black py-16 text-white sm:py-24">
       <Container>
         <div className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
           <div className="flex max-w-2xl flex-col gap-4">
-            <Eyebrow className="text-white/50">Fitur Utama</Eyebrow>
-            <Heading className="text-white">Semua yang Dibutuhkan untuk Mengelola Booking Harian</Heading>
+            <Eyebrow className="text-white/50">{t("Fitur Utama")}</Eyebrow>
+            <Heading className="text-white">{t("Semua yang Dibutuhkan untuk Mengelola Booking Harian")}</Heading>
           </div>
           <Reveal delay={0.1} className="shrink-0">
-            <Btn href="#demo">Lihat Demo Dashboard</Btn>
+            <Btn href="#demo">{t("Lihat Demo Dashboard")}</Btn>
           </Reveal>
         </div>
 
@@ -981,22 +989,23 @@ const comparison: [string, string][] = [
 ];
 
 function Comparison() {
+  const t = useT();
   return (
     <section className="bg-white py-16 sm:py-24">
       <Container>
         <div className="flex max-w-3xl flex-col gap-4">
-          <Eyebrow className="text-black/45">Dari Manual Menjadi Terpusat</Eyebrow>
-          <Heading>Tinggalkan Cara Kerja yang Membuat Tim Mudah Kehilangan Informasi</Heading>
+          <Eyebrow className="text-black/45">{t("Dari Manual Menjadi Terpusat")}</Eyebrow>
+          <Heading>{t("Tinggalkan Cara Kerja yang Membuat Tim Mudah Kehilangan Informasi")}</Heading>
         </div>
 
         <Reveal delay={0.08} className="mt-10">
           <div className="overflow-hidden rounded-[2rem_0.5rem_2rem_0.5rem] border border-black/10">
             <div className="grid grid-cols-2">
               <div className="bg-[#F2F3EE] px-5 py-4 sm:px-8">
-                <Eyebrow className="text-black/50">Sebelum GoStay</Eyebrow>
+                <Eyebrow className="text-black/50">{t("Sebelum GoStay")}</Eyebrow>
               </div>
               <div className="bg-[#D7F056] px-5 py-4 sm:px-8">
-                <Eyebrow>Dengan GoStay</Eyebrow>
+                <Eyebrow>{t("Dengan GoStay")}</Eyebrow>
               </div>
             </div>
 
@@ -1076,12 +1085,13 @@ const audiences: { title: string; desc: string; bg: string; accent: string; shap
 ];
 
 function TargetUser() {
+  const t = useT();
   return (
     <section id="cocok-untuk-siapa" className="bg-white pb-16 sm:pb-24">
       <Container>
         <div className="flex max-w-3xl flex-col gap-4">
-          <Eyebrow className="text-black/45">Cocok untuk Siapa</Eyebrow>
-          <Heading>Dibuat untuk Pengelola Berbagai Jenis Properti</Heading>
+          <Eyebrow className="text-black/45">{t("Cocok untuk Siapa")}</Eyebrow>
+          <Heading>{t("Dibuat untuk Pengelola Berbagai Jenis Properti")}</Heading>
         </div>
 
         <Stagger gap={0.07} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1125,6 +1135,7 @@ const steps = [
 ];
 
 function ServiceFlow() {
+  const t = useT();
   const trackRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: trackRef, offset: ["start 72%", "end 62%"] });
   const fill = useSpring(scrollYProgress, { stiffness: 90, damping: 28, mass: 0.4 });
@@ -1133,8 +1144,8 @@ function ServiceFlow() {
     <section id="cara-kerja" className="bg-[#FAF7EF] py-16 sm:py-24">
       <Container>
         <div className="flex max-w-3xl flex-col gap-4">
-          <Eyebrow className="text-black/45">Cara Kerja</Eyebrow>
-          <Heading>Mulai Mengelola Booking dengan Lebih Rapi</Heading>
+          <Eyebrow className="text-black/45">{t("Cara Kerja")}</Eyebrow>
+          <Heading>{t("Mulai Mengelola Booking dengan Lebih Rapi")}</Heading>
         </div>
 
         {/* A rail that fills as the section scrolls, instead of numbered steps. */}
@@ -1187,12 +1198,13 @@ const outcomes = [
 ];
 
 function Outcome() {
+  const t = useT();
   return (
     <section className="bg-black py-16 text-white sm:py-24">
       <Container>
         <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
           <div className="flex flex-col gap-5 lg:sticky lg:top-28 lg:self-start">
-            <Eyebrow className="text-white/50">Dampak untuk Operasional</Eyebrow>
+            <Eyebrow className="text-white/50">{t("Dampak untuk Operasional")}</Eyebrow>
             <Heading caps className="text-white">
               Lebih Sedikit Waktu Mengecek Catatan, Lebih Banyak Waktu Melayani Tamu
             </Heading>
@@ -1225,18 +1237,19 @@ function Outcome() {
 /* ─── social proof ───────────────────────────────────────────────────────── */
 
 function SocialProof() {
+  const t = useT();
   return (
     <section className="bg-white py-16 sm:py-24">
       <Container>
         <div className="flex max-w-3xl flex-col gap-4">
-          <Eyebrow className="text-black/45">Digunakan dalam Operasional Nyata</Eyebrow>
-          <Heading>Membantu Pengelola Properti Merapikan Booking Harian</Heading>
+          <Eyebrow className="text-black/45">{t("Digunakan dalam Operasional Nyata")}</Eyebrow>
+          <Heading>{t("Membantu Pengelola Properti Merapikan Booking Harian")}</Heading>
         </div>
 
         <div className="mt-10 grid gap-4 lg:grid-cols-[1.15fr_1fr]">
           <Reveal>
             <Card bg="bg-[#F2F3EE]" shape="leaf" accent="bg-[#8CA82E]" className="h-full p-7 sm:p-9">
-              <CardTitle className="text-[1.3125rem]">Studi Kasus — Pengelolaan Reservasi Villa</CardTitle>
+              <CardTitle className="text-[1.3125rem]">{t("Studi Kasus — Pengelolaan Reservasi Villa")}</CardTitle>
 
               <dl className="mt-7 flex flex-col gap-5">
                 <div>
@@ -1256,7 +1269,7 @@ function SocialProof() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-black/45">Hasil</dt>
+                  <dt className="text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-black/45">{t("Hasil")}</dt>
                   {/* Placeholder kept verbatim from the source copy — swap for a
                       verified metric before launch. */}
                   <dd className="mt-2 rounded-[1rem_0.25rem_1rem_0.25rem] border border-dashed border-black/25 bg-white/60 px-4 py-3 text-[0.9375rem] leading-relaxed text-black/50">
@@ -1270,7 +1283,7 @@ function SocialProof() {
           <Reveal delay={0.08}>
             <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-t-[3.25rem] rounded-b-[1.25rem] bg-black p-7 text-white sm:p-9">
               <div>
-                <Eyebrow className="text-white/45">Testimoni</Eyebrow>
+                <Eyebrow className="text-white/45">{t("Testimoni")}</Eyebrow>
                 <blockquote className="mt-6 font-display text-[1.3125rem] font-bold leading-[1.35] tracking-[-0.005em] sm:text-[1.5rem]">
                   <span className="mr-0.5 text-[#D7F056]">“</span>
                   GoStay membantu tim kami melihat jadwal booking dan ketersediaan unit dengan lebih jelas. Koordinasi
@@ -1280,8 +1293,8 @@ function SocialProof() {
               </div>
 
               <div className="mt-8">
-                <p className="text-[0.9375rem] font-semibold text-white/85">[Nama Pengguna]</p>
-                <p className="text-[0.9375rem] text-white/50">[Jabatan — Nama Properti]</p>
+                <p className="text-[0.9375rem] font-semibold text-white/85">{t("[Nama Pengguna]")}</p>
+                <p className="text-[0.9375rem] text-white/50">{t("[Jabatan — Nama Properti]")}</p>
                 <div className="mt-6">
                   <Btn href="#demo" variant="white">
                     Lihat Pengalaman Pengguna
@@ -1309,13 +1322,14 @@ const differentiators = [
 ];
 
 function Differentiator() {
+  const t = useT();
   return (
     <section className="bg-[#FAF7EF] py-16 sm:py-24">
       <Container>
         <div className="grid gap-10 lg:grid-cols-[1fr_1.15fr] lg:gap-16">
           <div className="flex flex-col gap-4 lg:sticky lg:top-28 lg:self-start">
-            <Eyebrow className="text-black/45">Kenapa Memilih GoStay</Eyebrow>
-            <Heading>Dibuat untuk Operasional Properti yang Membutuhkan Kejelasan</Heading>
+            <Eyebrow className="text-black/45">{t("Kenapa Memilih GoStay")}</Eyebrow>
+            <Heading>{t("Dibuat untuk Operasional Properti yang Membutuhkan Kejelasan")}</Heading>
           </div>
 
           <Stagger gap={0.07} className="grid gap-3 sm:grid-cols-2">
@@ -1386,13 +1400,14 @@ const faqJsonLd = {
 };
 
 function FAQ() {
+  const t = useT();
   const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   return (
     <section id="faq" className="bg-[#FFFCF6] py-16 sm:py-24">
       <Container>
         <div className="mx-auto w-full max-w-[841px]">
-          <Heading className="mb-8">Pertanyaan yang Sering Diajukan</Heading>
+          <Heading className="mb-8">{t("Pertanyaan yang Sering Diajukan")}</Heading>
 
           <Stagger gap={0.05} className="border-t border-black/15">
             {faqs.map((f, i) => {
@@ -1456,6 +1471,7 @@ function FAQ() {
 /* ─── final cta ──────────────────────────────────────────────────────────── */
 
 function FinalCTA() {
+  const t = useT();
   return (
     <section className="bg-[#FFFCF6]">
       <Container>
@@ -1505,7 +1521,7 @@ function FinalCTA() {
             </Child>
 
             <Child className="flex flex-wrap justify-center gap-3">
-              <Btn href="#demo">Jadwalkan Demo GoStay</Btn>
+              <Btn href="#demo">{t("Jadwalkan Demo GoStay")}</Btn>
               <Btn
                 href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
                   "Halo GoStay, saya ingin mengonsultasikan kebutuhan properti saya.",
@@ -1543,6 +1559,7 @@ const inputCls =
   "w-full rounded-[0.875rem_0.25rem_0.875rem_0.25rem] border border-black/15 bg-white px-4 py-3 text-[0.9375rem] outline-none transition-colors duration-200 placeholder:text-black/30 focus:border-black focus-visible:ring-2 focus-visible:ring-black/15 focus-visible:ring-offset-0";
 
 function DemoForm() {
+  const t = useT();
   const [values, setValues] = useState<Record<string, string>>({});
   const set = (k: string, v: string) => setValues((p) => ({ ...p, [k]: v }));
 
@@ -1564,7 +1581,7 @@ function DemoForm() {
       <Container>
         <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
           <div className="flex flex-col gap-4">
-            <Heading>Jadwalkan Demo GoStay</Heading>
+            <Heading>{t("Jadwalkan Demo GoStay")}</Heading>
             <Reveal delay={0.15}>
               <p className="max-w-md text-[1.0625rem] leading-relaxed text-black/65">
                 Tim GoStay akan menghubungi Anda untuk menyesuaikan jadwal demonstrasi.
@@ -1593,13 +1610,13 @@ function DemoForm() {
                           onChange={(e) => set(f.name, e.target.value)}
                           className={inputCls}
                         >
-                          <option value="">Pilih jenis properti</option>
+                          <option value="">{t("Pilih jenis properti")}</option>
                           {propertyTypes.map((t) => (
                             <option key={t} value={t}>
                               {t}
                             </option>
                           ))}
-                          <option value="Lainnya">Lainnya</option>
+                          <option value="Lainnya">{t("Lainnya")}</option>
                         </select>
                       ) : (
                         <input
@@ -1646,6 +1663,7 @@ const footerSocial = [
 ];
 
 function Footer() {
+  const t = useT();
   return (
     <footer className="bg-black pb-8 pt-14 text-white sm:pt-16">
       <Container>
@@ -1686,7 +1704,7 @@ function Footer() {
           </div>
         </div>
 
-        <p className="pt-5 text-[0.8125rem] text-white/45">© 2026 GoStay. All rights reserved.</p>
+        <p className="pt-5 text-[0.8125rem] text-white/45">{t("© 2026 GoStay. All rights reserved.")}</p>
       </Container>
     </footer>
   );

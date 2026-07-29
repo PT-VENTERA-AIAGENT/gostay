@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { CalendarCheck, Loader2 } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 import { usePlatformReservations, usePlatformHotels } from "@/hooks/usePlatform";
 import { PageHeader, Table, Th, Td, EmptyState, StatusBadge, SearchBox, formatIDR } from "@/components/platform/widgets";
 
@@ -14,6 +14,7 @@ const payStyle: Record<string, string> = {
 };
 
 export default function PlatformReservations() {
+  const t = useT();
   const { data: rows = [], isLoading } = usePlatformReservations();
   const { data: hotelList = [] } = usePlatformHotels();
   const [q, setQ] = useState("");
@@ -61,11 +62,11 @@ export default function PlatformReservations() {
             <thead>
               <tr>
                 <Th>{tr("Hotel")}</Th>
-                <Th>Ref</Th>
+                <Th>{t("Ref")}</Th>
                 <Th>{tr("Tamu")}</Th>
                 <Th>{tr("Kamar")}</Th>
                 <Th>{tr("Menginap")}</Th>
-                <Th>Status</Th>
+                <Th>{t("Status")}</Th>
                 <Th className="text-right">{tr("Total")}</Th>
                 <Th>{tr("Bayar")}</Th>
               </tr>

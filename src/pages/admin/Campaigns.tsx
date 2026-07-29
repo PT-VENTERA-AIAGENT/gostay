@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface Campaign {
   id: string;
@@ -97,6 +98,7 @@ function CampaignCard({ campaign, onClick }: { campaign: Campaign; onClick: () =
 }
 
 export default function Campaigns() {
+  const t = useT();
   const { session } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -274,11 +276,11 @@ export default function Campaigns() {
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Campaign Manager</h1>
-            <p className="text-sm text-muted-foreground mt-1">Generate, review, dan kirim WA ke leads secara batch</p>
+            <h1 className="text-2xl font-bold">{t("Campaign Manager")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("Generate, review, dan kirim WA ke leads secara batch")}</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/admin/leads")}>Leads</Button>
+            <Button variant="outline" onClick={() => navigate("/admin/leads")}>{t("Leads")}</Button>
             <Button onClick={() => setShowCreate(true)}>
               <Plus className="w-4 h-4 mr-2" /> New Campaign
             </Button>
@@ -291,7 +293,7 @@ export default function Campaigns() {
             {isLoading ? (
               <div className="flex justify-center py-8"><Loader2 className="animate-spin w-5 h-5" /></div>
             ) : campaigns.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-8 text-center">Belum ada campaign.</div>
+              <div className="text-sm text-muted-foreground py-8 text-center">{t("Belum ada campaign.")}</div>
             ) : (
               campaigns.map((c) => (
                 <CampaignCard
@@ -363,8 +365,8 @@ export default function Campaigns() {
                             )}
                           </span>
                           {draft.approved
-                            ? <span className="text-xs text-green-600 font-medium">Disetujui</span>
-                            : <span className="text-xs text-muted-foreground">Menunggu</span>}
+                            ? <span className="text-xs text-green-600 font-medium">{t("Disetujui")}</span>
+                            : <span className="text-xs text-muted-foreground">{t("Menunggu")}</span>}
                         </div>
                         <p className="text-muted-foreground whitespace-pre-wrap text-xs leading-relaxed">{draft.message}</p>
                       </div>
@@ -373,7 +375,7 @@ export default function Campaigns() {
                 )}
 
                 {pendingDrafts.length === 0 && drafts.length > 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">Semua pesan sudah terkirim.</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{t("Semua pesan sudah terkirim.")}</p>
                 )}
 
                 {drafts.length === 0 && activeCamp.status === "draft" && (
@@ -390,34 +392,34 @@ export default function Campaigns() {
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>New Campaign</DialogTitle>
+              <DialogTitle>{t("New Campaign")}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Nama Campaign</Label>
-                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="ex: Bali Villa Juli 2026" className="mt-1" />
+                <Label>{t("Nama Campaign")}</Label>
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("ex: Bali Villa Juli 2026")} className="mt-1" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Filter Kota</Label>
-                  <Input value={filterCity} onChange={(e) => setFilterCity(e.target.value)} placeholder="Ubud, Bali..." className="mt-1" />
+                  <Label>{t("Filter Kota")}</Label>
+                  <Input value={filterCity} onChange={(e) => setFilterCity(e.target.value)} placeholder={t("Ubud, Bali...")} className="mt-1" />
                 </div>
                 <div>
-                  <Label>Kategori</Label>
-                  <Input value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} placeholder="villa, hotel..." className="mt-1" />
+                  <Label>{t("Kategori")}</Label>
+                  <Input value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} placeholder={t("villa, hotel...")} className="mt-1" />
                 </div>
                 <div>
-                  <Label>Rating Min</Label>
+                  <Label>{t("Rating Min")}</Label>
                   <Input value={filterRatingMin} onChange={(e) => setFilterRatingMin(e.target.value)} type="number" step="0.1" min="1" max="5" className="mt-1" />
                 </div>
                 <div>
-                  <Label>Limit Harian</Label>
+                  <Label>{t("Limit Harian")}</Label>
                   <Input value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} type="number" className="mt-1" />
                 </div>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreate(false)}>Batal</Button>
+              <Button variant="outline" onClick={() => setShowCreate(false)}>{t("Batal")}</Button>
               <Button onClick={handleCreate} disabled={creating || !newName.trim()}>
                 {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
                 Buat

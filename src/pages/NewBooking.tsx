@@ -144,7 +144,7 @@ export default function NewBooking() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="lg:col-span-2 space-y-4 md:space-y-6">
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><User className="w-4 h-4" /> Guest Information</h2>
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><User className="w-4 h-4" /> {t("Guest Information")}</h2>
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
                 <div className="relative flex-1 w-full">
@@ -153,7 +153,7 @@ export default function NewBooking() {
                     <input
                       value={guestQuery}
                       onChange={(e) => setGuestQuery(e.target.value)}
-                      placeholder="Search existing guest by name, email or phone..."
+                      placeholder={t("Search existing guest by name, email or phone...")}
                       className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full"
                     />
                     {searching && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />}
@@ -190,7 +190,7 @@ export default function NewBooking() {
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Full Name")}</label>
                   <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={Boolean(linkedCustomer)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/50 disabled:text-muted-foreground" placeholder="Guest name" />
+                    className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/50 disabled:text-muted-foreground" placeholder={t("Guest name")} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Email")}</label>
@@ -211,15 +211,15 @@ export default function NewBooking() {
             </motion.div>
 
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><Calendar className="w-4 h-4" /> Stay Details</h2>
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><Calendar className="w-4 h-4" /> {t("Stay Details")}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Check-in Date")}</label>
-                  <DatePicker value={checkIn} onChange={setCheckIn} placeholder="Pilih check-in" />
+                  <DatePicker value={checkIn} onChange={setCheckIn} placeholder={t("Pilih check-in")} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Check-out Date")}</label>
-                  <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder="Pilih check-out" />
+                  <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder={t("Pilih check-out")} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Adults")}</label>
@@ -238,20 +238,20 @@ export default function NewBooking() {
             </motion.div>
 
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><MapPin className="w-4 h-4" /> Room Selection</h2>
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><MapPin className="w-4 h-4" /> {t("Room Selection")}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Room Type</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Room Type")}</label>
                   <select value={roomTypeId} onChange={(e) => { setRoomTypeId(e.target.value); setRoomId(""); }}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="">Select room type...</option>
+                    <option value="">{t("Select room type...")}</option>
                     {roomTypes?.map((t) => (
                       <option key={t.id} value={t.id}>{t.name} — {formatIDR(Number(t.base_rate))}/night</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Specific Room</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Specific Room")}</label>
                   <select value={roomId} onChange={(e) => setRoomId(e.target.value)} disabled={!datesValid || !roomTypeId}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/50 disabled:text-muted-foreground">
                     <option value="">{t("Auto-assign")}</option>
@@ -269,26 +269,26 @@ export default function NewBooking() {
                   {!datesValid && <p className="text-xs text-muted-foreground mt-1.5">{t("Pick dates to see what is free.")}</p>}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Source</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Source")}</label>
                   <select value={source} onChange={(e) => setSource(e.target.value as BookingSource)}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="walk_in">Walk-in</option>
+                    <option value="walk_in">{t("Walk-in")}</option>
                     <option value="phone">{t("Phone")}</option>
-                    <option value="staff">Staff</option>
+                    <option value="staff">{t("Staff")}</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground mb-1.5 block">Special Requests</label>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Special Requests")}</label>
                 <textarea rows={3} value={specialRequests} onChange={(e) => setSpecialRequests(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder="Any special requests..." />
+                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder={t("Any special requests...")} />
               </div>
             </motion.div>
 
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
               <h2 className="font-semibold text-foreground mb-4">{t("Internal Notes")}</h2>
               <textarea rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder="Staff-only notes..." />
+                className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder={t("Staff-only notes...")} />
             </motion.div>
           </motion.div>
 
@@ -296,12 +296,12 @@ export default function NewBooking() {
             <div className="bg-card rounded-xl border border-border p-4 md:p-5 sticky top-6">
               <h2 className="font-semibold text-foreground mb-4">{t("Price Summary")}</h2>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between text-muted-foreground"><span>Room type</span><span className="text-foreground">{selectedType?.name ?? "—"}</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>{t("Room type")}</span><span className="text-foreground">{selectedType?.name ?? "—"}</span></div>
                 <div className="flex justify-between text-muted-foreground"><span>{t("Dates")}</span><span className="text-foreground">{datesValid ? `${checkIn} → ${checkOut}` : "—"}</span></div>
                 <div className="flex justify-between text-muted-foreground"><span>{t("Nights")}</span><span className="text-foreground">{nights || "—"}</span></div>
                 <div className="flex justify-between text-muted-foreground"><span>{t("Rate / night")}</span><span className="text-foreground">{rate ? formatIDR(rate) : "—"}</span></div>
                 <div className="border-t border-border pt-3 flex justify-between font-semibold text-foreground">
-                  <span>Total</span><span className="tabular-nums">{total ? formatIDR(total) : "—"}</span>
+                  <span>{t("Total")}</span><span className="tabular-nums">{total ? formatIDR(total) : "—"}</span>
                 </div>
               </div>
 
@@ -315,7 +315,7 @@ export default function NewBooking() {
                 disabled={!canSubmit}
                 className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity mt-6 touch-target btn-press disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : "Create Booking"}
+                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> {t("Creating…")}</> : "Create Booking"}
               </motion.button>
             </div>
           </motion.div>

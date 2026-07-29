@@ -3,7 +3,7 @@ import {
   Building2, Radio, CalendarCheck, ConciergeBell, MessageCircle, BedDouble, Wallet,
 } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 import {
   usePlatformHotels, usePlatformReservations, usePlatformGuestRequests,
   usePlatformRoomAvailability, usePlatformBalances,
@@ -15,6 +15,7 @@ import {
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 export default function PlatformOverview() {
+  const t = useT();
   const { data: hotels = [] } = usePlatformHotels();
   const { data: reservations = [] } = usePlatformReservations();
   const { data: requests = [] } = usePlatformGuestRequests();
@@ -91,7 +92,7 @@ export default function PlatformOverview() {
               <EmptyState message={tr("Belum ada reservasi")} />
             ) : (
               <Table>
-                <thead><tr><Th>{tr("Hotel")}</Th><Th>{tr("Tamu")}</Th><Th className="text-right">{tr("Total")}</Th><Th>Status</Th></tr></thead>
+                <thead><tr><Th>{tr("Hotel")}</Th><Th>{tr("Tamu")}</Th><Th className="text-right">{tr("Total")}</Th><Th>{t("Status")}</Th></tr></thead>
                 <tbody>
                   {recentReservations.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/30">
@@ -115,7 +116,7 @@ export default function PlatformOverview() {
               <EmptyState message={tr("Belum ada permintaan")} />
             ) : (
               <Table>
-                <thead><tr><Th>{tr("Hotel")}</Th><Th>{tr("Permintaan")}</Th><Th>Status</Th></tr></thead>
+                <thead><tr><Th>{tr("Hotel")}</Th><Th>{tr("Permintaan")}</Th><Th>{t("Status")}</Th></tr></thead>
                 <tbody>
                   {recentRequests.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/30">
