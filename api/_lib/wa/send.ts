@@ -38,7 +38,7 @@ export async function sendText(
   sessionId: string,
   to: string,
   text: string,
-): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+): Promise<{ ok: boolean; messageId?: string; error?: string; resolved?: boolean }> {
   const { baseUrl, intKey } = config();
   if (!baseUrl || !intKey) {
     // Fail soft: a missing gateway config must not crash inbound handling.
@@ -75,7 +75,13 @@ export async function sendText(
     return { ok: false, error: `send_failed_${res.status}` };
   }
 
-  const body = (await res.json().catch(() => ({}))) as { messageId?: unknown };
+  const body = (await res.json().catch(() => ({}))) as { messageId?: unknown; resolved?: unknown };
   const messageId = typeof body.messageId === "string" ? body.messageId : undefined;
-  return { ok: true, messageId };
+  // The gateway resolves `@lid` aliases to the guest's real number before
+  // sending (getPNForLID). `resolved:false` means it could not — the send "went
+  // through" but WhatsApp may drop it. Older gateways don't send the field at
+  // all; undefined must NOT be read as success, so it is passed through as-is
+  // and callers treat only an explicit `true` as proof of a routable target.
+  const resolved = typeof body.resolved === "boolean" ? body.resolved : undefined;
+  return { ok: true, messageId, resolved };
 }

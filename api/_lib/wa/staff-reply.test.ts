@@ -81,6 +81,23 @@ describe("deliverStaffReply", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("trusts the gateway when it resolved the LID to a real number", async () => {
+    // The new gateway translates @lid → the guest's phone before sending and
+    // reports resolved:true. That is the one signal that clears the
+    // unreachable verdict — the message genuinely went to a routable address.
+    routes({
+      thread: [{ ...THREAD, customers: { phone: "181248240648388" } }],
+      identity: [{ phone_jid: "181248240648388@lid" }],
+    });
+    send.sendText.mockResolvedValue({ ok: true, resolved: true });
+
+    const r = await deliverStaffReply({ threadId: "th-1", text: "halo" });
+
+    expect(r.ok).toBe(true);
+    expect(client.serviceInsert).not.toHaveBeenCalled(); // no incident
+    expect(takeover.pauseBot).toHaveBeenCalledWith("th-1"); // real handoff
+  });
+
   it("reports the guest as unreachable when only a LID is known", async () => {
     // customers.phone holds the LID's own digits — what callablePhone stores
     // when WhatsApp withholds the number — so there is no real address at all.
