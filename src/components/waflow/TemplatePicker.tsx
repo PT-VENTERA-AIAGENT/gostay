@@ -11,6 +11,7 @@ import {
   FLOW_TEMPLATES, CATEGORY_META, CATEGORY_ORDER,
   type FlowTemplate, type TemplateCategory,
 } from "../../../api/_lib/wa/flow/templates";
+import { useT } from "@/lib/i18n";
 
 /**
  * Browse the ready-made flows and pick which ones to install.
@@ -37,6 +38,7 @@ export default function TemplatePicker({
   installedNames: Set<string>;
   onInstall: (templates: FlowTemplate[]) => Promise<void>;
 }) {
+  const t = useT();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
@@ -76,7 +78,7 @@ export default function TemplatePicker({
     <Dialog open={open} onOpenChange={(v) => !busy && onOpenChange(v)}>
       <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col gap-0 p-0">
         <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle>Pilih Template Alur</DialogTitle>
+          <DialogTitle>{t("Pilih Template Alur")}</DialogTitle>
           <DialogDescription>
             Semuanya bisa Anda ubah setelah terpasang — kata pemicu, teks balasan, maupun
             alurnya. Template dipasang dalam keadaan <strong>nonaktif</strong>, jadi WhatsApp
@@ -153,6 +155,7 @@ function TemplateCard({
   picked: boolean;
   onToggle: () => void;
 }) {
+  const t = useT();
   const kw = template.triggerKeywords;
 
   return (
@@ -190,13 +193,13 @@ function TemplateCard({
                 Tamu menginap
               </Badge>
             )}
-            {installed && <Badge variant="secondary">Sudah terpasang</Badge>}
+            {installed && <Badge variant="secondary">{t("Sudah terpasang")}</Badge>}
           </div>
 
           <p className="mt-1 text-xs text-muted-foreground">{template.description}</p>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-1">
-            <span className="text-[11px] text-muted-foreground">Dipicu oleh:</span>
+            <span className="text-[11px] text-muted-foreground">{t("Dipicu oleh:")}</span>
             {kw.slice(0, 5).map((k) => (
               <code key={k} className="rounded bg-muted px-1 py-0.5 text-[11px]">{k}</code>
             ))}

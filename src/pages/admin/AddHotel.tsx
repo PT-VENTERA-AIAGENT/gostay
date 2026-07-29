@@ -16,7 +16,7 @@ import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 /**
  * "Tambah Hotel" onboarding wizard (platform-admin only).
@@ -75,6 +75,7 @@ function messageForError(error: string | undefined): string {
 }
 
 export default function AddHotel() {
+  const t = useT();
   const { session } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -263,7 +264,7 @@ export default function AddHotel() {
     <PageTransition>
       <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-3xl mx-auto">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">Tambah Hotel</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Tambah Hotel")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Onboarding hotel baru: buat akun, lalu sambungkan WhatsApp untuk mulai menerima booking.
           </p>
@@ -302,18 +303,18 @@ export default function AddHotel() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">Nama hotel</label>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Nama hotel")}</label>
                     <input
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
-                      placeholder="Hotel Melati Indah"
+                      placeholder={t("Hotel Melati Indah")}
                       className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">Slug</label>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Slug")}</label>
                     <input
                       type="text"
                       value={slug}
@@ -339,7 +340,7 @@ export default function AddHotel() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">Nama staff</label>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Nama staff")}</label>
                     <input
                       type="text"
                       value={staffFullName}
@@ -350,7 +351,7 @@ export default function AddHotel() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">Email staff</label>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Email staff")}</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <input
@@ -364,7 +365,7 @@ export default function AddHotel() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">No. HP staff</label>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">{t("No. HP staff")}</label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <input
@@ -382,10 +383,10 @@ export default function AddHotel() {
 
               <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
                 <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4" /> WhatsApp Hotel <span className="text-xs font-normal text-muted-foreground">(opsional)</span>
+                  <MessageCircle className="w-4 h-4" /> WhatsApp Hotel <span className="text-xs font-normal text-muted-foreground">{t("(opsional)")}</span>
                 </h2>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Nomor / label WA hotel</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Nomor / label WA hotel")}</label>
                   <input
                     type="text"
                     value={botNumber}
@@ -427,11 +428,11 @@ export default function AddHotel() {
 
               <div className="mx-auto w-56 h-56 rounded-xl border border-border bg-background flex items-center justify-center overflow-hidden">
                 {qr ? (
-                  <img src={qr} alt="QR WhatsApp" className="w-full h-full object-contain" />
+                  <img src={qr} alt={t("QR WhatsApp")} className="w-full h-full object-contain" />
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <Loader2 className="w-6 h-6 animate-spin" />
-                    <span className="text-xs">Menyiapkan QR…</span>
+                    <span className="text-xs">{t("Menyiapkan QR…")}</span>
                   </div>
                 )}
               </div>
@@ -462,7 +463,7 @@ export default function AddHotel() {
                 <CheckCircle2 className="w-8 h-8 text-success" />
               </div>
               <h2 className="text-lg font-bold text-foreground mb-1">{name || "Hotel"} berhasil ditambahkan</h2>
-              <p className="text-sm text-muted-foreground">Hotel siap menerima booking WhatsApp.</p>
+              <p className="text-sm text-muted-foreground">{t("Hotel siap menerima booking WhatsApp.")}</p>
             </motion.div>
 
             <motion.div variants={staggerItem} className="flex flex-col sm:flex-row gap-3">

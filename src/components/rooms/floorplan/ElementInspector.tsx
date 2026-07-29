@@ -5,6 +5,7 @@ import {
   regularPolygonPoints,
   type PlanElement, type PlanCategory, type PlanShape,
 } from "@/types/floorPlan";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   element: PlanElement;
@@ -21,6 +22,7 @@ const field =
 const num = (v: number) => Math.round(v);
 
 export default function ElementInspector({ element, rooms, usedRoomIds, onChange, onDelete, onDuplicate }: Props) {
+  const t = useT();
   const meta = CATEGORY_META[element.category];
 
   // Switching to polygon needs a starting silhouette; keep existing points otherwise.
@@ -44,12 +46,12 @@ export default function ElementInspector({ element, rooms, usedRoomIds, onChange
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Properti Elemen</h3>
+        <h3 className="text-sm font-semibold text-foreground">{t("Properti Elemen")}</h3>
         <div className="flex items-center gap-1">
-          <button onClick={onDuplicate} title="Duplikat" className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={onDuplicate} title={t("Duplikat")} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
             <Copy className="w-4 h-4" />
           </button>
-          <button onClick={onDelete} title="Hapus" className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive transition-colors">
+          <button onClick={onDelete} title={t("Hapus")} className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive transition-colors">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -57,7 +59,7 @@ export default function ElementInspector({ element, rooms, usedRoomIds, onChange
 
       {/* Category */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1 block">Kategori</label>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Kategori")}</label>
         <select className={field} value={element.category} onChange={(e) => setCategory(e.target.value as PlanCategory)}>
           {CATEGORY_ORDER.map((c) => (
             <option key={c} value={c}>{CATEGORY_META[c].label}</option>
@@ -67,7 +69,7 @@ export default function ElementInspector({ element, rooms, usedRoomIds, onChange
 
       {/* Shape */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1 block">Bentuk</label>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Bentuk")}</label>
         <div className="grid grid-cols-4 gap-1">
           {(Object.keys(SHAPE_META) as PlanShape[]).map((s) => (
             <button
@@ -82,13 +84,13 @@ export default function ElementInspector({ element, rooms, usedRoomIds, onChange
           ))}
         </div>
         {element.shape === "polygon" && (
-          <p className="text-[11px] text-muted-foreground mt-1.5">Titik sudut bisa digeser langsung di kanvas (mode Titik).</p>
+          <p className="text-[11px] text-muted-foreground mt-1.5">{t("Titik sudut bisa digeser langsung di kanvas (mode Titik).")}</p>
         )}
       </div>
 
       {/* Label */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1 block">Label</label>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Label")}</label>
         <input
           className={field}
           value={element.label ?? ""}
@@ -108,7 +110,7 @@ export default function ElementInspector({ element, rooms, usedRoomIds, onChange
             value={element.roomId ?? ""}
             onChange={(e) => onChange({ roomId: e.target.value || null })}
           >
-            <option value="">— Tidak ditautkan —</option>
+            <option value="">{t("— Tidak ditautkan —")}</option>
             {rooms.map((r) => {
               const taken = r.id !== element.roomId && usedRoomIds.has(r.id);
               return (
@@ -118,13 +120,13 @@ export default function ElementInspector({ element, rooms, usedRoomIds, onChange
               );
             })}
           </select>
-          <p className="text-[11px] text-muted-foreground mt-1">Menghapus elemen tidak menghapus data kamar.</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{t("Menghapus elemen tidak menghapus data kamar.")}</p>
         </div>
       )}
 
       {/* Colour */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1 block">Warna</label>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Warna")}</label>
         <div className="flex items-center gap-2">
           <input
             type="color"
@@ -145,14 +147,14 @@ export default function ElementInspector({ element, rooms, usedRoomIds, onChange
       <div className="grid grid-cols-2 gap-2">
         <NumberField label="X" value={num(element.x)} onChange={(v) => onChange({ x: v })} />
         <NumberField label="Y" value={num(element.y)} onChange={(v) => onChange({ y: v })} />
-        <NumberField label="Lebar" value={num(element.w)} min={10} onChange={(v) => onChange({ w: Math.max(10, v) })} />
-        <NumberField label="Tinggi" value={num(element.h)} min={10} onChange={(v) => onChange({ h: Math.max(10, v) })} />
+        <NumberField label={t("Lebar")} value={num(element.w)} min={10} onChange={(v) => onChange({ w: Math.max(10, v) })} />
+        <NumberField label={t("Tinggi")} value={num(element.h)} min={10} onChange={(v) => onChange({ h: Math.max(10, v) })} />
       </div>
 
       {/* Rotation */}
       <div>
         <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center justify-between">
-          <span>Putaran</span>
+          <span>{t("Putaran")}</span>
           <span className="tabular-nums">{num(element.rotation)}°</span>
         </label>
         <input

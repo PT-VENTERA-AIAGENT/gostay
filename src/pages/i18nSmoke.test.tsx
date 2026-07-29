@@ -113,6 +113,22 @@ const PAGES: Array<[string, () => Promise<{ default: React.ComponentType }>]> = 
   ["NotificationsMenu", () => import("../components/layout/NotificationsMenu")],
   ["BookingReviewForm", () => import("../components/portal/BookingReviewForm")],
   ["PortalFloorPlan", () => import("./portal/PortalFloorPlan")],
+
+  // Third sweep: platform console, settings and admin. Several of these declare
+  // sub-components below the default export, and a binding in the page component
+  // does not reach them — WhatsApp.tsx had three such sub-components whose calls
+  // sat outside every binding.
+  ["PlatformOverview", () => import("./platform/Overview")],
+  ["PlatformHotels", () => import("./platform/Hotels")],
+  ["PlatformReservations", () => import("./platform/Reservations")],
+  ["PlatformGuestRequests", () => import("./platform/GuestRequests")],
+  ["WaFlows", () => import("./settings/WaFlows")],
+  ["Knowledge", () => import("./settings/Knowledge")],
+  ["SettingsWhatsApp", () => import("./settings/WhatsApp")],
+  ["AdminLeadList", () => import("./admin/LeadList")],
+  // Named exports rather than default, so they are adapted to the same shape.
+  ["ExitIntentPopup", () => import("../components/ExitIntentPopup").then((m) => ({ default: m.ExitIntentPopup }))],
+  ["PromoPopup", () => import("../components/PromoPopup").then((m) => ({ default: m.PromoPopup }))],
 ];
 
 describe("i18n sweep — every touched component renders", () => {

@@ -12,6 +12,7 @@ import {
   listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge,
   STARTER_KNOWLEDGE, type KnowledgeEntry,
 } from "@/services/knowledgeService";
+import { useT } from "@/lib/i18n";
 
 /**
  * The answers the WhatsApp assistant is allowed to give.
@@ -24,6 +25,7 @@ import {
  * assistant say it does not know and offer a human.
  */
 export default function Knowledge() {
+  const t = useT();
   const { toast } = useToast();
   const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,7 +151,7 @@ export default function Knowledge() {
         ) : entries.length === 0 ? (
           <div className="rounded-lg border border-dashed p-10 text-center">
             <BookOpen className="mx-auto h-10 w-10 text-muted-foreground/50" />
-            <h2 className="mt-4 font-medium">Belum ada informasi</h2>
+            <h2 className="mt-4 font-medium">{t("Belum ada informasi")}</h2>
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
               Tanpa isi di sini, asisten hanya bisa menjawab soal kamar, tarif, dan ketersediaan.
               Mulai dari {STARTER_KNOWLEDGE.length} topik yang paling sering ditanyakan tamu.
@@ -178,6 +180,7 @@ function EntryCard({
   onSave: (patch: Partial<KnowledgeEntry>) => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const [topic, setTopic] = useState(entry.topic);
   const [content, setContent] = useState(entry.content);
   const [keywords, setKeywords] = useState<string[]>(entry.keywords);
@@ -208,29 +211,29 @@ function EntryCard({
           onChange={(e) => setTopic(e.target.value)}
           onBlur={() => topic !== entry.topic && onSave({ topic })}
           className="h-9 flex-1 font-medium"
-          aria-label="Topik"
+          aria-label={t("Topik")}
         />
         <div className="flex shrink-0 items-center gap-2">
-          {placeholder && <Badge variant="secondary">Belum diisi</Badge>}
+          {placeholder && <Badge variant="secondary">{t("Belum diisi")}</Badge>}
           <Switch
             checked={entry.is_active}
             onCheckedChange={(v) => onSave({ is_active: v })}
-            aria-label="Aktifkan topik"
+            aria-label={t("Aktifkan topik")}
           />
-          <Button variant="ghost" size="icon" onClick={onDelete} aria-label="Hapus topik">
+          <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t("Hapus topik")}>
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold uppercase text-muted-foreground">Jawaban</Label>
+        <Label className="text-xs font-semibold uppercase text-muted-foreground">{t("Jawaban")}</Label>
         <Textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onBlur={() => content !== entry.content && onSave({ content })}
           rows={3}
-          placeholder="Tulis jawabannya seperti Anda menjawab tamu langsung."
+          placeholder={t("Tulis jawabannya seperti Anda menjawab tamu langsung.")}
         />
         <p className="text-xs text-muted-foreground">
           Dikutip hampir apa adanya ke tamu, jadi tulis sebagai balasan utuh.
@@ -256,10 +259,10 @@ function EntryCard({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addKeyword(); } }}
-            placeholder="mis. wifi"
+            placeholder={t("mis. wifi")}
             className="h-8"
           />
-          <Button size="sm" variant="outline" onClick={addKeyword}>Tambah</Button>
+          <Button size="sm" variant="outline" onClick={addKeyword}>{t("Tambah")}</Button>
         </div>
         <p className="text-xs text-muted-foreground">
           Kata lain yang harus mengarah ke topik ini. Dicocokkan sebagai kata utuh, jadi

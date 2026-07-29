@@ -7,7 +7,7 @@ import { useMyProfile, useUpdateMyProfile } from "@/hooks/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 const SSO_ACCOUNT_URL = (import.meta.env.VITE_SSO_ISSUER as string) ?? "https://sso.ventera.ai";
 
@@ -23,6 +23,7 @@ function memberSince(iso?: string) {
 }
 
 export default function PortalProfile() {
+  const t = useT();
   const { user } = useAuth();
   const { name: hotelName } = useTenant();
   const { data: profile, isLoading } = useMyProfile();

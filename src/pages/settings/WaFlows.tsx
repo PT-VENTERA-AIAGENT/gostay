@@ -22,6 +22,7 @@ import TemplatePicker from "@/components/waflow/TemplatePicker";
 // single definition serves both the installer and the engine's transcript
 // tests. A copy would drift the first time anyone edited one side.
 import { FLOW_TEMPLATES, type FlowTemplate } from "../../../api/_lib/wa/flow/templates";
+import { useT } from "@/lib/i18n";
 
 /**
  * The hotel's WhatsApp script: every flow, in the order the engine evaluates
@@ -34,6 +35,7 @@ import { FLOW_TEMPLATES, type FlowTemplate } from "../../../api/_lib/wa/flow/tem
  * without opening either one.
  */
 export default function WaFlows() {
+  const t = useT();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -212,7 +214,7 @@ export default function WaFlows() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogCancel>{t("Batal")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => confirmDelete && remove(confirmDelete)}
@@ -233,6 +235,7 @@ function FlowRow({
   onToggle: (next: boolean) => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const nodeCount = flow.definition.nodes.length;
   const req = REQUIREMENT_META[flow.requires];
 
@@ -262,7 +265,7 @@ function FlowRow({
                 Aktif
               </Badge>
             ) : (
-              <Badge variant="secondary" className="shrink-0">Nonaktif</Badge>
+              <Badge variant="secondary" className="shrink-0">{t("Nonaktif")}</Badge>
             )}
           </div>
 
@@ -292,13 +295,13 @@ function FlowRow({
 
         <div className="flex shrink-0 items-center gap-1">
           <span className="mr-1 hidden text-xs text-muted-foreground sm:inline">{nodeCount} node</span>
-          <Switch checked={flow.is_active} onCheckedChange={onToggle} aria-label="Aktifkan alur" />
+          <Switch checked={flow.is_active} onCheckedChange={onToggle} aria-label={t("Aktifkan alur")} />
           <Button variant="ghost" size="icon" asChild>
-            <Link to={`/settings/wa-flows/${flow.id}`} aria-label="Ubah alur">
+            <Link to={`/settings/wa-flows/${flow.id}`} aria-label={t("Ubah alur")}>
               <Pencil className="h-4 w-4" />
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" onClick={onDelete} aria-label="Hapus alur">
+          <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t("Hapus alur")}>
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
@@ -308,10 +311,11 @@ function FlowRow({
 }
 
 function EmptyState({ onBrowse }: { onBrowse: () => void }) {
+  const t = useT();
   return (
     <div className="rounded-lg border border-dashed p-10 text-center">
       <Workflow className="mx-auto h-10 w-10 text-muted-foreground/50" />
-      <h2 className="mt-4 font-medium">Belum ada alur</h2>
+      <h2 className="mt-4 font-medium">{t("Belum ada alur")}</h2>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
         Tersedia {FLOW_TEMPLATES.length} template siap pakai — reservasi dengan pembayaran di
         chat, request tamu yang menginap, info harga dan lokasi, penanganan keluhan, dan

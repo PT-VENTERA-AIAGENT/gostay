@@ -5,7 +5,7 @@ import {
   Download, Upload,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 import { useRooms } from "@/hooks/useRooms";
 import { useFloorPlan, useSaveFloorPlan } from "@/hooks/useFloorPlan";
 import ElementInspector from "./ElementInspector";
@@ -33,6 +33,7 @@ type Drag =
   | { kind: "pan"; startX: number; startY: number; tx: number; ty: number };
 
 export default function FloorPlanEditor() {
+  const t = useT();
   const { toast } = useToast();
   const { data: rooms = [] } = useRooms();
   const { data: serverPlan, isLoading } = useFloorPlan();
@@ -330,7 +331,7 @@ export default function FloorPlanEditor() {
       <div className="flex-1 min-w-0 flex flex-col rounded-xl border border-border bg-card overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center gap-1.5 flex-wrap p-2 border-b border-border bg-muted/40">
-          <span className="text-xs font-medium text-muted-foreground px-1 hidden sm:inline">Tambah:</span>
+          <span className="text-xs font-medium text-muted-foreground px-1 hidden sm:inline">{t("Tambah:")}</span>
           {CATEGORY_ORDER.map((c) => {
             const Icon = CAT_ICON[c];
             return (
@@ -348,15 +349,15 @@ export default function FloorPlanEditor() {
 
           <div className="w-px h-6 bg-border mx-1" />
 
-          <ToolToggle active={snap} onClick={() => setSnap((s) => !s)} title="Snap ke grid"><Magnet className="w-4 h-4" /></ToolToggle>
-          <ToolToggle active={showGrid} onClick={() => setShowGrid((s) => !s)} title="Tampilkan grid"><Grid3x3 className="w-4 h-4" /></ToolToggle>
+          <ToolToggle active={snap} onClick={() => setSnap((s) => !s)} title={t("Snap ke grid")}><Magnet className="w-4 h-4" /></ToolToggle>
+          <ToolToggle active={showGrid} onClick={() => setShowGrid((s) => !s)} title={t("Tampilkan grid")}><Grid3x3 className="w-4 h-4" /></ToolToggle>
 
           <div className="w-px h-6 bg-border mx-1" />
 
-          <ToolToggle active={false} onClick={() => setZoom((z) => Math.max(0.15, z / 1.15))} title="Perkecil"><ZoomOut className="w-4 h-4" /></ToolToggle>
+          <ToolToggle active={false} onClick={() => setZoom((z) => Math.max(0.15, z / 1.15))} title={t("Perkecil")}><ZoomOut className="w-4 h-4" /></ToolToggle>
           <span className="text-xs text-muted-foreground tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
-          <ToolToggle active={false} onClick={() => setZoom((z) => Math.min(4, z * 1.15))} title="Perbesar"><ZoomIn className="w-4 h-4" /></ToolToggle>
-          <ToolToggle active={false} onClick={fitView} title="Paskan ke layar"><Maximize className="w-4 h-4" /></ToolToggle>
+          <ToolToggle active={false} onClick={() => setZoom((z) => Math.min(4, z * 1.15))} title={t("Perbesar")}><ZoomIn className="w-4 h-4" /></ToolToggle>
+          <ToolToggle active={false} onClick={fitView} title={t("Paskan ke layar")}><Maximize className="w-4 h-4" /></ToolToggle>
 
           <div className="ml-auto flex items-center gap-2">
             <input
@@ -371,22 +372,22 @@ export default function FloorPlanEditor() {
             />
             <button
               onClick={() => importRef.current?.click()}
-              title="Impor desain JSON"
+              title={t("Impor desain JSON")}
               className="inline-flex items-center gap-1.5 border border-border bg-background text-foreground px-2.5 py-1.5 rounded-md text-xs font-semibold hover:bg-muted transition-colors btn-press"
             >
               <Upload className="w-4 h-4" />
-              <span className="hidden sm:inline">Impor</span>
+              <span className="hidden sm:inline">{t("Impor")}</span>
             </button>
             <button
               onClick={handleExport}
               disabled={!plan}
-              title="Ekspor desain JSON"
+              title={t("Ekspor desain JSON")}
               className="inline-flex items-center gap-1.5 border border-border bg-background text-foreground px-2.5 py-1.5 rounded-md text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50 btn-press"
             >
               <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Ekspor</span>
+              <span className="hidden sm:inline">{t("Ekspor")}</span>
             </button>
-            {dirty && <span className="text-xs text-amber-600 dark:text-amber-400">Belum disimpan</span>}
+            {dirty && <span className="text-xs text-amber-600 dark:text-amber-400">{t("Belum disimpan")}</span>}
             <button
               onClick={handleSave}
               disabled={save.isPending || !dirty}
@@ -437,8 +438,8 @@ export default function FloorPlanEditor() {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center px-6">
                 <Shapes className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-sm font-medium text-foreground mb-1">Denah masih kosong</p>
-                <p className="text-xs text-muted-foreground">Gunakan tombol “Tambah” di atas untuk menaruh bangunan, taman, kolam, dan lainnya.</p>
+                <p className="text-sm font-medium text-foreground mb-1">{t("Denah masih kosong")}</p>
+                <p className="text-xs text-muted-foreground">{t("Gunakan tombol “Tambah” di atas untuk menaruh bangunan, taman, kolam, dan lainnya.")}</p>
               </div>
             </div>
           )}
@@ -473,16 +474,16 @@ export default function FloorPlanEditor() {
           </div>
         ) : (
           <div className="text-sm text-muted-foreground space-y-3">
-            <p className="font-medium text-foreground">Editor Denah</p>
-            <p>Klik sebuah elemen untuk mengubah propertinya, atau seret latar untuk menggeser tampilan.</p>
+            <p className="font-medium text-foreground">{t("Editor Denah")}</p>
+            <p>{t("Klik sebuah elemen untuk mengubah propertinya, atau seret latar untuk menggeser tampilan.")}</p>
             <ul className="space-y-1.5 text-xs">
-              <li>• Seret elemen untuk memindahkan.</li>
-              <li>• Seret gagang sudut untuk mengubah ukuran.</li>
-              <li>• Scroll untuk zoom, seret latar untuk pan.</li>
-              <li>• Tombol Delete menghapus elemen terpilih.</li>
+              <li>{t("• Seret elemen untuk memindahkan.")}</li>
+              <li>{t("• Seret gagang sudut untuk mengubah ukuran.")}</li>
+              <li>{t("• Scroll untuk zoom, seret latar untuk pan.")}</li>
+              <li>{t("• Tombol Delete menghapus elemen terpilih.")}</li>
             </ul>
             <div className="pt-2 border-t border-border">
-              <p className="text-xs font-medium text-foreground mb-1.5">Legenda</p>
+              <p className="text-xs font-medium text-foreground mb-1.5">{t("Legenda")}</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {CATEGORY_ORDER.map((c) => (
                   <div key={c} className="flex items-center gap-1.5 text-xs">

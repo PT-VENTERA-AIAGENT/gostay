@@ -184,15 +184,15 @@ export default function WhatsApp() {
         <motion.div variants={staggerContainer} initial="hidden" animate="show">
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-6 md:p-8">
             {!loaded ? (
-              <CenteredSpinner label="Memuat status…" />
+              <CenteredSpinner label={t("Memuat status…")} />
             ) : state.status === "none" ? (
               <EmptyState onConnect={connect} busy={busy} />
             ) : state.status === "pairing" ? (
-              <CenteredSpinner label="Menyiapkan sesi…" />
+              <CenteredSpinner label={t("Menyiapkan sesi…")} />
             ) : state.status === "qr" ? (
               <QrState qr={state.qr} />
             ) : state.status === "connecting" ? (
-              <CenteredSpinner label="Menghubungkan…" />
+              <CenteredSpinner label={t("Menghubungkan…")} />
             ) : state.status === "open" ? (
               <ConnectedState linkedNumber={state.linkedNumber} onUnlink={unlink} busy={busy} />
             ) : (
@@ -239,6 +239,7 @@ function EmptyState({ onConnect, busy }: { onConnect: () => void; busy: boolean 
 }
 
 function QrState({ qr }: { qr?: string }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center text-center py-2">
       <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -246,7 +247,7 @@ function QrState({ qr }: { qr?: string }) {
       </h2>
       <div className="mt-5 rounded-xl border border-border bg-background p-3">
         {qr ? (
-          <img src={qr} alt="QR WhatsApp" className="w-64 h-64" />
+          <img src={qr} alt={t("QR WhatsApp")} className="w-64 h-64" />
         ) : (
           <div className="w-64 h-64 flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -270,12 +271,13 @@ function ConnectedState({
   onUnlink: () => void;
   busy: boolean;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center text-center py-6">
       <div className="w-16 h-16 rounded-2xl bg-success/10 flex items-center justify-center mb-4">
         <CheckCircle2 className="w-8 h-8 text-success" />
       </div>
-      <h2 className="text-lg font-semibold text-foreground">WhatsApp tertaut</h2>
+      <h2 className="text-lg font-semibold text-foreground">{t("WhatsApp tertaut")}</h2>
       {linkedNumber && (
         <p className="text-sm text-muted-foreground mt-1.5">
           Nomor tertaut: <span className="font-mono font-medium text-foreground">{linkedNumber}</span>
@@ -298,12 +300,13 @@ function ConnectedState({
 }
 
 function ClosedState({ onReconnect, busy }: { onReconnect: () => void; busy: boolean }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center text-center py-6">
       <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
         <AlertTriangle className="w-8 h-8 text-destructive" />
       </div>
-      <h2 className="text-lg font-semibold text-foreground">Tertaut terputus</h2>
+      <h2 className="text-lg font-semibold text-foreground">{t("Tertaut terputus")}</h2>
       <p className="text-sm text-muted-foreground mt-2 max-w-sm leading-relaxed">
         Koneksi WhatsApp hotel terputus. Sambungkan ulang untuk menerima pesanan lewat chat kembali.
       </p>

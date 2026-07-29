@@ -115,14 +115,14 @@ export default function HotelProfile() {
               </Field>
             </div>
             <Field label={t("Alamat")}>
-              <input className={inputCls} value={form.address} onChange={set("address")} placeholder="Jl. …, Kota" />
+              <input className={inputCls} value={form.address} onChange={set("address")} placeholder={t("Jl. …, Kota")} />
             </Field>
             <div className="space-y-1.5">
               <span className="text-sm font-medium text-foreground">{t("Logo hotel (opsional)")}</span>
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-xl border border-border bg-muted/40 flex items-center justify-center overflow-hidden shrink-0">
                   {form.logo_url ? (
-                    <img src={form.logo_url} alt="Logo hotel" className="w-full h-full object-contain" />
+                    <img src={form.logo_url} alt={t("Logo hotel")} className="w-full h-full object-contain" />
                   ) : (
                     <ImageIcon className="w-6 h-6 text-muted-foreground" />
                   )}

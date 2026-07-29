@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import PageTransition from "@/components/shared/PageTransition";
+import { useT } from "@/lib/i18n";
 
 interface Lead {
   id: string;
@@ -83,6 +84,7 @@ function StatsBar({ leads }: { leads: Lead[] }) {
 }
 
 export default function LeadList() {
+  const t = useT();
   const { session } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -150,7 +152,7 @@ export default function LeadList() {
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Lead Generation</h1>
+            <h1 className="text-2xl font-bold">{t("Lead Generation")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
               Outbound WA sales ke hotel & villa Indonesia
             </p>
@@ -173,7 +175,7 @@ export default function LeadList() {
           </p>
           <textarea
             className="w-full h-24 text-xs font-mono border rounded p-2 resize-none focus:outline-none focus:ring-1"
-            placeholder="Paste CSV di sini (dengan header row)..."
+            placeholder={t("Paste CSV di sini (dengan header row)...")}
             value={csvText}
             onChange={(e) => setCsvText(e.target.value)}
           />
@@ -189,7 +191,7 @@ export default function LeadList() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               className="pl-9"
-              placeholder="Cari nama atau kota..."
+              placeholder={t("Cari nama atau kota...")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -200,7 +202,7 @@ export default function LeadList() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua Status</SelectItem>
+              <SelectItem value="all">{t("Semua Status")}</SelectItem>
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
                 <SelectItem key={value} value={value}>{label}</SelectItem>
               ))}
@@ -211,7 +213,7 @@ export default function LeadList() {
         {/* Lead Table */}
         <div className="bg-card rounded-lg border overflow-hidden">
           {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground text-sm">Memuat leads...</div>
+            <div className="p-8 text-center text-muted-foreground text-sm">{t("Memuat leads...")}</div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground text-sm">
               {leads.length === 0
@@ -222,11 +224,11 @@ export default function LeadList() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium">Properti</th>
-                  <th className="text-left px-4 py-3 font-medium">Lokasi</th>
-                  <th className="text-left px-4 py-3 font-medium">Rating</th>
-                  <th className="text-left px-4 py-3 font-medium">Status</th>
-                  <th className="text-left px-4 py-3 font-medium">Terakhir Kontak</th>
+                  <th className="text-left px-4 py-3 font-medium">{t("Properti")}</th>
+                  <th className="text-left px-4 py-3 font-medium">{t("Lokasi")}</th>
+                  <th className="text-left px-4 py-3 font-medium">{t("Rating")}</th>
+                  <th className="text-left px-4 py-3 font-medium">{t("Status")}</th>
+                  <th className="text-left px-4 py-3 font-medium">{t("Terakhir Kontak")}</th>
                   <th className="w-10" />
                 </tr>
               </thead>

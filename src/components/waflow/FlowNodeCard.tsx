@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import * as Icons from "lucide-react";
 import { ACTION_META, NODE_META, type ActionType, type ChoiceOption, type NodeType } from "@/types/waFlow";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 /**
  * One node on the canvas.
@@ -39,6 +40,7 @@ function truncate(s: string, max = 90): string {
 }
 
 export default function FlowNodeCard({ data, selected }: NodeProps) {
+  const t = useT();
   const d = data as FlowNodeData;
   const meta = NODE_META[d.kind];
   if (!meta) return null;
@@ -68,7 +70,7 @@ export default function FlowNodeCard({ data, selected }: NodeProps) {
 
       <div className="space-y-1.5 px-3 py-2.5 text-xs">
         {d.kind === "trigger" && (
-          <p className="italic text-muted-foreground">Kata pemicu diatur di panel Pengaturan.</p>
+          <p className="italic text-muted-foreground">{t("Kata pemicu diatur di panel Pengaturan.")}</p>
         )}
 
         {d.kind === "message" && (
@@ -96,7 +98,7 @@ export default function FlowNodeCard({ data, selected }: NodeProps) {
             </p>
             <ol className="mt-1 space-y-0.5">
               {options.length === 0 ? (
-                <li className="italic text-muted-foreground">Belum ada opsi.</li>
+                <li className="italic text-muted-foreground">{t("Belum ada opsi.")}</li>
               ) : (
                 options.map((o, i) => (
                   <li key={o.id} className="truncate">
@@ -153,8 +155,8 @@ export default function FlowNodeCard({ data, selected }: NodeProps) {
             className="!h-2.5 !w-2.5 !bg-rose-500"
           />
           <div className="flex justify-between px-3 pb-1 text-[10px] text-muted-foreground">
-            <span>Ya</span>
-            <span>Tidak</span>
+            <span>{t("Ya")}</span>
+            <span>{t("Tidak")}</span>
           </div>
         </>
       )}

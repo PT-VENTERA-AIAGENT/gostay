@@ -24,6 +24,7 @@ import {
   type ActionType, type ConditionOperator, type FlowRequirement,
   type NodeType, type WaFlow,
 } from "@/types/waFlow";
+import { useT } from "@/lib/i18n";
 
 /**
  * The canvas editor for one flow.
@@ -42,6 +43,7 @@ const newId = (kind: string) => `${kind}-${Date.now().toString(36)}-${seq++}`;
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function WaFlowEditor() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -199,15 +201,15 @@ export default function WaFlowEditor() {
           value={name}
           onChange={(e) => { setName(e.target.value); markDirty(); }}
           className="h-8 w-56 font-medium"
-          aria-label="Nama alur"
+          aria-label={t("Nama alur")}
         />
         <div className="ml-auto flex items-center gap-3">
-          {dirty && <span className="text-xs text-muted-foreground">Belum disimpan</span>}
+          {dirty && <span className="text-xs text-muted-foreground">{t("Belum disimpan")}</span>}
           <div className="flex items-center gap-2">
             <Switch
               checked={isActive}
               onCheckedChange={(v) => { setIsActive(v); markDirty(); }}
-              aria-label="Aktifkan alur"
+              aria-label={t("Aktifkan alur")}
             />
             <span className="text-sm">{isActive ? "Aktif" : "Nonaktif"}</span>
           </div>
@@ -228,7 +230,7 @@ export default function WaFlowEditor() {
       <div className="flex min-h-0 flex-1">
         {/* ── Palette ───────────────────────────────────────────────────── */}
         <aside className="w-44 shrink-0 space-y-1 overflow-y-auto border-r p-2">
-          <p className="px-1 pb-1 text-xs font-semibold uppercase text-muted-foreground">Tambah Node</p>
+          <p className="px-1 pb-1 text-xs font-semibold uppercase text-muted-foreground">{t("Tambah Node")}</p>
           {PALETTE.map((kind) => {
             const meta = NODE_META[kind];
             const C = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[meta.icon];
@@ -296,6 +298,7 @@ function NodeInspector({
   onPatch: (p: Partial<FlowNodeData>) => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const meta = NODE_META[data.kind];
   const options = data.options ?? [];
 
@@ -314,7 +317,7 @@ function NodeInspector({
       )}
 
       {(data.kind === "message" || data.kind === "handoff" || data.kind === "end") && (
-        <Field label="Teks pesan" hint="Gunakan {{hotel_name}} dan {{guest_name}} untuk menyisipkan data.">
+        <Field label={t("Teks pesan")} hint="Gunakan {{hotel_name}} dan {{guest_name}} untuk menyisipkan data.">
           <Textarea
             value={data.text ?? ""}
             onChange={(e) => onPatch({ text: e.target.value })}
@@ -325,10 +328,10 @@ function NodeInspector({
 
       {data.kind === "ask" && (
         <>
-          <Field label="Pertanyaan">
+          <Field label={t("Pertanyaan")}>
             <Textarea value={data.prompt ?? ""} onChange={(e) => onPatch({ prompt: e.target.value })} rows={3} />
           </Field>
-          <Field label="Simpan jawaban ke" hint="Nama variabel; bisa dipakai lagi sebagai {{nama}}.">
+          <Field label={t("Simpan jawaban ke")} hint="Nama variabel; bisa dipakai lagi sebagai {{nama}}.">
             <Input value={data.variable ?? ""} onChange={(e) => onPatch({ variable: e.target.value })} />
           </Field>
         </>
@@ -336,10 +339,10 @@ function NodeInspector({
 
       {data.kind === "choice" && (
         <>
-          <Field label="Teks pengantar">
+          <Field label={t("Teks pengantar")}>
             <Textarea value={data.text ?? ""} onChange={(e) => onPatch({ text: e.target.value })} rows={3} />
           </Field>
-          <Field label="Pilihan" hint="Nomor ditambahkan otomatis. Tiap pilihan punya cabang sendiri.">
+          <Field label={t("Pilihan")} hint="Nomor ditambahkan otomatis. Tiap pilihan punya cabang sendiri.">
             <div className="space-y-2">
               {options.map((o, i) => (
                 <div key={o.id} className="flex items-center gap-1">
@@ -356,7 +359,7 @@ function NodeInspector({
                   <Button
                     variant="ghost" size="icon" className="h-8 w-8 shrink-0"
                     onClick={() => onPatch({ options: options.filter((x) => x.id !== o.id) })}
-                    aria-label="Hapus pilihan"
+                    aria-label={t("Hapus pilihan")}
                   >
                     <X className="h-3.5 w-3.5" />
                   </Button>
@@ -379,26 +382,26 @@ function NodeInspector({
 
       {data.kind === "condition" && (
         <>
-          <Field label="Variabel" hint="Contoh: is_inhouse, atau variabel dari node Tanya.">
+          <Field label={t("Variabel")} hint="Contoh: is_inhouse, atau variabel dari node Tanya.">
             <Input value={data.variable ?? ""} onChange={(e) => onPatch({ variable: e.target.value })} />
           </Field>
-          <Field label="Operator">
+          <Field label={t("Operator")}>
             <Select
               value={data.operator ?? "=="}
               onValueChange={(v) => onPatch({ operator: v as ConditionOperator })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="==">sama dengan</SelectItem>
-                <SelectItem value="!=">tidak sama dengan</SelectItem>
+                <SelectItem value="==">{t("sama dengan")}</SelectItem>
+                <SelectItem value="!=">{t("tidak sama dengan")}</SelectItem>
                 <SelectItem value="contains">mengandung</SelectItem>
-                <SelectItem value="is_set">ada isinya</SelectItem>
+                <SelectItem value="is_set">{t("ada isinya")}</SelectItem>
                 <SelectItem value="is_empty">kosong</SelectItem>
               </SelectContent>
             </Select>
           </Field>
           {data.operator !== "is_set" && data.operator !== "is_empty" && (
-            <Field label="Nilai pembanding">
+            <Field label={t("Nilai pembanding")}>
               <Input value={data.value ?? ""} onChange={(e) => onPatch({ value: e.target.value })} />
             </Field>
           )}
@@ -406,9 +409,9 @@ function NodeInspector({
       )}
 
       {data.kind === "action" && (
-        <Field label="Aksi">
+        <Field label={t("Aksi")}>
           <Select value={data.action} onValueChange={(v) => onPatch({ action: v as ActionType })}>
-            <SelectTrigger><SelectValue placeholder="Pilih aksi" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t("Pilih aksi")} /></SelectTrigger>
             <SelectContent>
               {(Object.keys(ACTION_META) as ActionType[]).map((a) => (
                 <SelectItem key={a} value={a}>{ACTION_META[a].label}</SelectItem>
@@ -441,6 +444,7 @@ function FlowSettings({
   requires: FlowRequirement; setRequires: (v: FlowRequirement) => void;
   priority: number; setPriority: (v: number) => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState("");
 
   function addKeyword() {
@@ -453,18 +457,18 @@ function FlowSettings({
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="font-medium">Pengaturan Alur</h2>
+        <h2 className="font-medium">{t("Pengaturan Alur")}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Pilih sebuah node untuk mengubah isinya.
         </p>
       </div>
 
-      <Field label="Keterangan" hint="Untuk staf Anda sendiri; tamu tidak melihatnya.">
+      <Field label={t("Keterangan")} hint="Untuk staf Anda sendiri; tamu tidak melihatnya.">
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
       </Field>
 
       <Field
-        label="Kata pemicu"
+        label={t("Kata pemicu")}
         hint="Dicocokkan sebagai kata utuh, bukan potongan — “menu” tidak akan terpicu oleh “menunggu”."
       >
         <div className="flex flex-wrap gap-1.5 pb-2">
@@ -482,14 +486,14 @@ function FlowSettings({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addKeyword(); } }}
-            placeholder="mis. booking"
+            placeholder={t("mis. booking")}
             className="h-8"
           />
-          <Button size="sm" variant="outline" onClick={addKeyword}>Tambah</Button>
+          <Button size="sm" variant="outline" onClick={addKeyword}>{t("Tambah")}</Button>
         </div>
       </Field>
 
-      <Field label="Syarat tamu">
+      <Field label={t("Syarat tamu")}>
         <Select value={requires} onValueChange={(v) => setRequires(v as FlowRequirement)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -502,7 +506,7 @@ function FlowSettings({
       </Field>
 
       <Field
-        label="Prioritas"
+        label={t("Prioritas")}
         hint="Angka lebih kecil diperiksa lebih dulu. Pakai ini bila dua alur berbagi kata pemicu."
       >
         <Input
