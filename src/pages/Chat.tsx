@@ -25,6 +25,21 @@ import { deliverToWhatsApp, setBotTakeover, isBotPaused } from "@/services/chatS
  * diverge once someone has booked, which is precisely when staff need to see
  * both. Identical names (or a missing pushName) get no second line.
  */
+/**
+ * Whether replies to this guest can reach them at all.
+ *
+ * When WhatsApp addresses a chat by LID it withholds the phone number, and the
+ * digits of the LID itself get stored as the contact's phone. Those are 14-15
+ * digits and never start with a dialling code that fits — an Indonesian number
+ * is at most 13 digits — so length is the honest signal we have client-side.
+ * The moment staff type a real number into CRM this turns false and every
+ * reply routes there (the server makes the same decision from the same data).
+ */
+function guestUnreachable(customer?: { phone?: string | null } | null): boolean {
+  const digits = (customer?.phone ?? "").replace(/\D+/g, "");
+  return digits.length >= 14;
+}
+
 function waAccountLabel(customer?: { full_name?: string | null; wa_push_name?: string | null } | null): string | null {
   const push = customer?.wa_push_name?.trim();
   if (!push) return null;
@@ -121,6 +136,19 @@ export default function Chat() {
             toast({
               title: "Tersimpan, tidak dikirim ke WhatsApp",
               description: "Tamu ini belum pernah menghubungi lewat WhatsApp.",
+            });
+            return;
+          }
+          if (r.error === "guest_unreachable_lid") {
+            // WhatsApp withheld this guest's number (a LID alias), so there is
+            // no address to deliver to. The one thing that fixes it is a human
+            // typing the real number into CRM — say exactly that.
+            toast({
+              title: "Tamu tidak bisa dihubungi",
+              description:
+                "WhatsApp menyembunyikan nomor tamu ini, jadi balasan tidak bisa dikirim. " +
+                "Isi nomor telepon aslinya di CRM Tamu — setelah itu semua balasan otomatis terkirim ke nomor tersebut.",
+              variant: "destructive",
             });
             return;
           }
@@ -296,6 +324,18 @@ export default function Chat() {
                   </DropdownMenu>
                 </div>
               </div>
+
+              {/* A guest whose number WhatsApp withheld cannot be replied to at
+                  all — the gateway even claims success while dropping the
+                  message. Without this strip the inbox looks perfectly healthy
+                  while every reply silently vanishes, which is exactly how it
+                  went unnoticed for days. */}
+              {guestUnreachable(selectedThread.customers) && (
+                <div className="px-4 md:px-6 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 shrink-0">
+                  ⚠ Nomor tamu ini disembunyikan WhatsApp — balasan (bot maupun staf) <b>tidak sampai</b> ke tamu.
+                  Isi nomor telepon aslinya di <b>CRM Tamu</b> agar balasan terkirim.
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
                 {messagesLoading ? (

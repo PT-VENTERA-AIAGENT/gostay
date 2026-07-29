@@ -127,7 +127,12 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     }
 
     const result = await deliverStaffReply({ threadId, text });
-    res.status(result.ok ? 200 : 502).json(result);
+    // Always 200: a failed delivery is an application OUTCOME the client reads
+    // from `ok`/`error`, not a gateway fault. Answering 502 put Cloudflare in
+    // the way — it replaces 502 bodies with its own error page, so the browser
+    // never saw the JSON and staff got a blank "Bad gateway" instead of the
+    // reason their message did not reach the guest.
+    res.status(200).json(result);
     return;
   }
 
