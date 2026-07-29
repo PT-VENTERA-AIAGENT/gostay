@@ -14,6 +14,7 @@ import {
   checkGreetCooldown,
   isReplyableMessage,
   isAllowedGuest,
+  parseDeliveryFailures,
 } from "./inbound";
 
 const SECRET = "wa-webhook-secret-value-1234567890";
@@ -505,5 +506,39 @@ describe("isAllowedGuest — the testing seatbelt", () => {
   it("stays silent for a JID with no digits at all", () => {
     process.env.WA_ALLOWED_GUESTS = "628111000001";
     expect(isAllowedGuest("@s.whatsapp.net")).toBe(false);
+  });
+});
+
+describe("parseDeliveryFailures", () => {
+  it("reads a refusal reported by the gateway", () => {
+    expect(
+      parseDeliveryFailures({
+        sessionId: "lor-kali",
+        messages: [],
+        deliveryFailures: [
+          { messageId: "3EB0", remoteJid: "628123@s.whatsapp.net", status: 0, reason: "whatsapp_rejected" },
+        ],
+      }),
+    ).toEqual([
+      { messageId: "3EB0", remoteJid: "628123@s.whatsapp.net", reason: "whatsapp_rejected" },
+    ]);
+  });
+
+  it("is empty for an ordinary inbound payload — old gateways send no such field", () => {
+    expect(parseDeliveryFailures({ sessionId: "lor-kali", messages: [] })).toEqual([]);
+    expect(parseDeliveryFailures(undefined)).toEqual([]);
+    expect(parseDeliveryFailures({ deliveryFailures: "bukan array" })).toEqual([]);
+  });
+
+  it("drops an entry with no address — there is nothing to attribute it to", () => {
+    expect(
+      parseDeliveryFailures({ deliveryFailures: [{ messageId: "x", remoteJid: "" }, { messageId: "y" }] }),
+    ).toEqual([]);
+  });
+
+  it("names a reason even when the gateway omits one", () => {
+    expect(parseDeliveryFailures({ deliveryFailures: [{ remoteJid: "628123@s.whatsapp.net" }] })).toEqual([
+      { messageId: null, remoteJid: "628123@s.whatsapp.net", reason: "whatsapp_rejected" },
+    ]);
   });
 });

@@ -84,10 +84,45 @@ interface WAMessage {
   };
 }
 
+interface DeliveryFailure {
+  messageId?: string | null;
+  remoteJid?: string;
+  status?: number;
+  reason?: string;
+}
+
 interface InboundBody {
   sessionId?: string;
   receivedAt?: string;
   messages?: WAMessage[];
+  deliveryFailures?: DeliveryFailure[];
+}
+
+/**
+ * Kiriman yang DITOLAK WhatsApp, dilaporkan gateway belakangan.
+ *
+ * Jawaban `POST /send` hanya berarti stanza sudah ditulis ke socket; penolakan
+ * datang lewat ack asinkron beberapa detik kemudian. Tanpa jalur ini penolakan
+ * itu tidak pernah sampai ke GoStay: inbox hotel menampilkan balasan seolah
+ * terkirim sementara tamu tidak menerima apa pun — persis kegagalan yang
+ * bertahan berhari-hari karena tidak ada yang melaporkannya.
+ */
+export interface ParsedDeliveryFailure {
+  messageId: string | null;
+  remoteJid: string;
+  reason: string;
+}
+
+export function parseDeliveryFailures(body: unknown): ParsedDeliveryFailure[] {
+  const b = (body ?? {}) as InboundBody;
+  const list = Array.isArray(b.deliveryFailures) ? b.deliveryFailures : [];
+  return list
+    .filter((f) => typeof f?.remoteJid === "string" && f.remoteJid.length > 0)
+    .map((f) => ({
+      messageId: typeof f.messageId === "string" ? f.messageId : null,
+      remoteJid: f.remoteJid as string,
+      reason: typeof f.reason === "string" && f.reason ? f.reason : "whatsapp_rejected",
+    }));
 }
 
 /**

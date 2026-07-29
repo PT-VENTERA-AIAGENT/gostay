@@ -22,8 +22,10 @@ import {
   shouldAutoReply,
   checkReplyRateLimit,
   isAllowedGuest,
+  parseDeliveryFailures,
 } from "../_lib/wa/inbound";
 import { handleGuestMessage } from "../_lib/wa/converse";
+import { recordDeliveryRejection } from "../_lib/wa/incidents";
 
 interface VercelRequest {
   method?: string;
@@ -60,8 +62,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const sessionId = sessionIdOf(body);
   const receivedAt = receivedAtOf(body);
   const messages = parseMessages(body);
+  const failures = parseDeliveryFailures(body);
 
   try {
+    // Kabar buruk yang datang terlambat. Gateway melaporkan di sini kiriman yang
+    // DITOLAK WhatsApp sesudah `POST /send` menjawab sukses — satu-satunya jalan
+    // bagi GoStay untuk mengetahuinya, karena penolakan itu datang lewat ack
+    // asinkron yang tidak pernah terlihat oleh pemanggil. Tanpa ini hotel melihat
+    // balasan "terkirim" di inbox sementara tamu tidak menerima apa pun.
+    if (failures.length > 0) {
+      const tenantId = await resolveTenant(sessionId);
+      if (tenantId) {
+        for (const f of failures) {
+          await recordDeliveryRejection({
+            tenantId,
+            sessionId,
+            remoteJid: f.remoteJid,
+            reason: f.reason,
+          });
+        }
+      }
+    }
+
     for (const msg of messages) {
       // Never react to our own outbound echo — that would feedback-loop.
       if (msg.fromMe) continue;

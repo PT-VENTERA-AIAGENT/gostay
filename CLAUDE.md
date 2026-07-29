@@ -26,7 +26,13 @@ Detail kontrak integrasi: `docs/INTEGRATIONS.md`.
 
 WhatsApp dilayani oleh **gateway Baileys milik Ventera sendiri (self-hosted)**.
 Di kode/env namanya masih "wa-ventera" (nama historis) — itu BUKAN layanan
-pihak ketiga; source-nya tidak ada di org GitHub ini (jalan di server sendiri).
+pihak ketiga. Source-nya ADA di mesin dev ini: `D:\Project\wa-ventera`
+(branch `fix/lid-resolve`); deploy = salin source ke server
+`ventera@103.93.162.172:/opt/wa-gostay` (SSH key sudah terpasang) lalu
+`sudo docker compose --env-file .env.production -f docker-compose.prod.yml
+build app && ... up -d app`. Container: `wa-gostay-app-1`, port 3061 =
+`WA_VENTERA_BASE_URL`. Baileys HARUS ≥7.0.0-rc13 — di rc10 kiriman ke akun
+yang sudah migrasi LID "sukses" (dapat messageId) tapi tidak pernah tiba.
 
 - GoStay → gateway: `POST /api/sessions` (buat sesi; id = slug tenant),
   `GET /api/sessions/{id}` (status), `GET /api/sessions/{id}/qr` (SSE),
