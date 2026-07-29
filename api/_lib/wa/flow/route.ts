@@ -18,9 +18,23 @@
 import { isConfigured } from "../client";
 import { checkFlowStartBudget } from "../inbound";
 import { clearPending, setPending, type PendingAction } from "../pending";
-import { runFlow, type FlowActions } from "./engine";
+import { runFlow, nodeAcceptsInput, type FlowActions } from "./engine";
 import { getFlow, listActiveFlows, type StoredFlow } from "./store";
-import { pickFlow, type GuestState } from "./select";
+import { selectFlow, type GuestState } from "./select";
+
+/**
+ * What a guest hears when they ask for something only in-house guests get.
+ *
+ * Previously this message did not exist: the gated flow was skipped and whatever
+ * lower-priority flow also claimed the word answered instead, so "menu" from a
+ * guest who had not checked in returned the greeting — no hint that room service
+ * was a thing, nor what to do about it. Both routes out are offered, because
+ * either may apply: they may have booked and not checked in yet, or not booked.
+ */
+const REQUIRES_INHOUSE_NOTICE =
+  "Mohon maaf, layanan ini hanya untuk tamu yang sedang menginap (sudah check-in).\n\n" +
+  "Bila Anda sudah memesan, silakan check-in dulu di resepsionis — setelah itu layanan ini otomatis terbuka.\n" +
+  "Bila belum memesan, balas *pesan kamar* untuk mulai reservasi.";
 
 /** How long a halted flow run stays resumable. Matches the booking TTL. */
 const FLOW_TTL_MINUTES = 30;
@@ -105,8 +119,17 @@ async function start(params: FlowRouteParams): Promise<FlowRouteResult> {
   if (flows.length === 0) return NOT_HANDLED;
 
   const state = await resolveState(flows, params);
-  const flow = pickFlow(flows, params.input, state);
-  if (!flow) return NOT_HANDLED;
+  const choice = selectFlow(flows, params.input, state);
+  if (choice.kind === "none") return NOT_HANDLED;
+
+  // The hotel offers exactly what they asked for — they just are not eligible
+  // yet. Say so, rather than letting a lower-priority flow answer something
+  // else. Handled, so the built-in conversation does not answer over the top.
+  if (choice.kind === "blocked") {
+    await params.reply(REQUIRES_INHOUSE_NOTICE);
+    return { handled: true };
+  }
+  const flow = choice.flow;
 
   // Anti-spam, on STARTS only — see checkFlowStartBudget. A resume is never
   // throttled: a guest answering a question we asked must always get through,
@@ -176,7 +199,51 @@ async function resume(
     return NOT_HANDLED;
   }
 
+  // ── A guest who changed their mind is not answering our question ─────────
+  // Parked on a choice node, anything that is not one of the options used to be
+  // met with the same list again, forever — so a guest sitting on the greeting's
+  // "1/2/3" who typed "menu" was told their choice was not recognised, and the
+  // room-service flow they were plainly asking for never ran. When the waiting
+  // node cannot consume the message but another flow claims it outright, that
+  // other flow wins. `ask` nodes are untouched: they accept any text, so a slot
+  // answer can never be stolen this way.
+  if (!nodeAcceptsInput(flow.definition, nodeId, params.input)) {
+    const switched = await startElsewhere(params, flow.id);
+    if (switched) return switched;
+  }
+
   return execute(params, flow, nodeId, { ...params.vars, ...saved });
+}
+
+/**
+ * Hand the message to a different flow, when one claims it. Returns null when
+ * none does, so the caller can carry on re-prompting the current node.
+ */
+async function startElsewhere(
+  params: FlowRouteParams,
+  currentFlowId: string,
+): Promise<FlowRouteResult | null> {
+  const flows = await listActiveFlows(params.tenantId);
+  const others = flows.filter((f) => f.id !== currentFlowId);
+  if (others.length === 0) return null;
+
+  // Resolved once and reused: isInhouse() is a database round-trip, and its
+  // contract is at most one call per message.
+  const state = await resolveState(others, params);
+  const choice = selectFlow(others, params.input, state);
+  if (choice.kind === "none") return null;
+
+  // Whichever way this goes the old run is over — the guest has moved on.
+  await clearPending(params.tenantId, params.phoneJid);
+
+  if (choice.kind === "blocked") {
+    await params.reply(REQUIRES_INHOUSE_NOTICE);
+    return { handled: true };
+  }
+  return execute(params, choice.flow, null, {
+    ...params.vars,
+    is_inhouse: state.isInhouse ? "ya" : "tidak",
+  });
 }
 
 // ─── Running + persisting ────────────────────────────────────────────────────

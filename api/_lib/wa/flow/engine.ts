@@ -272,6 +272,30 @@ async function consumeAnswer(
 }
 
 /**
+ * Would the node this run is parked on accept `input` as its answer?
+ *
+ * Asked BEFORE resuming, so the router can tell "the guest answered our
+ * question" from "the guest asked for something else entirely". A choice node
+ * only accepts one of its options, and a guest who types a different flow's
+ * trigger there is not answering — they changed their mind, and re-prompting
+ * them forever is the trap this exists to detect.
+ *
+ * `ask` nodes take any text by definition, so they always accept: a slot answer
+ * that happens to read like a keyword ("makan" as an order note) still belongs
+ * to the form the guest is filling in.
+ */
+export function nodeAcceptsInput(
+  def: StoredFlow["definition"],
+  nodeId: string,
+  input: string,
+): boolean {
+  const node = findNode(def, nodeId);
+  if (!node) return true; // unknown node — leave the decision to runFlow
+  if (node.type === "choice") return matchOption(node, input) !== null;
+  return true;
+}
+
+/**
  * Match a reply against a choice's options: the printed number first, then the
  * option's own words.
  *
