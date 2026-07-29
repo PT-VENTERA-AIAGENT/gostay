@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 // live site directly. Run: npx playwright test --config playwright.live.config.ts
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "**/app-live.spec.ts",
+  testMatch: "**/{app-live,live-verify}.spec.ts",
   outputDir: "./e2e/__artifacts__/live-results",
   timeout: 90_000,
   reporter: [["list"], ["html", { outputFolder: "./e2e/report-live", open: "never" }]],
