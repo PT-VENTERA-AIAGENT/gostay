@@ -1,4 +1,9 @@
-# Patch wa-ventera: tamu ber-alamat `@lid` tidak pernah menerima balasan
+# Patch gateway WhatsApp (Baileys self-hosted): tamu `@lid` tak menerima balasan
+
+> **Konteks penamaan.** "wa-ventera" adalah nama historis di kode/env untuk
+> **gateway Baileys milik Ventera sendiri** — bukan layanan pihak ketiga.
+> Source-nya berjalan di server sendiri (tidak ada di org GitHub ini), jadi
+> patch di bawah harus diterapkan langsung di deployment gateway tersebut.
 
 ## Masalah (terbukti di produksi GoStay, 29 Jul 2026)
 

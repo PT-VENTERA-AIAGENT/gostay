@@ -1,7 +1,7 @@
 # Hotel Management System — Product Requirements Document
 
-**Version:** 1.1.0
-**Date:** July 15, 2026
+**Version:** 1.2.0
+**Date:** July 29, 2026
 **Status:** Draft — aligned to the implementation as of this date
 
 > **Reading this document.** Sections 1–4 and 6 describe the product *intent* and
@@ -10,6 +10,18 @@
 > Supabase Auth, neither of which the codebase uses. Section 10 records what is
 > genuinely wired up today versus what is still a static mockup; treat it, not
 > the feature sections, as the source of truth on progress.
+>
+> **v1.2.0 (29 Jul 2026).** Banyak hal yang dokumen ini sebut "out of scope"
+> kini SUDAH TERBANGUN dan live: pembayaran online (Xendit LANGSUNG — bukan
+> Stripe, bukan lewat "gateway pembuat invoice"), saldo hotel + tarik saldo
+> (fee platform 7%), bot pemesanan WhatsApp di atas **gateway Baileys milik
+> Ventera sendiri** (nama historis di kode: "wa-ventera" — ini BUKAN layanan
+> pihak ketiga), flow builder WA per hotel, konsol platform multi-hotel
+> (`/platform/*`, daftar putih `platform_admins`), dan pencatatan insiden WA.
+> Kontrak integrasi yang berlaku — endpoint, header auth, nama env — ada di
+> **`docs/INTEGRATIONS.md`**; ringkasan untuk agen AI di **`CLAUDE.md`**.
+> Bila bagian mana pun dari dokumen ini bertentangan dengan keduanya, kedua
+> dokumen itulah yang benar.
 
 ---
 
@@ -62,7 +74,11 @@ The system is designed to replace fragmented tools (spreadsheets, third-party PM
 
 **Out of Scope (v1.0):**
 - Multi-property management (planned v2.0)
-- Payment gateway integration (placeholder UI, Stripe integration in v1.1)
+  — *update v1.2.0: konsol platform multi-hotel sudah terbangun (`/platform/*`)*
+- ~~Payment gateway integration (placeholder UI, Stripe integration in v1.1)~~
+  — *update v1.2.0: pembayaran online sudah live via **Xendit langsung**
+  (bukan Stripe); settlement dirutekan "Xendit Unified Callback Gateway"
+  Ventera ke `/api/payment/webhook`. Lihat `docs/INTEGRATIONS.md` §2.*
 - Mobile native apps (iOS/Android)
 - Channel manager integration (OTA sync — v2.0)
 - Housekeeping task management module
@@ -2114,7 +2130,10 @@ the first moment a real policy is evaluated by a real database.
 
 ### Appendix B — Open Questions for Stakeholder Review
 
-1. **Payment Processing:** Should v1.0 include an actual payment gateway (Stripe) or just record "payment collected offline" as a boolean on the booking? A full Stripe integration adds 2–3 weeks to Phase 3.
+1. **Payment Processing:** ~~Should v1.0 include an actual payment gateway (Stripe)…~~
+   **TERJAWAB (v1.2.0):** Xendit, langsung dari GoStay (`api.xendit.co/v2/invoices`),
+   dengan mode live/test per hotel dan fee platform 7% yang dipotong trigger DB.
+   Lihat `docs/INTEGRATIONS.md` §2–3.
 
 2. **Multi-Currency:** Is IDR the only required currency, or does the portal need multi-currency display for international guests?
 

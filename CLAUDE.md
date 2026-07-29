@@ -1,0 +1,90 @@
+# GoStay — panduan untuk agen AI
+
+Dokumen ini adalah kebenaran operasional per **29 Juli 2026**. Kalau komentar
+kode atau dokumen lain bertentangan dengan ini, yang di sini yang benar.
+Detail kontrak integrasi: `docs/INTEGRATIONS.md`.
+
+## Stack (yang benar-benar dipakai)
+
+- **Frontend**: Vite + React 18 SPA (`src/`), shadcn/Tailwind, TanStack Query,
+  i18n ID/EN (`src/lib/i18n`). BUKAN Next.js.
+- **Backend**: Vercel serverless functions di `api/` (plan Hobby, **maksimal 12
+  function** — karena itu route digabung: `api/payment/[action].ts`,
+  `api/wa/connect.ts` multi-aksi). Helper di `api/_lib/**` (underscore = tidak
+  di-deploy sebagai function).
+- **Database**: Supabase Postgres + RLS ketat per-tenant. Migration
+  `supabase/migrations/001–043`. Server-side pakai fetch PostgREST dengan
+  service key (`api/_lib/wa/client.ts`), BUKAN supabase-js.
+- **Auth**: SSO Ventera sendiri (OIDC + PKCE, issuer `sso.ventera.ai`, repo
+  `sso-ventera`). BUKAN Supabase Auth. `/api/sso/token` menukar code dan
+  mencetak JWT kompatibel-Supabase (ditandatangani `SUPABASE_JWT_SECRET`) —
+  itulah yang membuat `auth.uid()`/RLS jalan.
+- **Hosting**: Vercel. Produksi = project **gostay-app** → `app.gostay.id`.
+  `vercel.json` punya `ignoreCommand`: hanya branch `main` yang dibangun.
+
+## WhatsApp — PENTING, sering disalahpahami
+
+WhatsApp dilayani oleh **gateway Baileys milik Ventera sendiri (self-hosted)**.
+Di kode/env namanya masih "wa-ventera" (nama historis) — itu BUKAN layanan
+pihak ketiga; source-nya tidak ada di org GitHub ini (jalan di server sendiri).
+
+- GoStay → gateway: `POST /api/sessions` (buat sesi; id = slug tenant),
+  `GET /api/sessions/{id}` (status), `GET /api/sessions/{id}/qr` (SSE),
+  `DELETE /api/sessions/{id}`, `POST /api/sessions/{id}/send`
+  ({to, type:"text", text}). Auth: `Bearer WA_VENTERA_INT_KEY`,
+  base `WA_VENTERA_BASE_URL`.
+- Gateway → GoStay: `POST /api/wa/inbound`, header
+  `x-webhook-secret: WA_WEBHOOK_SECRET`, body `{sessionId, messages[]}`
+  (bentuk key Baileys; `remoteJidAlt` opsional).
+- Pemetaan sesi↔hotel: tabel `wa_hotel_sessions` (`session_id` = slug tenant;
+  webhook hanya melayani `is_active=true`).
+- Percakapan: flow buatan hotel (`wa_flows`, builder di
+  `/settings/wa-flows`, seleksi di `api/_lib/wa/flow/select.ts` — gerbang
+  `requires:'inhouse'` = punya booking `checked_in`) → fallback percakapan
+  booking bawaan (`api/_lib/wa/converse.ts`).
+- **Jebakan LID**: WhatsApp menyembunyikan nomor sebagian tamu di balik alias
+  `@lid`. Gateway saat ini MENJAWAB 200 lalu pesannya hilang. GoStay memilih
+  alamat kirim lewat `api/_lib/wa/address.ts` (nomor pendamping → nomor asli →
+  nomor di CRM → tandai `unroutable` + catat insiden meski gateway bilang
+  sukses). Kegagalan tercatat di `wa_incidents` → halaman
+  `/platform/incidents`. Patch untuk sisi gateway: `docs/wa-ventera-lid-fix.md`.
+
+## Pembayaran — riwayatnya menyesatkan
+
+- **Buat invoice**: GoStay memanggil **Xendit LANGSUNG**
+  (`api.xendit.co/v2/invoices`, kunci `XENDIT_API_KEY_PRODUCTION` /
+  `XENDIT_API_KEY_SANDBOX`). Komentar lama soal "gateway membuat invoice"
+  salah — layanan Ventera itu hanya router callback.
+- **Settlement**: Xendit → "Xendit Unified Callback Gateway" milik Ventera
+  (merutekan berdasar prefix `GOSTAY-` di external_id) → GoStay
+  `POST /api/payment/webhook` dengan `x-internal-token` =
+  `INTERNAL_TOKEN_PRODUCTION` | `INTERNAL_TOKEN_SANDBOX` (token yang cocok
+  menentukan stamp live/test).
+- **Saldo hotel**: fee platform **7%** (700 bps, `payment_config`), kredit
+  net-of-fee via trigger DB (migration 031/036), tarik saldo = tabel `payouts`.
+
+## Peran & RLS
+
+`staff` (satu hotel), `admin` (operator hotel — sejak 041 punya akses hotelnya
+sendiri seperti staf), `customer`. Kewenangan lintas-hotel = daftar putih
+`platform_admins` + header `x-platform-scope: all` (konsol `/platform/*`).
+Cabang tenant policy memakai `is_hotel_member()` (041) — JANGAN tulis
+`role = 'staff'` saja: itu regresi yang pernah mengunci admin (PR #69).
+
+## Perintah
+
+- `npm test` — vitest (semua unit; api/_lib punya test per modul)
+- `npm run test:balance` — trigger saldo di Postgres lokal throwaway
+- `npx playwright test --config playwright.local.config.ts` — UI vs dev server :8080
+- `npx playwright test --config playwright.live.config.ts` — E2E vs produksi
+- Login uji: `node scripts/e2e-live-setup.mjs` (staff+tamu; sesi via
+  sessionStorage `gostay_sso_session`)
+- Diagnosa WA: `node scripts/wa-diagnose.mjs`, audit flow:
+  `node scripts/wa-flow-audit.mjs`
+
+## Deploy
+
+Merge PR ke `main` → Vercel build otomatis (hanya main). Pre-push hook
+"Ventera AI Code Review" berjalan ±1–5 menit — beri timeout longgar pada
+`git push`. Migration DB TIDAK otomatis: terapkan manual dengan psql lewat
+`SETUP_DB_CONNECTION_STRING` di `.env`.
