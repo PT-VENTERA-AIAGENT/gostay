@@ -2,7 +2,6 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "//": "Bangun HANYA untuk main. Repo ini tertaut ke beberapa project Vercel, jadi setiap push memicu build preview di masing-masing — 27 dari 42 deployment dalam satu hari habis untuk cabang kerja yang tidak pernah dibuka siapa pun. Di plan Hobby (build berurutan) antrean itu menunda deploy produksi sampai berhenti sama sekali. Exit 0 = lewati build, exit 1 = lanjutkan.",
   "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ]; then exit 1; else exit 0; fi",
   "rewrites": [{ "source": "/((?!assets/|api/).*)", "destination": "/index.html" }]
 }
