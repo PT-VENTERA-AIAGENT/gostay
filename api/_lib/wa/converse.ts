@@ -178,8 +178,10 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const result = await sendText(sessionId, outboundJid, body);
     // A LID cannot be delivered to, but the gateway answers 200 and drops the
     // message — so its success is not evidence of anything. Record it anyway,
-    // or the failure stays invisible exactly as it did before.
-    if (result.ok && target.unroutable) {
+    // or the failure stays invisible exactly as it did before. The one proof
+    // that clears it: a gateway that says `resolved:true`, meaning it
+    // translated the alias to the guest's real number before sending.
+    if (result.ok && target.unroutable && result.resolved !== true) {
       await recordIncident({
         tenantId,
         kind: "delivery",

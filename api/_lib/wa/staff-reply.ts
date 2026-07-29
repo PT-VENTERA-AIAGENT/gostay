@@ -126,9 +126,11 @@ export async function deliverStaffReply(params: {
       return { ok: false, error: sent.error ?? "send_failed", jid: dest.jid };
     }
 
-    if (dest.unroutable) {
+    if (dest.unroutable && sent.resolved !== true) {
       // The gateway said 200, but a LID has nothing behind it to deliver to, so
-      // that success means nothing. Record it, and tell staff plainly.
+      // that success means nothing — UNLESS it explicitly reports resolved:true,
+      // i.e. it translated the alias to the guest's real number before sending.
+      // Record the rest, and tell staff plainly.
       await recordIncident({
         tenantId: thread.tenant_id,
         kind: "delivery",
