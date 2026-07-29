@@ -139,6 +139,68 @@ export const MIN_START_TIER: KeywordTier = 2;
  * that, "menu" from a guest who has not checked in would match room service,
  * fail, and answer nothing.
  */
+/**
+ * What selection decided, including the case a plain `pickFlow` cannot express:
+ * the guest asked for something the hotel DOES offer, but not to them yet.
+ */
+export type FlowChoice<T> =
+  /** Run this flow. */
+  | { kind: "run"; flow: T }
+  /**
+   * This flow owns the message but the guest fails its precondition. Telling
+   * them why beats the old behaviour — silently falling through to whichever
+   * lower-priority flow also happened to claim the word, which answered a room
+   * service request with the greeting menu and left the guest none the wiser.
+   */
+  | { kind: "blocked"; flow: T }
+  | { kind: "none" };
+
+/**
+ * Pick the flow that answers `input`, and say whether a precondition stopped it.
+ *
+ * Precedence is by match strength first, then the hotel's own ordering — and a
+ * gated flow competes on equal terms. So "menu" from a guest who has not checked
+ * in is claimed by room service (priority 20) rather than the greeting
+ * (priority 90), and comes back as `blocked` so the caller can explain. An
+ * in-house guest gets `run` for the same word.
+ *
+ * `flows` MUST already be in precedence order — lower `priority` first, then
+ * name — which is exactly what the idx_wa_flows_active index yields.
+ */
+export function selectFlow<T extends SelectableFlow>(
+  flows: readonly T[],
+  input: string,
+  state: GuestState,
+  minTier: KeywordTier = MIN_START_TIER,
+): FlowChoice<T> {
+  const lower = (input ?? "").toLowerCase().trim();
+  if (!lower) return { kind: "none" };
+
+  let best: T | null = null;
+  let bestScore: KeywordTier = 0;
+  let bestBlocked = false;
+
+  for (const f of flows) {
+    const s = bestKeywordScore(lower, f.triggerKeywords);
+    if (s < minTier) continue;
+    // Strictly greater, so ties keep the earlier (higher-precedence) flow.
+    if (s > bestScore) {
+      bestScore = s;
+      best = f;
+      bestBlocked = !meetsRequirement(f.requires, state);
+    }
+  }
+
+  if (!best) return { kind: "none" };
+  return bestBlocked ? { kind: "blocked", flow: best } : { kind: "run", flow: best };
+}
+
+/**
+ * The flow to run, ignoring any that the guest's state rules out.
+ *
+ * Kept for callers that only care about the runnable answer; `selectFlow` is
+ * what the router uses, because it can also report a blocked match.
+ */
 export function pickFlow<T extends SelectableFlow>(
   flows: readonly T[],
   input: string,

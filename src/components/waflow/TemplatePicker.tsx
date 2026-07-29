@@ -5,7 +5,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   FLOW_TEMPLATES, CATEGORY_META, CATEGORY_ORDER,
@@ -84,7 +83,15 @@ export default function TemplatePicker({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="min-h-0 flex-1">
+        {/* Native scrolling rather than Radix's ScrollArea.
+            ScrollArea's viewport sizes itself with `h-full`, a percentage that
+            only resolves when its parent has a definite height. Inside this
+            `flex-1` column the parent's height comes from flex, so the viewport
+            collapsed and the list below the fold was clipped by the Root's
+            `overflow-hidden` with nothing to scroll it — twelve templates of
+            which only the first nine could ever be reached. `overflow-y-auto`
+            needs no such resolution. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="space-y-6 px-6 py-4">
             {CATEGORY_ORDER.map((cat) => {
               const items = grouped.get(cat) ?? [];
@@ -110,7 +117,7 @@ export default function TemplatePicker({
               );
             })}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="items-center gap-2 border-t px-6 py-3 sm:justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

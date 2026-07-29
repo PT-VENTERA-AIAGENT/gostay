@@ -79,6 +79,103 @@ const simple = (id: string, text: string, keywords: string[], requires: "none" |
     }),
   });
 
+describe("routeFlow — a guest parked on a choice who asks for something else", () => {
+  // Reported from production: the greeting flow asked "1/2/3", the guest typed
+  // "menu", and the option matcher answered "pilihannya belum kami kenali" —
+  // every message, until the 30-minute TTL. The room-service flow they were
+  // plainly asking for never ran.
+  const greeting = flow({
+    id: "greet",
+    triggerKeywords: ["halo"],
+    priority: 90,
+    definition: coerceFlow({
+      version: 1,
+      nodes: [
+        { id: "t", type: "trigger", data: {} },
+        { id: "c", type: "choice", data: { text: "Ada yang bisa kami bantu?", options: [
+          { id: "o1", label: "Pesan kamar" },
+          { id: "o2", label: "Bicara dengan staf" },
+        ] } },
+      ],
+      edges: [{ id: "e", source: "t", target: "c" }],
+    }),
+  });
+  const roomservice = simple("rs", "Menu room service:", ["menu"], "inhouse");
+  const parked = { kind: "flow" as const, payload: { flowId: "greet", nodeId: "c", vars: {} } };
+
+  it("hands the message to the flow that owns the keyword", async () => {
+    store.listActiveFlows.mockResolvedValue([roomservice, greeting]);
+    store.getFlow.mockResolvedValue(greeting);
+    isInhouse.mockResolvedValue(true);
+
+    const r = await routeFlow(params({ input: "menu", pending: parked }));
+
+    expect(r.handled).toBe(true);
+    expect(sent).toEqual(["Menu room service:"]);
+    expect(pending.clearPending).toHaveBeenCalled();
+  });
+
+  it("explains the gate rather than re-asking, when the guest is not in-house", async () => {
+    store.listActiveFlows.mockResolvedValue([roomservice, greeting]);
+    store.getFlow.mockResolvedValue(greeting);
+    isInhouse.mockResolvedValue(false);
+
+    const r = await routeFlow(params({ input: "menu", pending: parked }));
+
+    expect(r.handled).toBe(true);
+    expect(sent[0]).toMatch(/sudah check-in/i);
+  });
+
+  it("still re-asks when the message claims no other flow", async () => {
+    store.listActiveFlows.mockResolvedValue([roomservice, greeting]);
+    store.getFlow.mockResolvedValue(greeting);
+
+    const r = await routeFlow(params({ input: "hmmm apa ya", pending: parked }));
+
+    expect(r.handled).toBe(true);
+    expect(sent[0]).toMatch(/belum kami kenali/i);
+    expect(pending.clearPending).not.toHaveBeenCalled();
+  });
+
+  it("answers a real option instead of switching flows", async () => {
+    // "Pesan kamar" is both an option here and a keyword elsewhere; the guest is
+    // answering our question, so the option must win.
+    const booking = simple("bk", "Tanggal menginap?", ["pesan kamar"]);
+    store.listActiveFlows.mockResolvedValue([booking, greeting]);
+    store.getFlow.mockResolvedValue(greeting);
+
+    const r = await routeFlow(params({ input: "1", pending: parked }));
+
+    expect(r.handled).toBe(true);
+    expect(sent).toEqual([]); // option 1 has no outlet wired — the run just ends
+  });
+
+  it("never steals a free-text answer from an ask node", async () => {
+    const asking = flow({
+      id: "ask",
+      definition: coerceFlow({
+        version: 1,
+        nodes: [
+          { id: "t", type: "trigger", data: {} },
+          { id: "q", type: "ask", data: { prompt: "Atas nama siapa?", variable: "nama" } },
+        ],
+        edges: [{ id: "e", source: "t", target: "q" }],
+      }),
+    });
+    store.listActiveFlows.mockResolvedValue([simple("rs2", "Menu:", ["menu"]), asking]);
+    store.getFlow.mockResolvedValue(asking);
+
+    // A guest whose answer happens to read like another flow's trigger.
+    const r = await routeFlow(params({
+      input: "menu",
+      pending: { kind: "flow", payload: { flowId: "ask", nodeId: "q", vars: {} } },
+    }));
+
+    expect(r.handled).toBe(true);
+    expect(sent).toEqual([]); // consumed as the slot value, not routed away
+  });
+});
+
 describe("routeFlow — when it declines", () => {
   it("declines when the hotel has drawn no flows", async () => {
     const r = await routeFlow(params());
@@ -125,11 +222,28 @@ describe("routeFlow — the reservation-vs-menu gate", () => {
     expect(sent).toEqual(["Menu room service:"]);
   });
 
-  it('routes "menu" to the greeting for a guest who is not', async () => {
+  it('tells a guest who is not checked in WHY "menu" is closed to them', async () => {
+    // Previously this fell through to the greeting, which answered a room
+    // service request with a welcome message and left the guest with no idea
+    // that room service existed or how to reach it. Room service owns the word
+    // (priority 20 beats the greeting's 90), so it is the one that answers —
+    // with the reason and both ways forward.
     store.listActiveFlows.mockResolvedValue(flows);
     isInhouse.mockResolvedValue(false);
 
     const r = await routeFlow(params({ input: "menu" }));
+
+    expect(r.handled).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatch(/sudah check-in/i);
+    expect(sent[0]).toMatch(/pesan kamar/i);
+  });
+
+  it("still routes a word only the greeting owns to the greeting", async () => {
+    store.listActiveFlows.mockResolvedValue(flows);
+    isInhouse.mockResolvedValue(false);
+
+    const r = await routeFlow(params({ input: "halo" }));
 
     expect(r.handled).toBe(true);
     expect(sent).toEqual(["Selamat datang di Hotel Uji"]);
