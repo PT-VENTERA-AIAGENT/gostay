@@ -67,14 +67,41 @@ describe("deliverStaffReply", () => {
     expect(takeover.pauseBot).not.toHaveBeenCalled();
   });
 
-  it("prefers the LID the guest actually messaged from over their phone", async () => {
-    // WhatsApp addresses some chats by LID, which is not a phone number.
-    // Replying to the phone instead silently goes nowhere.
+  it("uses the guest's real number when WhatsApp only gave a LID", async () => {
+    // This test used to assert the opposite, on the belief that the LID was the
+    // address that worked. Production proved it backwards: every LID guest
+    // received nothing while every guest with a real number received their
+    // replies. The gateway accepts a LID and answers 200, then drops it — so a
+    // recorded number is the only address that actually reaches the guest.
     routes({ identity: [{ phone_jid: "181248240648388@lid" }] });
 
-    await deliverStaffReply({ threadId: "th-1", text: "halo" });
+    const r = await deliverStaffReply({ threadId: "th-1", text: "halo" });
 
-    expect(send.sendText).toHaveBeenCalledWith("lor-kali", "181248240648388@lid", "halo");
+    expect(send.sendText).toHaveBeenCalledWith("lor-kali", "628111000001@s.whatsapp.net", "halo");
+    expect(r.ok).toBe(true);
+  });
+
+  it("reports the guest as unreachable when only a LID is known", async () => {
+    // customers.phone holds the LID's own digits — what callablePhone stores
+    // when WhatsApp withholds the number — so there is no real address at all.
+    routes({
+      thread: [{ ...THREAD, customers: { phone: "181248240648388" } }],
+      identity: [{ phone_jid: "181248240648388@lid" }],
+    });
+
+    const r = await deliverStaffReply({ threadId: "th-1", text: "halo" });
+
+    // Staff must be told, rather than shown a tick mark for a message that was
+    // never delivered.
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe("guest_unreachable_lid");
+    // And it is recorded, because the gateway's 200 proves nothing here.
+    expect(client.serviceInsert).toHaveBeenCalledWith(
+      "wa_incidents",
+      expect.objectContaining({ reason: "unroutable_lid:gateway_reported_ok" }),
+    );
+    // The bot stays in charge: nothing was actually handed to a human.
+    expect(takeover.pauseBot).not.toHaveBeenCalled();
   });
 });
 

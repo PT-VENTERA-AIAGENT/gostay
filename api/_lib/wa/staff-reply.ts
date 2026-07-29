@@ -15,6 +15,7 @@ import { serviceGet } from "./client";
 import { sendText } from "./send";
 import { pauseBot } from "./takeover";
 import { recordIncident } from "./incidents";
+import { chooseOutboundTarget } from "./address";
 
 export interface StaffReplyResult {
   ok: boolean;
@@ -41,7 +42,8 @@ interface ThreadRow {
 async function resolveDestination(
   tenantId: string,
   customerId: string,
-): Promise<{ jid: string; sessionId: string } | null> {
+  customerPhone: string | null,
+): Promise<{ jid: string; sessionId: string; unroutable: boolean } | null> {
   const [identityRes, sessionRes] = await Promise.all([
     serviceGet(
       `wa_guest_identities?tenant_id=eq.${encodeURIComponent(tenantId)}` +
@@ -60,7 +62,14 @@ async function resolveDestination(
 
   if (identityRes.ok) {
     const rows = (await identityRes.json()) as Array<{ phone_jid: string }>;
-    if (rows[0]?.phone_jid) return { jid: rows[0].phone_jid, sessionId };
+    const jid = rows[0]?.phone_jid;
+    if (jid) {
+      // A LID is not a destination: the gateway accepts it, answers 200, and
+      // drops the message. When the hotel has since recorded the guest's real
+      // number, that number is the only address that actually reaches them.
+      const target = chooseOutboundTarget({ phoneJid: jid, customerPhone });
+      return { jid: target.jid, sessionId, unroutable: target.unroutable };
+    }
   }
 
   // No WhatsApp identity: this guest reached the hotel some other way (the web
@@ -96,7 +105,7 @@ export async function deliverStaffReply(params: {
     if (!thread) return { ok: false, error: "thread_not_found" };
     if (!thread.customer_id) return { ok: false, error: "thread_has_no_guest" };
 
-    const dest = await resolveDestination(thread.tenant_id, thread.customer_id);
+    const dest = await resolveDestination(thread.tenant_id, thread.customer_id, thread.customers?.phone ?? null);
     if (!dest) return { ok: false, error: "guest_not_on_whatsapp" };
 
     const sent = await sendText(dest.sessionId, dest.jid, body);
@@ -115,6 +124,22 @@ export async function deliverStaffReply(params: {
         message: body,
       });
       return { ok: false, error: sent.error ?? "send_failed", jid: dest.jid };
+    }
+
+    if (dest.unroutable) {
+      // The gateway said 200, but a LID has nothing behind it to deliver to, so
+      // that success means nothing. Record it, and tell staff plainly.
+      await recordIncident({
+        tenantId: thread.tenant_id,
+        kind: "delivery",
+        customerId: thread.customer_id,
+        threadId: params.threadId,
+        targetJid: dest.jid,
+        sessionId: dest.sessionId,
+        reason: "gateway_reported_ok",
+        message: body,
+      });
+      return { ok: false, error: "guest_unreachable_lid", jid: dest.jid };
     }
 
     // A human just spoke. Silence the bot so it does not answer the guest's

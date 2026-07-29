@@ -43,6 +43,7 @@ import {
   getTenantName,
   getTenantSlug,
   setCustomerName,
+  getCustomerPhone,
 } from "./booking";
 import {
   resolveOrProvisionGuest,
@@ -50,6 +51,7 @@ import {
 } from "./guest";
 import { sendText } from "./send";
 import { recordIncident } from "./incidents";
+import { chooseOutboundTarget } from "./address";
 import { getOrCreateBotProfile, getOrCreateThread, logMessage } from "./crm";
 import { checkGreetCooldown, checkFlowStartBudget } from "./inbound";
 import { isBotPaused, pauseBot } from "./takeover";
@@ -164,12 +166,31 @@ function knownFromPending(
  */
 export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
   const { tenantId, sessionId, phoneJid, replyJid, text, displayName } = msg;
-  const outboundJid = replyJid ?? phoneJid;
+  // Where replies go. Starts with whatever the webhook gave us and is refined
+  // once the guest is known — a hotel that has typed the guest's real number
+  // into CRM rescues a conversation WhatsApp would otherwise leave unreachable.
+  let target = chooseOutboundTarget({ phoneJid, replyJid });
+  let outboundJid = target.jid;
   // Filled in once the guest is provisioned, so a failure recorded after that
   // point names the guest instead of just a JID.
   let failureCtx: { customerId?: string | null; threadId?: string | null } = {};
   const deliver = async (body: string) => {
     const result = await sendText(sessionId, outboundJid, body);
+    // A LID cannot be delivered to, but the gateway answers 200 and drops the
+    // message — so its success is not evidence of anything. Record it anyway,
+    // or the failure stays invisible exactly as it did before.
+    if (result.ok && target.unroutable) {
+      await recordIncident({
+        tenantId,
+        kind: "delivery",
+        customerId: failureCtx.customerId,
+        threadId: failureCtx.threadId,
+        targetJid: outboundJid,
+        sessionId,
+        reason: "gateway_reported_ok",
+        message: body,
+      });
+    }
     if (!result.ok) {
       console.error("[wa/converse] outbound reply failed:", {
         sessionId,
@@ -227,6 +248,15 @@ export async function handleGuestMessage(msg: GuestMessage): Promise<void> {
     const brand = hotelName ?? "hotel kami";
     // From here on a delivery failure can name the guest and the conversation.
     failureCtx = { customerId: guest.customerId, threadId };
+
+    // Now that the guest is known, see whether the hotel has recorded a real
+    // number for them. For a LID guest that is the difference between a
+    // conversation that works and one that silently goes nowhere.
+    if (target.unroutable) {
+      const phone = await getCustomerPhone(guest.customerId);
+      target = chooseOutboundTarget({ phoneJid, replyJid, customerPhone: phone });
+      outboundJid = target.jid;
+    }
     await logMessage(tenantId, threadId, guest.profileId, trimmed, true); // inbound
     const reply = async (body: string) => {
       await logMessage(tenantId, threadId, botId, body, false); // outbound
