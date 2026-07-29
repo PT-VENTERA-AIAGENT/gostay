@@ -139,6 +139,49 @@ export const MIN_START_TIER: KeywordTier = 2;
  * that, "menu" from a guest who has not checked in would match room service,
  * fail, and answer nothing.
  */
+/** A keyword that two flows claim — the lower-priority one can never win it. */
+export interface KeywordClash {
+  keyword: string;
+  /** The flow that actually receives messages containing it. */
+  ownerName: string;
+  /** The flow that lists it but is shadowed. */
+  shadowedName: string;
+}
+
+/**
+ * Keywords listed by more than one flow.
+ *
+ * Selection walks flows in precedence order and the first best match wins, so a
+ * shared keyword only ever fires the higher-priority flow — the other is dead
+ * for that word, with nothing in the console to say so. Lor Kali shipped this
+ * way: "handuk" and "laundry" sat on Request Tamu, so its whole Housekeeping
+ * flow was unreachable, and "kamar kosong" sat on Reservasi, burying Cek Kamar
+ * Kosong. Surfacing it is what stops it recurring.
+ *
+ * `flows` MUST be in precedence order; the first flow to claim a keyword is
+ * reported as its owner.
+ */
+export function findKeywordClashes<T extends SelectableFlow>(
+  flows: readonly T[],
+): KeywordClash[] {
+  const owner = new Map<string, string>();
+  const clashes: KeywordClash[] = [];
+
+  for (const f of flows) {
+    for (const kw of f.triggerKeywords ?? []) {
+      const key = (kw ?? "").trim().toLowerCase();
+      if (!key) continue;
+      const prev = owner.get(key);
+      if (prev === undefined) {
+        owner.set(key, f.name);
+      } else if (prev !== f.name) {
+        clashes.push({ keyword: kw, ownerName: prev, shadowedName: f.name });
+      }
+    }
+  }
+  return clashes;
+}
+
 /**
  * What selection decided, including the case a plain `pickFlow` cannot express:
  * the guest asked for something the hotel DOES offer, but not to them yet.

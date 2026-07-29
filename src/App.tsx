@@ -39,6 +39,7 @@ import PlatformHotelDetail from "./pages/platform/HotelDetail";
 import PlatformRoomAvailability from "./pages/platform/RoomAvailability";
 import PlatformReservations from "./pages/platform/Reservations";
 import PlatformGuestRequests from "./pages/platform/GuestRequests";
+import PlatformIncidents from "./pages/platform/Incidents";
 import PlatformMessages from "./pages/platform/Messages";
 import PlatformBalances from "./pages/platform/Balances";
 import PlatformCalendar from "./pages/platform/Calendar";
@@ -250,6 +251,7 @@ const App = () => (
               <Route path="/platform/messages" element={<PlatformMessages />} />
               <Route path="/platform/balances" element={<PlatformBalances />} />
               <Route path="/platform/requests" element={<PlatformGuestRequests />} />
+              <Route path="/platform/incidents" element={<PlatformIncidents />} />
               <Route path="/admin/add-hotel" element={<AddHotel />} />
               <Route path="/admin/leads" element={<LeadList />} />
               <Route path="/admin/leads/:id" element={<LeadDetail />} />

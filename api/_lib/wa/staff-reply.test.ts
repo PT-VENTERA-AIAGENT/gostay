@@ -2,7 +2,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { client, send, takeover } = vi.hoisted(() => ({
-  client: { serviceGet: vi.fn() },
+  // serviceInsert is here because a failed send records an incident; without it
+  // the module under test would be exercising its own error-swallowing path
+  // rather than the behaviour these tests describe.
+  client: { serviceGet: vi.fn(), serviceInsert: vi.fn() },
   send: { sendText: vi.fn() },
   takeover: { pauseBot: vi.fn() },
 }));
@@ -35,6 +38,7 @@ function routes(over: Partial<Record<"thread" | "identity" | "session", unknown[
 beforeEach(() => {
   vi.clearAllMocks();
   routes();
+  client.serviceInsert.mockResolvedValue({ ok: true, status: 201 });
   send.sendText.mockResolvedValue({ ok: true });
   takeover.pauseBot.mockResolvedValue(undefined);
 });

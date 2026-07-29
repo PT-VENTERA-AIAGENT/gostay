@@ -557,9 +557,11 @@ const SAPAAN: FlowTemplate = {
   triggerKeywords: [
     "halo", "hallo", "helo", "hai", "hi", "hey", "assalamualaikum",
     "permisi", "pagi", "siang", "sore", "malam",
-    // Also here so a guest who is NOT staying still gets a useful answer to
-    // "menu" instead of silence.
-    "menu", "info", "bantuan", "help", "tanya", "mulai", "start",
+    // "menu" is deliberately NOT here — it belongs to Request Tamu (priority
+    // 20), which wins it either way. A guest who has not checked in is now told
+    // that room service needs a check-in, and how to get one; before, this flow
+    // caught the word and answered a food request with a welcome message.
+    "info", "bantuan", "help", "tanya", "mulai", "start",
   ],
   requires: "none",
   priority: 90,

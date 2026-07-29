@@ -175,6 +175,38 @@ describe("parseMessages", () => {
     });
   });
 
+  it("refuses a LID alternate — it is not a reply address", () => {
+    // The bug this exists to stop: the alternate was validated with
+    // isDirectChat, which counts "@lid" as a direct chat, so a LID alternate
+    // passed and the reply went to an address the gateway cannot route to.
+    // Guests on those addresses received nothing while the inbox showed the
+    // replies as sent.
+    const parsed = parseMessages({
+      messages: [
+        {
+          key: {
+            remoteJid: "181248240648388@lid",
+            remoteJidAlt: "153416298926309@lid",
+            id: "LID2",
+          },
+          message: { conversation: "menu" },
+        },
+      ],
+    });
+
+    expect(parsed[0].phoneJid).toBe("181248240648388@lid");
+    expect(parsed[0].replyJid).toBeUndefined();
+  });
+
+  it("has no reply address when the gateway sends no alternate at all", () => {
+    const parsed = parseMessages({
+      messages: [
+        { key: { remoteJid: "181248240648388@lid", id: "LID3" }, message: { conversation: "halo" } },
+      ],
+    });
+    expect(parsed[0].replyJid).toBeUndefined();
+  });
+
   it("extracts text from extendedTextMessage", () => {
     expect(parseMessages(body)[1].text).toBe("kamar deluxe");
   });

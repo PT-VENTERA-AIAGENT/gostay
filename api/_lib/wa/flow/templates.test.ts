@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { runFlow, type FlowActions } from "./engine";
-import { pickFlow } from "./select";
+import { pickFlow, selectFlow } from "./select";
 import { FLOW_TEMPLATES, findTemplate, CATEGORY_META, CATEGORY_ORDER, type FlowTemplate } from "./templates";
 import { coerceFlow } from "./types";
 import type { StoredFlow } from "./store";
@@ -66,6 +66,35 @@ function stored(t: FlowTemplate): StoredFlow {
 const ALL = FLOW_TEMPLATES.map(stored).sort(
   (a, b) => a.priority - b.priority || a.name.localeCompare(b.name),
 );
+
+// ─── No template may shadow another's trigger ────────────────────────────────
+
+describe("trigger keywords do not collide", () => {
+  // Selection walks flows in precedence order and the first best match wins, so
+  // a keyword listed by two templates only ever fires the higher-priority one —
+  // the lower one is dead for that word, silently. Lor Kali shipped with exactly
+  // this: "handuk" and "laundry" sat on Request Tamu, so the whole Housekeeping
+  // flow could never be reached; "kamar kosong" and "check in" sat on Reservasi,
+  // burying Cek Kamar Kosong and Info Check-in.
+  it("no keyword appears in more than one template", () => {
+    const owner = new Map<string, string>();
+    const clashes: string[] = [];
+
+    for (const t of ALL) {
+      for (const kw of t.triggerKeywords) {
+        const key = kw.trim().toLowerCase();
+        const prev = owner.get(key);
+        if (prev && prev !== t.name) {
+          clashes.push(`"${kw}" diklaim "${prev}" dan "${t.name}"`);
+        } else {
+          owner.set(key, t.name);
+        }
+      }
+    }
+
+    expect(clashes).toEqual([]);
+  });
+});
 
 // ─── The templates survive coercion ──────────────────────────────────────────
 
@@ -186,8 +215,21 @@ describe("routing across the installed templates", () => {
     expect(pick("menu", true)).toBe("request_tamu");
   });
 
-  it('"menu" reaches Sapaan for a guest who is not', () => {
-    expect(pick("menu", false)).toBe("sapaan");
+  it('"menu" is owned by Request Tamu even for a guest who is not staying', () => {
+    // pickFlow only returns what may RUN, so a guest who is not checked in gets
+    // null here — and selectFlow (which the router uses) reports it as blocked
+    // so they are told room service needs a check-in. Previously Sapaan also
+    // claimed "menu" and answered a food request with a welcome message.
+    expect(pick("menu", false)).toBeNull();
+    expect(selectFlow(ALL, "menu", { isInhouse: false })).toMatchObject({
+      kind: "blocked",
+      flow: { id: "request_tamu" },
+    });
+  });
+
+  it("a guest who is not staying still reaches Sapaan by other words", () => {
+    expect(pick("halo", false)).toBe("sapaan");
+    expect(pick("bantuan", false)).toBe("sapaan");
   });
 
   it("booking words reach Reservasi whether or not they are staying", () => {

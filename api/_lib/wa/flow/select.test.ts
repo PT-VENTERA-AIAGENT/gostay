@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { scoreKeyword, bestKeywordScore, pickFlow, meetsRequirement, type SelectableFlow } from "./select";
+import { scoreKeyword, bestKeywordScore, pickFlow, meetsRequirement, findKeywordClashes, type SelectableFlow } from "./select";
 
 const flow = (over: Partial<SelectableFlow> & { id: string }): SelectableFlow => ({
   name: over.id,
@@ -129,5 +129,52 @@ describe("pickFlow — precedence", () => {
       flow({ id: "strong", triggerKeywords: ["kamarnya"], priority: 90 }),
     ];
     expect(pickFlow(mixed, "kamarnya", { isInhouse: false })?.id).toBe("strong");
+  });
+});
+
+describe("findKeywordClashes", () => {
+  // Precedence order in, as the bot sees it: lower priority first.
+  const ordered = (...fs: SelectableFlow[]) =>
+    [...fs].sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name));
+
+  it("reports nothing when every keyword has one owner", () => {
+    const flows = ordered(
+      flow({ id: "a", name: "Reservasi", triggerKeywords: ["booking"], priority: 10 }),
+      flow({ id: "b", name: "Sapaan", triggerKeywords: ["halo"], priority: 90 }),
+    );
+    expect(findKeywordClashes(flows)).toEqual([]);
+  });
+
+  it("names the winner and the flow it buries", () => {
+    // The real case: Housekeeping could never be reached for "handuk" because
+    // Request Tamu (a lower priority number) claimed the same word.
+    const flows = ordered(
+      flow({ id: "rs", name: "Request Tamu", triggerKeywords: ["menu", "handuk"], priority: 20 }),
+      flow({ id: "hk", name: "Housekeeping", triggerKeywords: ["handuk", "sprei"], priority: 25 }),
+    );
+    expect(findKeywordClashes(flows)).toEqual([
+      { keyword: "handuk", ownerName: "Request Tamu", shadowedName: "Housekeeping" },
+    ]);
+  });
+
+  it("compares case- and space-insensitively", () => {
+    const flows = ordered(
+      flow({ id: "a", name: "A", triggerKeywords: ["Check In"], priority: 10 }),
+      flow({ id: "b", name: "B", triggerKeywords: [" check in "], priority: 55 }),
+    );
+    expect(findKeywordClashes(flows)).toHaveLength(1);
+  });
+
+  it("does not flag a flow against itself when it repeats a keyword", () => {
+    const flows = [flow({ id: "a", name: "A", triggerKeywords: ["menu", "menu"], priority: 10 })];
+    expect(findKeywordClashes(flows)).toEqual([]);
+  });
+
+  it("ignores blank keywords rather than reporting them as a clash", () => {
+    const flows = ordered(
+      flow({ id: "a", name: "A", triggerKeywords: ["", "  "], priority: 10 }),
+      flow({ id: "b", name: "B", triggerKeywords: [""], priority: 20 }),
+    );
+    expect(findKeywordClashes(flows)).toEqual([]);
   });
 });
