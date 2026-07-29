@@ -280,7 +280,7 @@ export default function Campaigns() {
             <p className="text-sm text-muted-foreground mt-1">{t("Generate, review, dan kirim WA ke leads secara batch")}</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/admin/leads")}>Leads</Button>
+            <Button variant="outline" onClick={() => navigate("/admin/leads")}>{t("Leads")}</Button>
             <Button onClick={() => setShowCreate(true)}>
               <Plus className="w-4 h-4 mr-2" /> New Campaign
             </Button>

@@ -723,6 +723,14 @@ export const EN: Record<string, string> = {
   "Menyiapkan sesi…": "Preparing the session…",
   "Menghubungkan…": "Connecting…",
   "Tertaut terputus": "Link disconnected",
+
+  // ── Labels sitting next to an inline icon ────────────────────────────────
+  "Tamu:": "Guest:",
+  "Memuat biaya…": "Loading charges…",
+  "Memuat pembayaran…": "Loading payments…",
+  "Tandai selesai": "Mark as done",
+  "Buka lagi": "Reopen",
+  "WhatsApp Hotel": "Hotel WhatsApp",
 };
 
 // English → Indonesian, for the staff pages (which are authored in English).
@@ -1007,6 +1015,7 @@ export const ID: Record<string, string> = {
   "No rooms added yet.": "Belum ada kamar ditambahkan.",
   "Search users...": "Cari pengguna...",
   "Out": "Keluar",
+  "In": "Masuk",
 
   // ── Guest portal ─────────────────────────────────────────────────────────
   "Profile Settings": "Pengaturan Profil",
@@ -1041,4 +1050,10 @@ export const ID: Record<string, string> = {
   "vs prev": "vs sebelumnya",
   "/ night": "/ malam",
   "(you)": "(Anda)",
+  "Unread Chats": "Chat Belum Dibaca",
+  "Notes": "Catatan",
+  "Audit Trail": "Jejak Audit",
+  "Folio": "Folio",
+  "Creating…": "Membuat…",
+  "Leads": "Leads",
 };

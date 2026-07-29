@@ -117,7 +117,7 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
         <div className="p-4 space-y-4">
           {/* Guest */}
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Tamu</p>
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {t("Tamu")}</p>
             <input className={inputCls} placeholder={t("Nama tamu *")} value={fullName} onChange={(e) => setFullName(e.target.value)} />
             <div className="grid grid-cols-2 gap-2">
               <input className={inputCls} placeholder={t("No. HP (opsional)")} value={phone} onChange={(e) => setPhone(e.target.value)} />
@@ -127,7 +127,7 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
 
           {/* Stay */}
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5" /> Menginap</p>
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><BedDouble className="w-3.5 h-3.5" /> {t("Menginap")}</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">{t("Check-in")}</label>

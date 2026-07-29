@@ -263,8 +263,8 @@ export default function Chat() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={toggleThreadStatus}>
                         {selectedThread.status === "active"
-                          ? <><CheckCircle className="w-4 h-4 mr-2" /> Tandai selesai</>
-                          : <><RotateCcw className="w-4 h-4 mr-2" /> Buka lagi</>}
+                          ? <><CheckCircle className="w-4 h-4 mr-2" /> {t("Tandai selesai")}</>
+                          : <><RotateCcw className="w-4 h-4 mr-2" /> {t("Buka lagi")}</>}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={resetChat} disabled={resetWaChat.isPending}>
                         <RotateCcw className="w-4 h-4 mr-2" /> Reset chat

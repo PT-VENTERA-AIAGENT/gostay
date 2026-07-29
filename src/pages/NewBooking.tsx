@@ -315,7 +315,7 @@ export default function NewBooking() {
                 disabled={!canSubmit}
                 className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity mt-6 touch-target btn-press disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : "Create Booking"}
+                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> {t("Creating…")}</> : "Create Booking"}
               </motion.button>
             </div>
           </motion.div>

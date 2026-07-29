@@ -219,7 +219,7 @@ export default function FloorPlanViewer({
                 <p className="text-sm font-semibold text-foreground">{formatIDR(selectedRoom.room_types.base_rate)} <span className="font-normal text-muted-foreground text-xs">{t("/ malam")}</span></p>
               )}
               {mode === "staff" && occupantByRoom?.get(selectedRoom.id) && (
-                <p className="text-xs text-muted-foreground">Tamu: <span className="text-foreground font-medium">{occupantByRoom.get(selectedRoom.id)}</span></p>
+                <p className="text-xs text-muted-foreground">{t("Tamu:")} <span className="text-foreground font-medium">{occupantByRoom.get(selectedRoom.id)}</span></p>
               )}
               {onPickRoom && (
                 <button

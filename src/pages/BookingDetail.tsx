@@ -178,7 +178,7 @@ export default function BookingDetail() {
             <FolioCard bookingId={id!} roomTotal={booking.total_amount} amountPaid={booking.amount_paid} />
 
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><FileText className="w-4 h-4" /> Notes</h2>
+              <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><FileText className="w-4 h-4" /> {t("Notes")}</h2>
               <div className="space-y-3 text-sm">
                 <div><span className="text-muted-foreground text-xs uppercase tracking-wide">{t("Special Requests")}</span><p className="text-foreground mt-1">{booking.special_requests ?? "—"}</p></div>
                 <div><span className="text-muted-foreground text-xs uppercase tracking-wide">{t("Internal Notes")}</span><p className="text-foreground mt-1">{booking.internal_notes ?? "—"}</p></div>
@@ -186,7 +186,7 @@ export default function BookingDetail() {
             </motion.div>
 
             <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><Clock className="w-4 h-4" /> Audit Trail</h2>
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2"><Clock className="w-4 h-4" /> {t("Audit Trail")}</h2>
               {auditLog.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("No audit entries yet.")}</p>
               ) : (
@@ -311,7 +311,7 @@ function FolioCard({ bookingId, roomTotal, amountPaid }: { bookingId: string; ro
   return (
     <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-foreground flex items-center gap-2"><Receipt className="w-4 h-4" /> Folio</h2>
+        <h2 className="font-semibold text-foreground flex items-center gap-2"><Receipt className="w-4 h-4" /> {t("Folio")}</h2>
         {!showForm && (
           <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 text-sm font-medium text-primary hover:opacity-80 transition-opacity">
             <Plus className="w-4 h-4" /> Tambah biaya
@@ -320,7 +320,7 @@ function FolioCard({ bookingId, roomTotal, amountPaid }: { bookingId: string; ro
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2"><Loader2 className="w-4 h-4 animate-spin" /> Memuat biaya…</div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2"><Loader2 className="w-4 h-4 animate-spin" /> {t("Memuat biaya…")}</div>
       ) : charges.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("Belum ada biaya lain.")}</p>
       ) : (
@@ -426,7 +426,7 @@ function PaymentCard({ bookingId }: { bookingId: string }) {
   return (
     <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-foreground flex items-center gap-2"><Wallet className="w-4 h-4" /> Pembayaran</h2>
+        <h2 className="font-semibold text-foreground flex items-center gap-2"><Wallet className="w-4 h-4" /> {t("Pembayaran")}</h2>
         {!showForm && (
           <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 text-sm font-medium text-primary hover:opacity-80 transition-opacity">
             <Plus className="w-4 h-4" /> Catat Pembayaran
@@ -435,7 +435,7 @@ function PaymentCard({ bookingId }: { bookingId: string }) {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2"><Loader2 className="w-4 h-4 animate-spin" /> Memuat pembayaran…</div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2"><Loader2 className="w-4 h-4 animate-spin" /> {t("Memuat pembayaran…")}</div>
       ) : payments.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("Belum ada pembayaran.")}</p>
       ) : (

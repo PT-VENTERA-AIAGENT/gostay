@@ -370,7 +370,7 @@ export default function Analytics() {
             <div className="mt-4 pt-4 border-t border-border space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("Quick Stats")}</h3>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Unread Chats</span>
+                <span className="text-muted-foreground flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> {t("Unread Chats")}</span>
                 <span className="font-semibold text-foreground tabular-nums">{quickStats.unreadChats}</span>
               </div>
               <div className="flex items-center justify-between text-sm">

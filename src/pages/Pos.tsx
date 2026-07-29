@@ -360,7 +360,7 @@ function DailyRecap({ onClose }: { onClose: () => void }) {
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div>
-            <h2 className="font-semibold text-foreground flex items-center gap-2"><Receipt className="w-4 h-4" /> Rekap kasir</h2>
+            <h2 className="font-semibold text-foreground flex items-center gap-2"><Receipt className="w-4 h-4" /> {t("Rekap kasir")}</h2>
             <p className="text-xs text-muted-foreground mt-0.5">{today}</p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t("Tutup")}><X className="w-5 h-5" /></button>

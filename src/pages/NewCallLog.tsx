@@ -89,8 +89,8 @@ export default function NewCallLog() {
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Direction")}</label>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setDirection("inbound")} className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium btn-press touch-target transition-colors ${direction === "inbound" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}><PhoneIncoming className="w-4 h-4" /> Inbound</button>
-                      <button type="button" onClick={() => setDirection("outbound")} className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium btn-press touch-target transition-colors ${direction === "outbound" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}><PhoneOutgoing className="w-4 h-4" /> Outbound</button>
+                      <button type="button" onClick={() => setDirection("inbound")} className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium btn-press touch-target transition-colors ${direction === "inbound" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}><PhoneIncoming className="w-4 h-4" /> {t("Inbound")}</button>
+                      <button type="button" onClick={() => setDirection("outbound")} className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium btn-press touch-target transition-colors ${direction === "outbound" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}><PhoneOutgoing className="w-4 h-4" /> {t("Outbound")}</button>
                     </div>
                   </div>
                   <div>

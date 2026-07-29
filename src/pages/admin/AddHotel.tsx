@@ -383,7 +383,7 @@ export default function AddHotel() {
 
               <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
                 <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4" /> WhatsApp Hotel <span className="text-xs font-normal text-muted-foreground">{t("(opsional)")}</span>
+                  <MessageCircle className="w-4 h-4" /> {t("WhatsApp Hotel")} <span className="text-xs font-normal text-muted-foreground">{t("(opsional)")}</span>
                 </h2>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Nomor / label WA hotel")}</label>
