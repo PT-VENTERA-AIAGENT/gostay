@@ -16,6 +16,16 @@ import { useToast } from "@/hooks/use-toast";
  */
 
 const POLL_INTERVAL_MS = 2500;
+/**
+ * How long a non-settled status (pairing/connecting) may persist before we treat
+ * the session as wedged and offer recovery.
+ *
+ * A gateway session can sit on "connecting" indefinitely — it never finishes the
+ * handshake and never emits a QR. Rendering only a spinner for that state left
+ * the operator with no way out and the hotel's WhatsApp silently off, so past
+ * this deadline we surface the restore action instead.
+ */
+const STUCK_AFTER_MS = 20_000;
 
 type WaStatus = "none" | "pairing" | "qr" | "connecting" | "open" | "closed";
 
@@ -43,8 +53,13 @@ export default function WhatsApp() {
   // Distinguishes "we have never heard from the server" from a real 'none', so
   // the empty state does not flash before the first poll resolves.
   const [loaded, setLoaded] = useState(false);
+  // True once a pairing/connecting status has outlived STUCK_AFTER_MS — the cue
+  // to offer recovery instead of an endless spinner.
+  const [stuck, setStuck] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** When the current non-settled status began, or null when settled. */
+  const stuckSinceRef = useRef<number | null>(null);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current !== null) {
@@ -89,6 +104,17 @@ export default function WhatsApp() {
     try {
       const next = await apiFetch<WaState>("/api/wa/connect");
       setState(next);
+      // Start the stuck-clock when we ENTER a non-settled state and clear it the
+      // moment we leave, so the deadline measures THIS stall rather than the
+      // page's lifetime. Re-evaluated on every poll, so no extra timer is needed.
+      const waiting = next.status === "pairing" || next.status === "connecting";
+      if (!waiting) {
+        stuckSinceRef.current = null;
+        setStuck(false);
+      } else {
+        if (stuckSinceRef.current === null) stuckSinceRef.current = Date.now();
+        setStuck(Date.now() - stuckSinceRef.current >= STUCK_AFTER_MS);
+      }
       setLoaded(true);
       if (next.status === "open") stopPolling();
     } catch {
@@ -145,6 +171,32 @@ export default function WhatsApp() {
     }
   }, [apiFetch, startPolling, toast]);
 
+  /**
+   * Recover a wedged session: the server drops the stuck gateway session and
+   * starts a fresh one, which makes the QR flow available again. Used when the
+   * status has stalled, and from the closed state.
+   */
+  const restore = useCallback(async () => {
+    setBusy(true);
+    try {
+      const res = await apiFetch<ConnectResponse>("/api/wa/connect?action=restore", { method: "POST" });
+      if (!res.ok) throw new Error(res.error ?? "Gagal memulihkan layanan WhatsApp.");
+      stuckSinceRef.current = null;
+      setStuck(false);
+      setState({ status: "pairing", connected: false });
+      toast({ title: tr("Layanan WhatsApp dipulihkan — menyiapkan sesi baru") });
+      startPolling();
+    } catch (e) {
+      toast({
+        title: tr("Gagal memulihkan layanan"),
+        description: (e as Error).message || "Terjadi kesalahan. Coba lagi.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }, [apiFetch, startPolling, toast]);
+
   const unlink = useCallback(async () => {
     if (!window.confirm("Lepas tautan WhatsApp? Tamu tidak bisa memesan lewat chat sampai Anda menautkan ulang.")) {
       return;
@@ -187,6 +239,12 @@ export default function WhatsApp() {
               <CenteredSpinner label="Memuat status…" />
             ) : state.status === "none" ? (
               <EmptyState onConnect={connect} busy={busy} />
+            ) : stuck ? (
+              <StuckState
+                status={state.status}
+                onRestore={restore}
+                busy={busy}
+              />
             ) : state.status === "pairing" ? (
               <CenteredSpinner label="Menyiapkan sesi…" />
             ) : state.status === "qr" ? (
@@ -196,7 +254,7 @@ export default function WhatsApp() {
             ) : state.status === "open" ? (
               <ConnectedState linkedNumber={state.linkedNumber} onUnlink={unlink} busy={busy} />
             ) : (
-              <ClosedState onReconnect={connect} busy={busy} />
+              <ClosedState onReconnect={connect} onRestore={restore} busy={busy} />
             )}
           </motion.div>
         </motion.div>
@@ -297,7 +355,15 @@ function ConnectedState({
   );
 }
 
-function ClosedState({ onReconnect, busy }: { onReconnect: () => void; busy: boolean }) {
+function ClosedState({
+  onReconnect,
+  onRestore,
+  busy,
+}: {
+  onReconnect: () => void;
+  onRestore: () => void;
+  busy: boolean;
+}) {
   return (
     <div className="flex flex-col items-center text-center py-6">
       <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
@@ -316,6 +382,56 @@ function ClosedState({ onReconnect, busy }: { onReconnect: () => void; busy: boo
         {busy && <Loader2 className="w-4 h-4 animate-spin" />}
         Sambungkan ulang
       </motion.button>
+      <button
+        onClick={onRestore}
+        disabled={busy}
+        className="mt-3 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 disabled:opacity-60"
+      >
+        {tr("Sambungkan ulang gagal? Pulihkan layanan")}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Shown when pairing/connecting has stalled past STUCK_AFTER_MS. A wedged
+ * gateway session never emits a QR and never connects, so the plain spinner was
+ * a dead end — the hotel's WhatsApp stays off with nothing the operator can do.
+ * Restoring drops the stuck session and starts a fresh one.
+ */
+function StuckState({
+  status,
+  onRestore,
+  busy,
+}: {
+  status: WaStatus;
+  onRestore: () => void;
+  busy: boolean;
+}) {
+  const t = useT();
+  return (
+    <div className="flex flex-col items-center text-center py-6">
+      <div className="w-16 h-16 rounded-2xl bg-warning/10 flex items-center justify-center mb-4">
+        <AlertTriangle className="w-8 h-8 text-warning" />
+      </div>
+      <h2 className="text-lg font-semibold text-foreground">{t("Layanan WhatsApp tidak merespons")}</h2>
+      <p className="text-sm text-muted-foreground mt-2 max-w-sm leading-relaxed">
+        Sesi tersangkut di status{" "}
+        <span className="font-mono text-foreground">{status}</span> dan tidak kunjung tersambung, jadi
+        tamu yang mengirim pesan belum dibalas. Pulihkan layanan untuk memulai sesi baru.
+      </p>
+      <motion.button
+        onClick={onRestore}
+        disabled={busy}
+        whileTap={{ scale: 0.97 }}
+        className="mt-6 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+      >
+        {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+        {tr("Pulihkan Layanan")}
+      </motion.button>
+      <p className="text-xs text-muted-foreground mt-3 max-w-sm">
+        {tr("Setelah dipulihkan, scan ulang QR dari WhatsApp di HP hotel.")}
+      </p>
     </div>
   );
 }

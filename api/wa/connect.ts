@@ -153,6 +153,29 @@ export default async function handler(req: VercelReq, res: VercelRes) {
 
   try {
     if (method === "POST") {
+      // ?action=restore — recover a WEDGED session.
+      //
+      // A gateway session can get stuck reporting "connecting" forever: it never
+      // completes the handshake and never emits a QR, so plain POST (which is
+      // idempotent and just re-starts an existing session) cannot dislodge it and
+      // the operator is left staring at a spinner. Deleting first forces the
+      // gateway to drop that state, so the fresh session below starts from
+      // scratch and emits a QR again. The mapping is parked inactive until GET
+      // observes a real connection, so a half-restored session can never be
+      // mistaken for a live one by the inbound webhook.
+      if (action === "restore") {
+        await deleteSession(slug).catch(() => {});
+        await upsertMapping(slug, tenantId, false);
+        const recreated = await createSession(slug, t.name);
+        if (!recreated.ok) {
+          console.error("[wa/connect] restore/createSession:", recreated.error);
+          res.status(502).json({ ok: false, error: recreated.error ?? "restore_failed" });
+          return;
+        }
+        res.status(200).json({ ok: true, sessionId: slug, restored: true });
+        return;
+      }
+
       // Best-effort: a session with this id may already exist (reconnect). The
       // gateway's start is idempotent, and polling GET is the real driver of the
       // UI, so we don't hard-fail here — we just log a genuine gateway error.
