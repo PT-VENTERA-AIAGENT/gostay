@@ -277,9 +277,9 @@ export default function Rooms() {
         {/* Date selector — the board reflects room status for this night. */}
         <div className="flex items-center gap-2 flex-wrap">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Status untuk tanggal:</span>
+          <span className="text-sm text-muted-foreground">{t("Status untuk tanggal:")}</span>
           <div className="w-44">
-            <DatePicker value={date} onChange={(v) => setDate(v || todayISO())} placeholder="Pilih tanggal" />
+            <DatePicker value={date} onChange={(v) => setDate(v || todayISO())} placeholder={t("Pilih tanggal")} />
           </div>
           {!isToday && (
             <button onClick={() => setDate(todayISO())} className="text-sm text-primary font-medium hover:underline">{t("Hari ini")}</button>

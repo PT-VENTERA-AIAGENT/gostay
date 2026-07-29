@@ -65,7 +65,7 @@ export default function NewCallLog() {
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Log a Call</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Log a Call")}</h1>
             <p className="text-sm text-muted-foreground">{t("Record an inbound or outbound phone call")}</p>
           </div>
         </div>
@@ -87,7 +87,7 @@ export default function NewCallLog() {
                     </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">Direction</label>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Direction")}</label>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setDirection("inbound")} className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium btn-press touch-target transition-colors ${direction === "inbound" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}><PhoneIncoming className="w-4 h-4" /> Inbound</button>
                       <button type="button" onClick={() => setDirection("outbound")} className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium btn-press touch-target transition-colors ${direction === "outbound" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}><PhoneOutgoing className="w-4 h-4" /> Outbound</button>
@@ -98,14 +98,14 @@ export default function NewCallLog() {
                     <input type="datetime-local" value={datetime} onChange={(e) => setDatetime(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">Duration (mm:ss)</label>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Duration (mm:ss)")}</label>
                     <input type="text" placeholder="05:30" value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
                   </div>
                 </div>
               </motion.div>
 
               <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-                <h2 className="font-semibold text-foreground mb-4">Call Summary</h2>
+                <h2 className="font-semibold text-foreground mb-4">{t("Call Summary")}</h2>
                 <textarea rows={4} value={summary} onChange={(e) => setSummary(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder={t("Summarize what was discussed...")} />
               </motion.div>
 
@@ -120,7 +120,7 @@ export default function NewCallLog() {
                 {followUp && (
                   <div>
                     <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Follow-up Date")}</label>
-                    <DatePicker value={followUpDue} onChange={setFollowUpDue} placeholder="Pilih tanggal follow-up" />
+                    <DatePicker value={followUpDue} onChange={setFollowUpDue} placeholder={t("Pilih tanggal follow-up")} />
                   </div>
                 )}
               </motion.div>
@@ -144,7 +144,7 @@ export default function NewCallLog() {
                 )}
               </motion.div>
               <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
-                <h2 className="font-semibold text-foreground mb-4">Quick Actions</h2>
+                <h2 className="font-semibold text-foreground mb-4">{t("Quick Actions")}</h2>
                 <Link to="/bookings/new" className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors btn-press"><CalendarPlus className="w-4 h-4" /> {t("Create Booking from Call")}</Link>
               </motion.div>
               <motion.div variants={staggerItem}>

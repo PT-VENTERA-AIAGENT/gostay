@@ -202,7 +202,7 @@ export default function PortalChat() {
               <p className="text-sm font-semibold text-foreground">{hotelName} Front Desk</p>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-success" />
-                <span className="text-xs text-muted-foreground">Online</span>
+                <span className="text-xs text-muted-foreground">{t("Online")}</span>
               </div>
             </div>
           </div>
@@ -265,7 +265,7 @@ export default function PortalChat() {
           <div className="px-4 py-3 border-t border-border">
             <div className="flex items-center gap-2">
               <input ref={fileRef} type="file" className="hidden" onChange={handleAttach} />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} title="Lampirkan file" className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors border border-border disabled:opacity-50">
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} title={t("Lampirkan file")} className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors border border-border disabled:opacity-50">
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
               </button>
               <input

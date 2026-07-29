@@ -1,4 +1,4 @@
-import { useLang, type Lang } from "@/lib/i18n";
+import { useLang, useT, type Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const OPTIONS: { value: Lang; label: string }[] = [
@@ -9,8 +9,9 @@ const OPTIONS: { value: Lang; label: string }[] = [
 /** Compact ID/EN switch. Sits next to the theme toggle in both shells. */
 export default function LanguageToggle() {
   const { lang, setLang } = useLang();
+  const t = useT();
   return (
-    <div className="inline-flex items-center rounded-full border border-border bg-card p-0.5" role="group" aria-label="Bahasa / Language">
+    <div className="inline-flex items-center rounded-full border border-border bg-card p-0.5" role="group" aria-label={t("Bahasa / Language")}>
       {OPTIONS.map((o) => (
         <button
           key={o.value}

@@ -73,18 +73,18 @@ export default function GlobalSearch() {
         <kbd className="hidden xl:inline-flex items-center text-[10px] border border-border rounded px-1.5 py-0.5 font-mono shrink-0">/</kbd>
       </button>
       {/* Compact trigger (mobile + tablet) */}
-      <button onClick={() => setOpen(true)} aria-label="Cari" className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors touch-target btn-press">
+      <button onClick={() => setOpen(true)} aria-label={t("Cari")} className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors touch-target btn-press">
         <Search className="w-5 h-5" />
       </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Cari booking, tamu, kamar, tipe…" value={term} onValueChange={setTerm} />
+        <CommandInput placeholder={t("Cari booking, tamu, kamar, tipe…")} value={term} onValueChange={setTerm} />
         <CommandList>
           {debounced.length < 2 && roomHits.length === 0 && typeHits.length === 0 && (
-            <CommandEmpty>Ketik minimal 2 huruf…</CommandEmpty>
+            <CommandEmpty>{t("Ketik minimal 2 huruf…")}</CommandEmpty>
           )}
           {debounced.length >= 2 && bookings.length === 0 && customers.length === 0 && roomHits.length === 0 && typeHits.length === 0 && (
-            <CommandEmpty>Tidak ada hasil.</CommandEmpty>
+            <CommandEmpty>{t("Tidak ada hasil.")}</CommandEmpty>
           )}
 
           {bookings.length > 0 && (

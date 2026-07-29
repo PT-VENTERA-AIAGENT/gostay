@@ -111,17 +111,17 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
           <h2 className="font-semibold text-foreground flex items-center gap-2">
             <Zap className="w-4 h-4 text-primary" /> Walk-in check-in kilat
           </h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Tutup"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t("Tutup")}><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-4 space-y-4">
           {/* Guest */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Tamu</p>
-            <input className={inputCls} placeholder="Nama tamu *" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            <input className={inputCls} placeholder={t("Nama tamu *")} value={fullName} onChange={(e) => setFullName(e.target.value)} />
             <div className="grid grid-cols-2 gap-2">
-              <input className={inputCls} placeholder="No. HP (opsional)" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <input className={inputCls} placeholder="Email (opsional)" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input className={inputCls} placeholder={t("No. HP (opsional)")} value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input className={inputCls} placeholder={t("Email (opsional)")} value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
           </div>
 
@@ -140,11 +140,11 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground">Dewasa</label>
+                <label className="text-xs text-muted-foreground">{t("Dewasa")}</label>
                 <input className={inputCls} type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))} />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Anak</label>
+                <label className="text-xs text-muted-foreground">{t("Anak")}</label>
                 <input className={inputCls} type="number" min={0} value={children} onChange={(e) => setChildren(Math.max(0, Number(e.target.value)))} />
               </div>
             </div>
@@ -153,13 +153,13 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
           {/* Room */}
           <div className="space-y-2">
             <select className={inputCls} value={roomTypeId} onChange={(e) => { setRoomTypeId(e.target.value); setRoomId(""); }}>
-              <option value="">Pilih tipe kamar *…</option>
+              <option value="">{t("Pilih tipe kamar *…")}</option>
               {roomTypes?.map((t) => (
                 <option key={t.id} value={t.id}>{t.name} — {formatIDR(Number(t.base_rate))}/malam</option>
               ))}
             </select>
             <select className={inputCls} value={roomId} onChange={(e) => setRoomId(e.target.value)} disabled={!datesValid || !roomTypeId}>
-              <option value="">Kamar otomatis (pertama yang kosong)</option>
+              <option value="">{t("Kamar otomatis (pertama yang kosong)")}</option>
               {rooms.map((r) => (
                 <option key={r.id} value={r.id}>Kamar {r.number} (lantai {r.floor})</option>
               ))}

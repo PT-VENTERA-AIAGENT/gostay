@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+// tr(), not useT(): this is a class component, so hooks are unavailable.
+import { tr } from "@/lib/i18n";
 
 interface Props {
   children: ReactNode;
@@ -61,7 +63,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-5">
             <AlertTriangle className="w-7 h-7 text-destructive" />
           </div>
-          <h1 className="text-xl font-bold text-foreground mb-2">Terjadi kesalahan</h1>
+          <h1 className="text-xl font-bold text-foreground mb-2">{tr("Terjadi kesalahan")}</h1>
           <p className="text-sm text-muted-foreground mb-6">
             Maaf, halaman ini gagal dimuat. Silakan muat ulang, atau kembali ke beranda.
           </p>

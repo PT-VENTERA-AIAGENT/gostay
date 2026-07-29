@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { useAuth, roleHome } from "@/contexts/AuthContext";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 /**
  * /login is a redirect, not a page.
@@ -23,6 +23,7 @@ import { tr } from "@/lib/i18n";
  *   - a live session — the user is already in; send them to their own home.
  */
 export default function Login() {
+  const t = useT();
   const { session, role, signIn, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

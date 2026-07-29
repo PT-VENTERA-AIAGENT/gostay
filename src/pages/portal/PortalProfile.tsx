@@ -68,7 +68,7 @@ export default function PortalProfile() {
           <ArrowLeft className="w-4 h-4" /> Back
         </Link>
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">Profile Settings</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Profile Settings")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("Manage your personal information")}</p>
         </div>
 
@@ -90,7 +90,7 @@ export default function PortalProfile() {
               an input here would accept a change and silently lose it. */}
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-6 space-y-4">
             <div className="flex items-start justify-between gap-3">
-              <h2 className="font-semibold text-foreground">Ventera Account</h2>
+              <h2 className="font-semibold text-foreground">{t("Ventera Account")}</h2>
               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
                 <ShieldCheck className="w-3.5 h-3.5" /> Managed by SSO
               </span>
@@ -124,7 +124,7 @@ export default function PortalProfile() {
           </motion.div>
 
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-6 space-y-4">
-            <h2 className="font-semibold text-foreground">Contact</h2>
+            <h2 className="font-semibold text-foreground">{t("Contact")}</h2>
             <div>
               <label htmlFor="phone" className="text-sm font-medium text-foreground mb-1.5 block">{t("Phone")}</label>
               <div className="relative">
@@ -151,7 +151,7 @@ export default function PortalProfile() {
                 className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 btn-press disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updateProfile.isPending
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> {t("Saving…")}</>
                   : <><Save className="w-4 h-4" /> {t("Save Changes")}</>}
               </motion.button>
             </div>

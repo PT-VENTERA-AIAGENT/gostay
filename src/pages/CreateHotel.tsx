@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 /**
  * Self-serve hotel creation (PRD §2.2, path 1).
@@ -43,6 +43,7 @@ function messageForError(error: string | undefined): string {
 }
 
 export default function CreateHotel() {
+  const t = useT();
   const { session, signIn, role } = useAuth();
   const { toast } = useToast();
   const token = session?.supabase_token ?? null;
@@ -122,7 +123,7 @@ export default function CreateHotel() {
                     onChange={(e) => setName(e.target.value)}
                     required
                     autoFocus
-                    placeholder="Hotel Melati Indah"
+                    placeholder={t("Hotel Melati Indah")}
                     className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>

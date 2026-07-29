@@ -181,7 +181,7 @@ export default function BookingDetail() {
               <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2"><FileText className="w-4 h-4" /> Notes</h2>
               <div className="space-y-3 text-sm">
                 <div><span className="text-muted-foreground text-xs uppercase tracking-wide">{t("Special Requests")}</span><p className="text-foreground mt-1">{booking.special_requests ?? "—"}</p></div>
-                <div><span className="text-muted-foreground text-xs uppercase tracking-wide">Internal Notes</span><p className="text-foreground mt-1">{booking.internal_notes ?? "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs uppercase tracking-wide">{t("Internal Notes")}</span><p className="text-foreground mt-1">{booking.internal_notes ?? "—"}</p></div>
               </div>
             </motion.div>
 
@@ -322,7 +322,7 @@ function FolioCard({ bookingId, roomTotal, amountPaid }: { bookingId: string; ro
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-2"><Loader2 className="w-4 h-4 animate-spin" /> Memuat biaya…</div>
       ) : charges.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Belum ada biaya lain.</p>
+        <p className="text-sm text-muted-foreground">{t("Belum ada biaya lain.")}</p>
       ) : (
         <div className="space-y-2">
           {charges.map((c) => (
@@ -333,7 +333,7 @@ function FolioCard({ bookingId, roomTotal, amountPaid }: { bookingId: string; ro
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="font-medium text-foreground">{formatIDR(lineTotal(c))}</span>
-                <button onClick={() => handleDelete(c)} disabled={deleteCharge.isPending} className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50" aria-label="Hapus biaya">
+                <button onClick={() => handleDelete(c)} disabled={deleteCharge.isPending} className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50" aria-label={t("Hapus biaya")}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -344,31 +344,31 @@ function FolioCard({ bookingId, roomTotal, amountPaid }: { bookingId: string; ro
 
       {showForm && (
         <div className="mt-3 space-y-2 p-3 rounded-lg border border-border">
-          <input className={inputCls} placeholder="Deskripsi (mis. Nasi goreng)" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <input className={inputCls} placeholder={t("Deskripsi (mis. Nasi goreng)")} value={description} onChange={(e) => setDescription(e.target.value)} />
           <div className="grid grid-cols-2 gap-2">
             <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value as PosCategory)}>
               {(Object.keys(CATEGORY_LABELS) as PosCategory[]).map((k) => (
                 <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
               ))}
             </select>
-            <input className={inputCls} type="number" min="1" step="1" placeholder="Jumlah" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            <input className={inputCls} type="number" min="1" step="1" placeholder={t("Jumlah")} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
           </div>
-          <input className={inputCls} type="number" min="0" step="1000" placeholder="Harga satuan (Rp)" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+          <input className={inputCls} type="number" min="0" step="1000" placeholder={t("Harga satuan (Rp)")} value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
           <div className="flex items-center gap-2 pt-1">
             <button onClick={handleAdd} disabled={addCharge.isPending} className="flex-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60">
               {addCharge.isPending ? "Menyimpan…" : "Simpan"}
             </button>
-            <button onClick={resetForm} className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">Batal</button>
+            <button onClick={resetForm} className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">{t("Batal")}</button>
           </div>
         </div>
       )}
 
       <div className="mt-4 pt-3 border-t border-border space-y-2 text-sm">
-        <div className="flex justify-between"><span className="text-muted-foreground">Kamar</span><span className="font-medium text-foreground">{formatIDR(roomTotal)}</span></div>
-        <div className="flex justify-between"><span className="text-muted-foreground">Biaya lain</span><span className="font-medium text-foreground">{formatIDR(chargesTotal)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">{t("Kamar")}</span><span className="font-medium text-foreground">{formatIDR(roomTotal)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">{t("Biaya lain")}</span><span className="font-medium text-foreground">{formatIDR(chargesTotal)}</span></div>
         <div className="flex justify-between pt-2 border-t border-border"><span className="font-semibold text-foreground">{t("Total tagihan")}</span><span className="font-semibold text-foreground">{formatIDR(totalTagihan)}</span></div>
-        <div className="flex justify-between"><span className="text-muted-foreground">Terbayar</span><span className="font-medium text-success">{formatIDR(amountPaid)}</span></div>
-        <div className="flex justify-between"><span className="text-muted-foreground">Sisa</span><span className={cn("font-semibold", sisa > 0 ? "text-warning" : "text-success")}>{formatIDR(sisa)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">{t("Terbayar")}</span><span className="font-medium text-success">{formatIDR(amountPaid)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">{t("Sisa")}</span><span className={cn("font-semibold", sisa > 0 ? "text-warning" : "text-success")}>{formatIDR(sisa)}</span></div>
       </div>
     </motion.div>
   );
@@ -437,7 +437,7 @@ function PaymentCard({ bookingId }: { bookingId: string }) {
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-2"><Loader2 className="w-4 h-4 animate-spin" /> Memuat pembayaran…</div>
       ) : payments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Belum ada pembayaran.</p>
+        <p className="text-sm text-muted-foreground">{t("Belum ada pembayaran.")}</p>
       ) : (
         <div className="space-y-2">
           {payments.map((p) => (
@@ -447,7 +447,7 @@ function PaymentCard({ bookingId }: { bookingId: string }) {
                 {p.note && <p className="text-xs text-muted-foreground truncate">{p.note}</p>}
                 <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleString("id-ID")}</p>
               </div>
-              <button onClick={() => handleDelete(p)} disabled={deletePayment.isPending} className="text-muted-foreground hover:text-destructive transition-colors shrink-0 disabled:opacity-50" aria-label="Hapus pembayaran">
+              <button onClick={() => handleDelete(p)} disabled={deletePayment.isPending} className="text-muted-foreground hover:text-destructive transition-colors shrink-0 disabled:opacity-50" aria-label={t("Hapus pembayaran")}>
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -457,18 +457,18 @@ function PaymentCard({ bookingId }: { bookingId: string }) {
 
       {showForm && (
         <div className="mt-3 space-y-2 p-3 rounded-lg border border-border">
-          <input className={inputCls} type="number" min="0" step="1000" placeholder="Jumlah (Rp)" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <input className={inputCls} type="number" min="0" step="1000" placeholder={t("Jumlah (Rp)")} value={amount} onChange={(e) => setAmount(e.target.value)} />
           <select className={inputCls} value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
             {(Object.keys(METHOD_LABELS) as PaymentMethod[]).map((k) => (
               <option key={k} value={k}>{METHOD_LABELS[k]}</option>
             ))}
           </select>
-          <input className={inputCls} placeholder="Catatan (opsional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <input className={inputCls} placeholder={t("Catatan (opsional)")} value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="flex items-center gap-2 pt-1">
             <button onClick={handleAdd} disabled={addPayment.isPending} className="flex-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60">
               {addPayment.isPending ? "Menyimpan…" : "Simpan"}
             </button>
-            <button onClick={resetForm} className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">Batal</button>
+            <button onClick={resetForm} className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">{t("Batal")}</button>
           </div>
         </div>
       )}

@@ -197,7 +197,7 @@ export default function UserManagement() {
                             <div>
                               <p className="text-sm font-medium text-foreground">
                                 {u.full_name || "—"}
-                                {isMe && <span className="ml-2 text-xs text-muted-foreground font-normal">(you)</span>}
+                                {isMe && <span className="ml-2 text-xs text-muted-foreground font-normal">{t("(you)")}</span>}
                               </p>
                               <p className="text-xs text-muted-foreground">{u.email}</p>
                             </div>
@@ -267,7 +267,7 @@ export default function UserManagement() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">
                           {u.full_name || "—"}
-                          {isMe && <span className="ml-1.5 text-xs text-muted-foreground font-normal">(you)</span>}
+                          {isMe && <span className="ml-1.5 text-xs text-muted-foreground font-normal">{t("(you)")}</span>}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                       </div>

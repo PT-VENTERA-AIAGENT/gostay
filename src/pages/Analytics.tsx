@@ -83,7 +83,7 @@ function KpiCard({ kpi }: { kpi: KPI }) {
           <span className={cn("text-xs font-medium", kpi.delta >= 0 ? "text-success" : "text-destructive")}>
             {kpi.delta >= 0 ? "+" : ""}{kpi.delta.toFixed(1)}%
           </span>
-          <span className="text-[10px] text-muted-foreground hidden lg:inline">vs prev</span>
+          <span className="text-[10px] text-muted-foreground hidden lg:inline">{t("vs prev")}</span>
         </div>
       )}
     </motion.div>
@@ -186,13 +186,13 @@ export default function Analytics() {
       <div className="p-4 md:p-6 space-y-4 md:space-y-6 print:p-0">
         {/* Print header */}
         <div className="hidden print:block mb-6">
-          <h1 className="text-2xl font-bold">GoStay Hotel — Analytics Report</h1>
+          <h1 className="text-2xl font-bold">{t("GoStay Hotel — Analytics Report")}</h1>
           <p className="text-sm text-muted-foreground">Generated: {new Date().toLocaleDateString()}</p>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">Analytics &amp; Reports</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Analytics & Reports")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {summary.totalRooms} active rooms · {RANGES[rangeKey].label.toLowerCase()}
             </p>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Star, Loader2, CheckCircle } from "lucide-react";
 import { useReviewForBooking, useCreateReview } from "@/hooks/useReviews";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, useT } from "@/lib/i18n";
 
 interface Props {
   bookingId: string;
@@ -16,6 +16,7 @@ interface Props {
  * read-only instead of the form.
  */
 export default function BookingReviewForm({ bookingId, customerId }: Props) {
+  const t = useT();
   const { data: existing, isLoading } = useReviewForBooking(bookingId);
   const create = useCreateReview();
   const { toast } = useToast();
@@ -32,7 +33,7 @@ export default function BookingReviewForm({ bookingId, customerId }: Props) {
       <div className="bg-card rounded-xl border border-border p-4 md:p-5">
         <div className="flex items-center gap-2 mb-2">
           <CheckCircle className="w-4 h-4 text-success" />
-          <h2 className="font-semibold text-foreground">Ulasan Anda</h2>
+          <h2 className="font-semibold text-foreground">{t("Ulasan Anda")}</h2>
         </div>
         <div className="flex items-center gap-1 mb-2">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -57,8 +58,8 @@ export default function BookingReviewForm({ bookingId, customerId }: Props) {
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 md:p-5">
-      <h2 className="font-semibold text-foreground mb-1">Beri Ulasan</h2>
-      <p className="text-sm text-muted-foreground mb-3">Bagaimana pengalaman menginap Anda?</p>
+      <h2 className="font-semibold text-foreground mb-1">{t("Beri Ulasan")}</h2>
+      <p className="text-sm text-muted-foreground mb-3">{t("Bagaimana pengalaman menginap Anda?")}</p>
       <div className="flex items-center gap-1 mb-3">
         {Array.from({ length: 5 }).map((_, i) => {
           const v = i + 1;
@@ -81,7 +82,7 @@ export default function BookingReviewForm({ bookingId, customerId }: Props) {
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         rows={3}
-        placeholder="Ceritakan pengalaman Anda (opsional)…"
+        placeholder={t("Ceritakan pengalaman Anda (opsional)…")}
         className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
       />
       {error && <div className="mt-2 bg-destructive/10 border border-destructive/20 rounded-lg p-2.5 text-sm text-destructive">{error}</div>}

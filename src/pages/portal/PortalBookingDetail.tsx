@@ -128,7 +128,7 @@ export default function PortalBookingDetail() {
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Special Requests</span>
+                <span className="text-muted-foreground">{t("Special Requests")}</span>
                 <p className="font-medium text-foreground mt-0.5">{booking.special_requests || "—"}</p>
               </div>
             </div>
@@ -178,7 +178,7 @@ export default function PortalBookingDetail() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-destructive text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors btn-press touch-target disabled:opacity-50"
                 >
                   {cancelBooking.isPending
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling…</>
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> {t("Cancelling…")}</>
                     : <><XCircle className="w-4 h-4" /> {t("Cancel Booking")}</>}
                 </button>
               </AlertDialogTrigger>

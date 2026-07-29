@@ -109,7 +109,7 @@ export default function RoomTypes() {
                   </div>
                 </div>
                 <p className="text-lg font-bold text-primary mb-1 tabular-nums">
-                  {formatIDR(type.base_rate)} <span className="text-xs font-normal text-muted-foreground">/ night</span>
+                  {formatIDR(type.base_rate)} <span className="text-xs font-normal text-muted-foreground">{t("/ night")}</span>
                 </p>
                 <div className="flex flex-wrap gap-1.5 mt-auto pt-3">
                   {type.amenities.slice(0, 4).map((a) => {

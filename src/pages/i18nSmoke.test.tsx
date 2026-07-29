@@ -19,7 +19,16 @@ import { LanguageProvider } from "@/lib/i18n";
 // would rot; the one failure mode this must never miss is a render that throws.
 
 vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({ user: null, profile: null, loading: false, signOut: vi.fn() }),
+  useAuth: () => ({
+    user: null,
+    profile: null,
+    loading: false,
+    signIn: () => {},
+    signOut: () => {},
+    refreshSession: async () => {},
+  }),
+  useSsoAuth: () => ({ refreshSession: async () => {}, loading: false }),
+  roleHome: () => "/",
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -91,6 +100,19 @@ const PAGES: Array<[string, () => Promise<{ default: React.ComponentType }>]> = 
   ["PortalRoomDetail", () => import("./portal/PortalRoomDetail")],
   ["ChatWidget", () => import("../components/portal/ChatWidget")],
   ["QuickWalkIn", () => import("../components/bookings/QuickWalkIn")],
+
+  // Second sweep: files where hardcoded text was wrapped in t(). LandingPage
+  // matters most — it is the public page, and it holds ~25 components, so its
+  // binding had to be inserted 16 times rather than once.
+  ["LandingPage", () => import("./LandingPage")],
+  ["Login", () => import("./Login")],
+  ["CreateHotel", () => import("./CreateHotel")],
+  ["AuthCallback", () => import("./AuthCallback")],
+  ["LanguageToggle", () => import("../components/shared/LanguageToggle")],
+  ["ErrorBoundary", () => import("../components/shared/ErrorBoundary")],
+  ["NotificationsMenu", () => import("../components/layout/NotificationsMenu")],
+  ["BookingReviewForm", () => import("../components/portal/BookingReviewForm")],
+  ["PortalFloorPlan", () => import("./portal/PortalFloorPlan")],
 ];
 
 describe("i18n sweep — every touched component renders", () => {

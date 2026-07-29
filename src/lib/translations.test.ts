@@ -20,6 +20,17 @@ import { EN, ID } from "./translations";
 
 const SRC = readFileSync(new URL("./translations.ts", import.meta.url), "utf8");
 
+/** Every tracked source file except the translation machinery and tests. */
+function trackedFiles(): string[] {
+  return execSync('git ls-files "src/*.ts" "src/*.tsx" "src/**/*.ts" "src/**/*.tsx"', {
+    encoding: "utf8",
+    cwd: process.cwd(),
+  })
+    .trim()
+    .split("\n")
+    .filter((f) => !/translations\.ts|i18n\.tsx|\.test\./.test(f));
+}
+
 /** Keys in source order, so duplicates survive — the object literal loses them. */
 function sourceKeys(name: string): string[] {
   const start = SRC.indexOf(`export const ${name}`);
@@ -43,18 +54,30 @@ describe("translation maps", () => {
   });
 });
 
+describe("wrapped strings are safe to wrap", () => {
+  it("no t() argument contains an HTML entity", () => {
+    // JSX decodes entities in literal text but not in a string a function
+    // returns, so `>Analytics &amp; Reports<` renders an ampersand while
+    // `{t("Analytics &amp; Reports")}` renders the five characters "&amp;".
+    // Wrapping text is what introduces this, so the check lives with the sweep.
+    const files = trackedFiles();
+    const bad: string[] = [];
+    for (const file of files) {
+      const code = readFileSync(file, "utf8");
+      for (const m of code.matchAll(/(?:^|[^A-Za-z0-9_$.])(?:t|tr)\("([^"]*&[a-zA-Z]+;[^"]*)"\)/g)) {
+        bad.push(`${file}: ${m[1]}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+});
+
 describe("translation coverage", () => {
   it("every string passed to t() or tr() exists in a map", () => {
     // Two source languages coexist: the portal is authored in Indonesian and
     // mapped to English, the staff pages the other way. A string lives in one
     // map only, so presence in either is correct — absence from both is the bug.
-    const files = execSync('git ls-files "src/*.ts" "src/*.tsx" "src/**/*.ts" "src/**/*.tsx"', {
-      encoding: "utf8",
-      cwd: process.cwd(),
-    })
-      .trim()
-      .split("\n")
-      .filter((f) => !/translations\.ts|i18n\.tsx|\.test\./.test(f));
+    const files = trackedFiles();
 
     const missing: Array<{ text: string; file: string }> = [];
     for (const file of files) {

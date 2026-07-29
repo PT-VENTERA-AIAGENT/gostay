@@ -144,15 +144,15 @@ export default function Bookings() {
         {showFilter && (
           <div className="flex flex-col sm:flex-row sm:items-end gap-3 bg-card border border-border rounded-lg p-3 md:p-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-in dari</label>
-              <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Dari tanggal" className="sm:w-44" />
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Check-in dari")}</label>
+              <DatePicker value={dateFrom} onChange={setDateFrom} placeholder={t("Dari tanggal")} className="sm:w-44" />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-in sampai</label>
-              <DatePicker value={dateTo} onChange={setDateTo} min={dateFrom || undefined} placeholder="Sampai tanggal" className="sm:w-44" />
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("Check-in sampai")}</label>
+              <DatePicker value={dateTo} onChange={setDateTo} min={dateFrom || undefined} placeholder={t("Sampai tanggal")} className="sm:w-44" />
             </div>
             {(dateFrom || dateTo) && (
-              <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-sm text-primary font-medium hover:underline py-2">Reset tanggal</button>
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-sm text-primary font-medium hover:underline py-2">{t("Reset tanggal")}</button>
             )}
           </div>
         )}

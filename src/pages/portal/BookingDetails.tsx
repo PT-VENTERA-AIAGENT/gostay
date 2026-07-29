@@ -180,14 +180,14 @@ export default function BookingDetails() {
           </div>
           <div>
             <label className="text-sm font-medium text-foreground mb-1.5 block">
-              Special Requests <span className="text-muted-foreground font-normal">(optional)</span>
+              Special Requests <span className="text-muted-foreground font-normal">{t("(optional)")}</span>
             </label>
             <textarea
               rows={3}
               value={specialRequests}
               onChange={(e) => setSpecialRequests(e.target.value)}
               className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-              placeholder="Any special requests..."
+              placeholder={t("Any special requests...")}
             />
           </div>
         </motion.div>

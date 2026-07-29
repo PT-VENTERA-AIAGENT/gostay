@@ -131,7 +131,7 @@ export default function PortalHome() {
                   <DatePicker
                     value={checkIn}
                     min={todayISO}
-                    placeholder="Pilih tanggal"
+                    placeholder={t("Pilih tanggal")}
                     onChange={(v) => {
                       setCheckIn(v);
                       // Keep the range coherent: if check-out is now on or before
@@ -145,7 +145,7 @@ export default function PortalHome() {
                   <DatePicker
                     value={checkOut}
                     min={checkIn || todayISO}
-                    placeholder="Pilih tanggal"
+                    placeholder={t("Pilih tanggal")}
                     onChange={setCheckOut}
                   />
                 </div>

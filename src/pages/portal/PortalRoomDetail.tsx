@@ -161,7 +161,7 @@ export default function PortalRoomDetail() {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3">Amenities</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">{t("Amenities")}</h2>
               <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {(room.amenities ?? []).map((a) => {
                   const Icon = amenityIcons[a] || Check;
@@ -175,7 +175,7 @@ export default function PortalRoomDetail() {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3">Policies</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">{t("Policies")}</h2>
               <ul className="space-y-2">
                 {policies.map((p, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -198,7 +198,7 @@ export default function PortalRoomDetail() {
                     value={checkIn}
                     onChange={pickCheckIn}
                     min={today}
-                    placeholder="Pilih tanggal menginap"
+                    placeholder={t("Pilih tanggal menginap")}
                   />
                 </div>
                 <div>

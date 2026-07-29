@@ -215,11 +215,11 @@ export default function NewBooking() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Check-in Date")}</label>
-                  <DatePicker value={checkIn} onChange={setCheckIn} placeholder="Pilih check-in" />
+                  <DatePicker value={checkIn} onChange={setCheckIn} placeholder={t("Pilih check-in")} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Check-out Date")}</label>
-                  <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder="Pilih check-out" />
+                  <DatePicker value={checkOut} onChange={setCheckOut} min={checkIn || undefined} placeholder={t("Pilih check-out")} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Adults")}</label>
@@ -269,7 +269,7 @@ export default function NewBooking() {
                   {!datesValid && <p className="text-xs text-muted-foreground mt-1.5">{t("Pick dates to see what is free.")}</p>}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Source</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Source")}</label>
                   <select value={source} onChange={(e) => setSource(e.target.value as BookingSource)}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="walk_in">{t("Walk-in")}</option>
@@ -279,9 +279,9 @@ export default function NewBooking() {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground mb-1.5 block">Special Requests</label>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Special Requests")}</label>
                 <textarea rows={3} value={specialRequests} onChange={(e) => setSpecialRequests(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder="Any special requests..." />
+                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" placeholder={t("Any special requests...")} />
               </div>
             </motion.div>
 

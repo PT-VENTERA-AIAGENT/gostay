@@ -166,7 +166,7 @@ export default function BookingReview() {
             <h2 className="font-semibold text-foreground mb-3">{t("Room Details")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div><span className="text-muted-foreground">{t("Room Type")}</span><p className="font-medium text-foreground mt-0.5">{roomType.name}</p></div>
-              <div><span className="text-muted-foreground">Max Occupancy</span><p className="font-medium text-foreground mt-0.5">{roomType.max_occupancy} guests</p></div>
+              <div><span className="text-muted-foreground">{t("Max Occupancy")}</span><p className="font-medium text-foreground mt-0.5">{roomType.max_occupancy} guests</p></div>
               <div><span className="text-muted-foreground">{t("Check-in")}</span><p className="font-medium text-foreground mt-0.5">{formatDate(checkIn)}</p></div>
               <div><span className="text-muted-foreground">{t("Check-out")}</span><p className="font-medium text-foreground mt-0.5">{formatDate(checkOut)}</p></div>
               <div><span className="text-muted-foreground">{t("Nights")}</span><p className="font-medium text-foreground mt-0.5">{nights}</p></div>
@@ -181,7 +181,7 @@ export default function BookingReview() {
               <div><span className="text-muted-foreground">{t("Email")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.email}</p></div>
               <div><span className="text-muted-foreground">{t("Phone")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.phone}</p></div>
               {guestInfo.specialRequests && (
-                <div className="sm:col-span-2"><span className="text-muted-foreground">Special Requests</span><p className="font-medium text-foreground mt-0.5">{guestInfo.specialRequests}</p></div>
+                <div className="sm:col-span-2"><span className="text-muted-foreground">{t("Special Requests")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.specialRequests}</p></div>
               )}
             </div>
           </motion.div>
@@ -222,7 +222,7 @@ export default function BookingReview() {
               className="bg-primary text-primary-foreground px-5 md:px-6 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 touch-target disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
+                <><Loader2 className="w-4 h-4 animate-spin" /> {t("Submitting...")}</>
               ) : user ? (
                 <>{t("Request Booking")} <Check className="w-4 h-4" /></>
               ) : (
