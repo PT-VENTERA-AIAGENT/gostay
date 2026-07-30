@@ -52,6 +52,7 @@ import {
 import { sendText } from "./send";
 import { recordIncident } from "./incidents";
 import { chooseOutboundTarget } from "./address";
+import { mintPortalToken } from "./portal-token";
 import { getOrCreateBotProfile, getOrCreateThread, logMessage } from "./crm";
 import { checkGreetCooldown, checkFlowStartBudget } from "./inbound";
 import { isBotPaused, pauseBot } from "./takeover";
@@ -119,9 +120,18 @@ export function isGreetingTrigger(text: string): boolean {
  * who has only ever met it over WhatsApp (src/lib/tenant.ts reads it at runtime).
  * Base URL from APP_PUBLIC_URL, defaulting to the production app domain.
  */
-function portalLink(slug: string): string {
+function portalLink(slug: string, customerId?: string, tenantId?: string): string {
   const base = (process.env.APP_PUBLIC_URL ?? "https://app.gostay.id").replace(/\/$/, "");
-  return `${base}/portal?hotel=${encodeURIComponent(slug)}`;
+  const url = `${base}/portal?hotel=${encodeURIComponent(slug)}`;
+  // Token yang sekaligus MEMASUKKAN tamu. Pesan ini hanya tiba di nomor yang
+  // memiliki percakapan tersebut, jadi ia saluran yang sah untuk itu — dan jauh
+  // lebih andal daripada menuntut tamu hotel punya akun yang mereka ingat.
+  //
+  // Tanpa token (rahasia tak terpasang, atau tamu belum dikenal) tautannya tetap
+  // dikirim apa adanya: tamu masih bisa menelusuri hotel, hanya tidak otomatis
+  // masuk. Itu jauh lebih baik daripada tidak mengirim tautan sama sekali.
+  const t = customerId && tenantId ? mintPortalToken(customerId, tenantId) : null;
+  return t ? `${url}&t=${encodeURIComponent(t)}` : url;
 }
 
 function formatIDR(n: number): string {
@@ -682,7 +692,7 @@ async function confirmBooking(
   // which hotel they came from. Best-effort: never block the confirmation on it.
   const slug = await getTenantSlug(tenantId).catch(() => null);
   const portal = slug
-    ? `\n\nPantau & kelola pesanan Anda di portal tamu:\n${portalLink(slug)}`
+    ? `\n\nPantau & kelola pesanan Anda di portal tamu:\n${portalLink(slug, guest.customerId, tenantId)}`
     : "";
 
   // Payment, in the same chat. Best-effort by construction: the booking is
@@ -871,7 +881,9 @@ function builtInActions(
     async sendPortalLink() {
       const slug = await getTenantSlug(tenantId).catch(() => null);
       if (!slug) return;
-      await reply(`Pantau & kelola pesanan Anda di portal tamu:\n${portalLink(slug)}`);
+      await reply(
+        `Pantau & kelola pesanan Anda di portal tamu:\n${portalLink(slug, guest.customerId, tenantId)}`,
+      );
     },
   };
 }

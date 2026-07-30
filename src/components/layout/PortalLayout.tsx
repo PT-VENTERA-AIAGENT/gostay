@@ -4,13 +4,14 @@ import { User, Calendar, MessageSquare, Search, Menu, X, LogOut, UtensilsCrossed
 import ChatWidget from "@/components/portal/ChatWidget";
 import PortalBottomNav from "@/components/shared/PortalBottomNav";
 import ThemeToggle from "@/components/shared/ThemeToggle";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import RealtimeSync from "@/components/shared/RealtimeSync";
 import LanguageToggle from "@/components/shared/LanguageToggle";
 import { useT } from "@/lib/i18n";
+import { loginWithPortalToken } from "@/lib/sso";
 
 const portalNav = [
   { label: "Beranda", path: "/portal", icon: Search },
@@ -24,7 +25,7 @@ const portalNav = [
 export default function PortalLayout() {
   const { pathname } = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
-  const { session, user, role, signOut } = useAuth();
+  const { session, user, role, signOut, refreshSession } = useAuth();
   const {
     name: hotelName,
     initial: hotelInitial,
@@ -34,6 +35,29 @@ export default function PortalLayout() {
     requestedSlug,
   } = useTenant();
   const t = useT();
+  // Tamu yang datang dari tautan WhatsApp membawa `?t=` — tukar sekali, lalu
+  // BUANG dari URL. Membiarkannya berarti token itu ikut ter-bookmark, ikut
+  // ter-share, dan muncul di setiap tautan yang dibagikan tamu.
+  const [redeeming, setRedeeming] = useState(() =>
+    Boolean(new URLSearchParams(window.location.search).get("t")),
+  );
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const portalToken = url.searchParams.get("t");
+    if (!portalToken) return;
+    let cancelled = false;
+    void (async () => {
+      await loginWithPortalToken(portalToken);
+      if (cancelled) return;
+      url.searchParams.delete("t");
+      window.history.replaceState({}, "", url.toString());
+      refreshSession();
+      setRedeeming(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshSession]);
 
   // A signed-in user who belongs to no hotel is a prospective OWNER, not a guest
   // of anyone. Send them to self-serve "Buat Hotel" instead of the default
@@ -48,7 +72,9 @@ export default function PortalLayout() {
       // Compatibility with sessions issued before tenant_id was included.
       (session.tenant_id === undefined && !tenantLoading && tenant === null)
     );
-  if (hasNoHotel) {
+  // Selagi token tautan ditukar, sesi belum ada — mengalihkan sekarang akan
+  // melempar tamu ke "Buat Hotel" tepat sebelum ia berhasil masuk.
+  if (hasNoHotel && !redeeming) {
     return <Navigate to="/create-hotel" replace />;
   }
 

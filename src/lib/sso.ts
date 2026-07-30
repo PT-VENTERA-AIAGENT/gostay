@@ -284,3 +284,63 @@ export function logout() {
   // clearing our own session is still a valid local sign-out.
   window.location.assign("/");
 }
+
+/**
+ * Masuk lewat tautan portal yang dikirim bot WhatsApp.
+ *
+ * Tamu hotel tidak punya akun yang bisa mereka ingat, dan menuntut SSO dari
+ * mereka justru sumber kegagalan: nomor tak terdaftar, realm keliru, OTP tak
+ * sampai. Saluran yang jauh lebih kuat sudah ada — pesan WhatsApp itu sendiri
+ * hanya tiba di nomor yang memiliki percakapannya.
+ *
+ * Token dari `?t=` ditukar menjadi sesi yang BENTUKNYA SAMA dengan hasil login
+ * SSO, supaya seluruh aplikasi tidak perlu tahu bedanya: `getSession`,
+ * `ProtectedRoute`, dan RLS semuanya berjalan seperti biasa.
+ *
+ * Mengembalikan false untuk token yang tidak sah — pemanggil lalu membiarkan
+ * tamu menelusuri hotel sebagai pengunjung anonim, bukan memblokir halaman.
+ */
+export async function loginWithPortalToken(portalToken: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/sso/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ portal_token: portalToken }),
+    });
+    if (!res.ok) return false;
+
+    const data = (await res.json()) as {
+      supabase_token?: string;
+      profile_id?: string;
+      role?: SsoRole;
+      tenant_id?: string | null;
+      expires_in?: number;
+      user?: { name?: string | null; email?: string | null; phone_number?: string | null };
+    };
+    if (!data.supabase_token || !data.profile_id) return false;
+
+    const expiresIn = Number(data.expires_in ?? 3600);
+    const session: SsoSession = {
+      // Tidak ada id_token di jalur ini — tamu tidak lewat OIDC sama sekali.
+      // Klaim diisi dari data yang dipulangkan server, cukup untuk menampilkan
+      // nama/nomor; yang menentukan kewenangan tetap supabase_token.
+      claims: {
+        sub: data.profile_id,
+        name: data.user?.name ?? undefined,
+        email: data.user?.email ?? undefined,
+        phone_number: data.user?.phone_number ?? undefined,
+      },
+      access_token: "",
+      id_token: "",
+      expires_at: Date.now() + expiresIn * 1000,
+      supabase_token: data.supabase_token,
+      role: data.role ?? "customer",
+      profile_id: data.profile_id,
+      tenant_id: data.tenant_id ?? null,
+    };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return true;
+  } catch {
+    return false;
+  }
+}
