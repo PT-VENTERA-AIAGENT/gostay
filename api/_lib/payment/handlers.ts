@@ -10,13 +10,63 @@ import { matchGatewayToken } from "./token";
 
 const PREFIX = "GOSTAY-";
 
-/** external_id ⇄ booking reference. The gateway routes on the GOSTAY- prefix. */
-export function externalIdFor(reference: string): string {
-  return PREFIX + reference;
+/** Setiap referensi booking dimulai dengan ini — jangkar untuk membacanya kembali. */
+const REFERENCE_MARKER = "BK-";
+
+/**
+ * Slug hotel dalam bentuk yang aman untuk external_id: huruf besar, dan apa pun
+ * selain huruf/angka menjadi satu tanda hubung. Xendit menerima ini apa adanya,
+ * dan bentuknya tetap enak dibaca di dashboard mereka.
+ */
+function slugSegment(hotelSlug: string): string {
+  return (hotelSlug ?? "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
-/** Strip the GOSTAY- prefix and any -R<n> retry suffix to recover the reference. */
+
+/**
+ * external_id untuk sebuah invoice: `GOSTAY-<HOTEL>-<referensi>`.
+ *
+ * Dua hal yang harus benar sekaligus, dan keduanya alasan bentuk ini dipilih:
+ *
+ *   1. Router callback Ventera memilih tujuan berdasarkan awalan `GOSTAY-`, jadi
+ *      awalan itu tidak boleh bergeser satu karakter pun.
+ *   2. Di dashboard Xendit, sebuah pembayaran harus bisa langsung dikenali milik
+ *      hotel mana. Tanpa nama hotel, satu akun Xendit yang melayani banyak hotel
+ *      hanya memperlihatkan deretan kode booking yang tak berarti bagi manusia —
+ *      dan itu jadi masalah nyata begitu produksi menampung hotel kedua.
+ *
+ * Nama hotel boleh kosong (mis. slug tenant belum terbaca); hasilnya kembali ke
+ * bentuk lama `GOSTAY-<referensi>` yang tetap sah dan tetap terbaca.
+ */
+export function externalIdFor(reference: string, hotelSlug?: string | null): string {
+  const hotel = slugSegment(hotelSlug ?? "");
+  return hotel ? `${PREFIX}${hotel}-${reference}` : PREFIX + reference;
+}
+
+/**
+ * Baca referensi booking dari sebuah external_id.
+ *
+ * Mencari POLA referensinya, bukan memotong awalan dengan panjang tetap — sebab
+ * segmen nama hotel panjangnya berbeda-beda per hotel, dan yang lebih penting:
+ * invoice yang sudah terbit sebelum perubahan ini membawa bentuk lama
+ * `GOSTAY-<referensi>`. Kalau pembacaan di sini hanya mengerti bentuk baru,
+ * pembayaran atas invoice-invoice lama itu gagal dicatat — tamu membayar, uangnya
+ * masuk ke Xendit, dan reservasinya tetap menunggu selamanya.
+ *
+ * Sufiks percobaan ulang `-R<n>` tetap dibuang seperti sebelumnya.
+ */
 export function referenceFromExternalId(externalId: string): string {
-  return externalId.replace(new RegExp("^" + PREFIX), "").replace(/-R\d+$/, "");
+  const stripped = (externalId ?? "")
+    .replace(new RegExp("^" + PREFIX), "")
+    .replace(/-R\d+$/, "");
+  // Kemunculan TERAKHIR, bukan yang pertama: sebuah slug hotel pun boleh memuat
+  // "BK-" (mis. hotel bernama "BK Residence") tanpa membuat referensinya salah
+  // dibaca. Bentuk lama tanpa segmen hotel punya penanda ini di posisi 0, jadi
+  // aturan yang sama melayani keduanya.
+  const at = stripped.lastIndexOf(REFERENCE_MARKER);
+  return at > 0 ? stripped.slice(at) : stripped;
 }
 
 export interface CreateInvoiceRequest {
@@ -50,10 +100,15 @@ export async function handleCreateInvoice(
 
   const invoice = await createInvoiceViaGateway(
     {
-      externalId: externalIdFor(booking.reference),
+      externalId: externalIdFor(booking.reference, booking.hotel_slug),
       amount,
       payerEmail: booking.customer_email ?? undefined,
-      description: `Pembayaran reservasi ${booking.reference}`,
+      // Nama hotelnya disebut: ini teks yang dilihat TAMU di halaman pembayaran
+      // Xendit, dan "Pembayaran reservasi BK-…" saja tidak memberi tahu mereka
+      // sedang membayar ke siapa.
+      description: booking.hotel_name
+        ? `Pembayaran reservasi ${booking.reference} — ${booking.hotel_name}`
+        : `Pembayaran reservasi ${booking.reference}`,
       successRedirectUrl: req.successRedirectUrl,
     },
     env,

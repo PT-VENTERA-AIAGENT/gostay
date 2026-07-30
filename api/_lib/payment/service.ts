@@ -46,19 +46,24 @@ export interface BookingForPayment {
   total_amount: number;
   amount_paid: number;
   customer_email: string | null;
+  /** Slug hotelnya, untuk external_id + deskripsi invoice. Null bila tak terbaca. */
+  hotel_slug: string | null;
+  /** Nama hotel apa adanya, untuk deskripsi yang dibaca tamu di halaman Xendit. */
+  hotel_name: string | null;
 }
 
 /** Look up a booking by its guest-facing reference (external_id minus GOSTAY-). */
 export async function getBookingByReference(reference: string): Promise<BookingForPayment | null> {
   const q =
     `bookings?reference=eq.${encodeURIComponent(reference)}` +
-    `&select=id,tenant_id,reference,total_amount,amount_paid,customers(email)&limit=1`;
+    `&select=id,tenant_id,reference,total_amount,amount_paid,customers(email),tenants(slug,name)&limit=1`;
   const res = await serviceGet(q);
   if (!res.ok) throw new Error(`booking_read_failed_${res.status}`);
   const rows = (await res.json()) as Array<{
     id: string; tenant_id: string; reference: string;
     total_amount: number; amount_paid: number;
     customers?: { email?: string | null } | null;
+    tenants?: { slug?: string | null; name?: string | null } | null;
   }>;
   const b = rows[0];
   if (!b) return null;
@@ -66,6 +71,8 @@ export async function getBookingByReference(reference: string): Promise<BookingF
     id: b.id, tenant_id: b.tenant_id, reference: b.reference,
     total_amount: Number(b.total_amount), amount_paid: Number(b.amount_paid),
     customer_email: b.customers?.email ?? null,
+    hotel_slug: b.tenants?.slug ?? null,
+    hotel_name: b.tenants?.name ?? null,
   };
 }
 
