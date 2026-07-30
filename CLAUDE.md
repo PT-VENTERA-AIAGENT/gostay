@@ -49,11 +49,19 @@ yang sudah migrasi LID "sukses" (dapat messageId) tapi tidak pernah tiba.
   `requires:'inhouse'` = punya booking `checked_in`) → fallback percakapan
   booking bawaan (`api/_lib/wa/converse.ts`).
 - **Jebakan LID**: WhatsApp menyembunyikan nomor sebagian tamu di balik alias
-  `@lid`. Gateway saat ini MENJAWAB 200 lalu pesannya hilang. GoStay memilih
-  alamat kirim lewat `api/_lib/wa/address.ts` (nomor pendamping → nomor asli →
-  nomor di CRM → tandai `unroutable` + catat insiden meski gateway bilang
-  sukses). Kegagalan tercatat di `wa_incidents` → halaman
-  `/platform/incidents`. Patch untuk sisi gateway: `docs/wa-ventera-lid-fix.md`.
+  `@lid`. GoStay memilih alamat kirim lewat `api/_lib/wa/address.ts` (nomor
+  pendamping → nomor asli → nomor di CRM). Sisi gateway sudah diperbaiki
+  (30 Jul): LID kini alamat yang BENAR dan tidak lagi diturunkan menjadi nomor.
+- **Sukses dari `POST /send` BUKAN bukti sampai.** Jawabannya hanya berarti
+  stanza ditulis ke socket; WhatsApp menolak beberapa detik kemudian lewat ack
+  asinkron. Gateway melaporkannya sebagai `deliveryFailures[]` ke
+  `/api/wa/inbound` → dicatat `wa_incidents` (`rejected_by_whatsapp:*`) →
+  halaman `/platform/incidents`. `error 463` = privacy token kontak belum
+  terbit; gateway mengulang kiriman sekali karena penolakan itu sendiri yang
+  memicu penerbitannya.
+- **Balasan beberapa pesan datang berjarak ~8 detik.** Cooldown per-kontak di
+  gateway; kiriman yang tertahan DIANTRE (FIFO per kontak), tidak dibuang —
+  dulu dibuang, dan itu sebabnya pesan ke-2 dan ke-3 tak pernah tiba.
 
 ## Pembayaran — riwayatnya menyesatkan
 
