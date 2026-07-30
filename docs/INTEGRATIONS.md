@@ -49,10 +49,31 @@ WhatsApp** — sukses palsu. Karena itu GoStay memutuskan alamat SEBELUM kirim:
    `unroutable_lid:gateway_reported_ok`).
 
 Kegagalan tampil di: strip peringatan di inbox (`/chat`), toast balasan staf,
-dan konsol platform `/platform/incidents`. Patch yang harus diterapkan DI
-GATEWAY (resolve `getPNForLID()` + jangan jawab 200 palsu):
-`docs/wa-ventera-lid-fix.md`. Referensi implementasi ada di repo `Chatly`
-(`workers/wa-inbound.handler.ts`, `jidToContactId`).
+dan konsol platform `/platform/incidents`.
+
+### Bukti sampai: ack, bukan jawaban HTTP (diperbaiki 30 Jul 2026)
+
+Jawaban `POST /send` hanya berarti stanza ditulis ke socket. Penolakan WhatsApp
+datang beberapa detik kemudian lewat ack asinkron, dan dulu berhenti di log
+server — itulah yang membuat balasan hilang berhari-hari tanpa jejak. Sekarang:
+
+- Gateway mengirim `deliveryFailures[]` ke `POST /api/wa/inbound` (endpoint yang
+  sama, kunci baru — konsumer yang hanya membaca `messages[]` tak terpengaruh).
+  GoStay mencatatnya di `wa_incidents` dengan reason `rejected_by_whatsapp:*`.
+- `error 463` = privacy token kontak belum terbit. Token itu diterbitkan **oleh
+  penerima**, dan penolakan 463 itu sendiri yang memicu penerbitannya — jadi
+  gateway mengulang kiriman **sekali**. Gagal kedua dilaporkan, tidak diulang
+  lagi (mengulang terus dihitung WhatsApp sebagai reach-out berulang).
+- Alamat yang benar sekarang **LID**, bukan nomor: ack pengiriman yang berhasil
+  datang di alamat `@lid`. Penerjemahan LID→nomor (benar di Baileys rc10) sudah
+  dibalik.
+- Baileys gateway HARUS ≥ 7.0.0-rc13, dan history sync TIDAK boleh dimatikan —
+  paket sync itu yang membawa pemetaan LID; tanpanya WhatsApp menolak semua
+  kiriman dengan 463.
+- Balasan yang terdiri dari beberapa pesan tiba berjarak ~8 detik: cooldown
+  per-kontak, dan kiriman yang tertahan **diantre** (FIFO per kontak, 3
+  percobaan), tidak dibuang. Pola ini menyamai antrean BullMQ milik `Chatly`,
+  yang memakai cooldown 8 detik yang sama tanpa pernah kehilangan pesan.
 
 ### Lapisan percakapan (urutan penanganan pesan)
 
