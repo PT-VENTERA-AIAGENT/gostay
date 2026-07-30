@@ -86,24 +86,38 @@ async function phoneFromInbound(phoneJid) {
   return null;
 }
 
+// Realm yang client OIDC GoStay diizinkan pakai. Sama dengan guestRealm() di
+// api/_lib/wa/guest.ts, dan alasannya sama: akun di realm lain ada tapi tak
+// pernah bisa dipakai login (form OTP menyaring realmId IN allowedRealms).
+const GUEST_REALM = (env.SSO_GUEST_REALM ?? "").trim() || "ventera-shop";
+
 async function provision(phone, displayName) {
   const res = await fetch(`${PROVISION_URL}/api/admin/users/provision`, {
     method: "POST",
     headers: { Authorization: `Bearer ${PROVISION_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, ...(displayName ? { displayName } : {}) }),
+    body: JSON.stringify({ phone, realm: GUEST_REALM, ...(displayName ? { displayName } : {}) }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.sub) throw new Error(`ventera_${res.status}${body.error ? `: ${body.error}` : ""}`);
   return { sub: body.sub, created: body.created === true };
 }
 
+// SEMUA identitas tamu, bukan hanya yang ber-sso_sub lokal.
+//
+// Sebuah identitas bisa memegang sub yang asli tapi milik realm yang SALAH —
+// akunnya ada, hanya di ruangan yang tak boleh dipakai client OIDC GoStay, jadi
+// login tetap menjawab "nomor tidak terdaftar". Menyaring `wa:%` melewatkan
+// justru kasus itu. Endpoint provisioning idempoten per (realm, nomor), jadi
+// memeriksa semua orang aman: yang sudah benar mengembalikan sub yang sama dan
+// tidak ditulis ulang.
 const { data: rows, error } = await svc
   .from("wa_guest_identities")
-  .select("id,tenant_id,phone_jid,sso_sub,profile_id,customer_id")
-  .like("sso_sub", "wa:%");
+  .select("id,tenant_id,phone_jid,sso_sub,profile_id,customer_id");
 if (error) throw error;
 
-console.log(`${APPLY ? "TERAPKAN" : "RENCANA (dry-run)"} — ${rows.length} identitas ber-sso_sub lokal\n`);
+console.log(
+  `${APPLY ? "TERAPKAN" : "RENCANA (dry-run)"} — ${rows.length} identitas tamu, realm target ${GUEST_REALM}\n`,
+);
 
 let upgraded = 0, skipped = 0, failed = 0;
 
@@ -133,6 +147,14 @@ for (const r of rows) {
 
   try {
     const { sub, created } = await provision(phone, name ?? undefined);
+
+    // Sudah menunjuk akun yang benar di realm target — tidak ada yang perlu
+    // ditulis. Ini yang membuat skrip aman dijalankan berulang.
+    if (r.sso_sub === sub) {
+      console.log(`  SUDAH   ${who} → ${phone} (sudah menunjuk akun realm ${GUEST_REALM})`);
+      skipped++;
+      continue;
+    }
 
     // `profiles.sso_sub` UNIK, dan satu nomor bisa muncul sebagai beberapa
     // identitas dengan PROFIL berbeda — mis. sebuah nomor yang pernah menyapa
