@@ -206,8 +206,10 @@ describe("resolveOrProvisionGuest", () => {
     expect(state.venteraCalls).toHaveLength(1);
     expect(state.venteraCalls[0].auth).toBe("Bearer provision-key-abc");
     expect(state.venteraCalls[0].body).toMatchObject({ phone: DIGITS, displayName: "Budi Santoso" });
-    // realm is not sent — Ventera defaults it.
-    expect(state.venteraCalls[0].body).not.toHaveProperty("realm");
+    // Realm DISEBUT, dan harus realm yang client OIDC GoStay diizinkan pakai.
+    // Dibiarkan default (ventera-shop), akun tamu terbentuk di realm yang tak
+    // pernah bisa dipakai login — form OTP menjawab "nomor tidak terdaftar".
+    expect(state.venteraCalls[0].body.realm).toBe("ventera-shop");
 
     // profileId derives from the SSO sub, same as the web flow.
     const expectedProfileId = profileIdFor(SSO_SUB);
@@ -433,5 +435,19 @@ describe("tamu yang pernah menghubungi hotel LAIN", () => {
     await resolveOrProvisionGuest(LID_JID, TENANT, "Sellora", COMPANION);
 
     expect(state.customerInserts).toHaveLength(1);
+  });
+});
+
+describe("realm akun tamu", () => {
+  it("bisa diarahkan lewat env bila pendaftaran client berubah", async () => {
+    const prev = process.env.SSO_GUEST_REALM;
+    process.env.SSO_GUEST_REALM = "ventera-public";
+    try {
+      await resolveOrProvisionGuest(PHONE_JID, TENANT, "Budi");
+      expect(state.venteraCalls[0].body.realm).toBe("ventera-public");
+    } finally {
+      if (prev === undefined) delete process.env.SSO_GUEST_REALM;
+      else process.env.SSO_GUEST_REALM = prev;
+    }
   });
 });

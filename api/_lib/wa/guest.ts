@@ -109,6 +109,30 @@ export function phoneDigits(jid: string): string {
 const PROVISION_MAX = 5;
 const PROVISION_WINDOW = "1 hour";
 
+/**
+ * Realm SSO tempat akun tamu dibuat.
+ *
+ * `ventera-shop` adalah realm pelanggan, dan itu memang tempat tamu hotel —
+ * sekaligus default endpoint provisioning Ventera. Disebut EKSPLISIT di sini,
+ * bukan dibiarkan default, karena nilainya menentukan apakah tamu bisa login
+ * sama sekali: form OTP menyaring `realmId IN allowedRealms` milik client OIDC,
+ * jadi akun di realm yang tidak terdaftar untuk client `gostay` akan ada tapi
+ * selalu dijawab "Nomor HP tidak terdaftar di aplikasi ini".
+ *
+ * Karena itu realm ini HARUS terdaftar untuk client `gostay` di
+ * `_ClientAllowedRealms` pada sisi sso-ventera. Lihat docs/INTEGRATIONS.md.
+ *
+ * Memindahkan tamu ke realm lain BUKAN jalan keluar: `LinkedAccount` unik pada
+ * (provider, providerAccountId), jadi satu nomor hanya boleh punya satu tautan
+ * WhatsApp di SELURUH realm — nomor yang sudah punya akun di sini tidak bisa
+ * dibuatkan akun ber-OTP di realm lain. Env-override disediakan hanya untuk
+ * deployment yang memang mendaftarkan client-nya di realm berbeda sejak awal.
+ */
+function guestRealm(): string {
+  const raw = (process.env.SSO_GUEST_REALM ?? "").trim();
+  return raw || "ventera-shop";
+}
+
 /** Read the Ventera provisioning endpoint lazily — same reasoning as config() in provision.ts. */
 function venteraConfig(): { provisionUrl: string; provisionKey: string | undefined } {
   return {
@@ -324,8 +348,14 @@ async function provisionVentera(digits: string, displayName?: string): Promise<s
         Authorization: `Bearer ${provisionKey}`,
         "Content-Type": "application/json",
       },
-      // realm is omitted on purpose — Ventera defaults to ventera-shop.
-      body: JSON.stringify({ phone: digits, ...(displayName ? { displayName } : {}) }),
+      // Realm disebut EKSPLISIT — lihat guestRealm(). Nilainya menentukan apakah
+      // tamu bisa login sama sekali, jadi ia tidak boleh bergantung pada default
+      // layanan lain yang bisa berubah tanpa kita ketahui.
+      body: JSON.stringify({
+        phone: digits,
+        realm: guestRealm(),
+        ...(displayName ? { displayName } : {}),
+      }),
     });
   } catch (e) {
     // DNS failure / refused connection / timeout — Ventera unreachable.
