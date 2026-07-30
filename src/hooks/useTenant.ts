@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { currentTenantSlug } from "@/lib/tenant";
 
 export interface Tenant {
   id: string;
@@ -47,24 +48,43 @@ export async function uploadHotelLogo(tenantId: string, file: File): Promise<str
 }
 
 /**
- * The hotel (tenant) the signed-in user belongs to. RLS restricts `tenants` to
- * the caller's own row (`id = get_my_tenant()`), so a bare select returns just
- * that hotel. Used to brand the shell and drive the Hotel Profile editor.
+ * The hotel (tenant) this page is about.
+ *
+ * Staff read exactly one row — their own hotel — so the choice is trivial for
+ * them. A GUEST is different: one person can be a guest at several hotels, and
+ * since migration 045 they may read each of those rows. `profiles.tenant_id`
+ * cannot express that: it holds the hotel where the person first appeared, so
+ * relying on it showed a guest who arrived on Lor Kali's link the branding of
+ * Kopi Rintik — the first hotel they ever messaged.
+ *
+ * So the hotel is chosen, in order:
+ *   1. the slug this visit is for (`?hotel=`, remembered for the visit) —
+ *      the guest arrived through a specific hotel's door;
+ *   2. the profile's own hotel, for staff and for a guest with no hint;
+ *   3. whatever single row came back, which is the staff case anyway.
  */
 export function useTenant() {
   const { session } = useAuth();
+  const slug = currentTenantSlug();
 
   const query = useQuery({
-    queryKey: ["tenant", session?.profile_id ?? "anon"],
+    queryKey: ["tenant", session?.profile_id ?? "anon", slug ?? "-"],
     enabled: !!session,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<Tenant | null> => {
-      const { data, error } = await supabase
-        .from("tenants")
-        .select(TENANT_COLUMNS)
-        .maybeSingle();
+      // No `.maybeSingle()`: a guest of several hotels legitimately reads
+      // several rows, and maybeSingle turns that into an error rather than a
+      // choice. RLS still bounds the set to hotels this person belongs to.
+      const { data, error } = await supabase.from("tenants").select(TENANT_COLUMNS);
       if (error) throw error;
-      return (data as Tenant) ?? null;
+
+      const rows = (data ?? []) as Tenant[];
+      if (rows.length === 0) return null;
+      return (
+        (slug ? rows.find((t) => t.slug === slug) : undefined) ??
+        rows.find((t) => t.id === session?.tenant_id) ??
+        rows[0]
+      );
     },
   });
 
