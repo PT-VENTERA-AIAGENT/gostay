@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { createBooking, getOrCreateOwnCustomer } from "@/services/bookingService";
+import { useTenant } from "@/hooks/useTenant";
 import { getAvailableRooms } from "@/services/roomService";
 import { useAuth } from "@/contexts/AuthContext";
 import type { RoomType } from "@/types/database.types";
@@ -46,6 +47,7 @@ export default function BookingReview() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signIn } = useAuth();
+  const { tenant } = useTenant();
   const state = location.state as ReviewState | null;
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -78,12 +80,18 @@ export default function BookingReview() {
     setSubmitError(null);
     try {
       // 1. Get or create the customer record owned by this profile
-      const customer = await getOrCreateOwnCustomer(user.id, {
-        full_name: `${guestInfo.firstName} ${guestInfo.lastName}`.trim(),
-        email: guestInfo.email,
-        phone: guestInfo.phone || null,
-        nationality: null,
-      });
+      // Hotel yang sedang dibuka ikut disebut — tanpa itu, booking seorang tamu
+      // yang pernah menginap di hotel lain menempel pada kontaknya di hotel itu.
+      const customer = await getOrCreateOwnCustomer(
+        user.id,
+        {
+          full_name: `${guestInfo.firstName} ${guestInfo.lastName}`.trim(),
+          email: guestInfo.email,
+          phone: guestInfo.phone || null,
+          nationality: null,
+        },
+        tenant?.id ?? null,
+      );
 
       // 2. Find an available room for this room type
       const availableRooms = await getAvailableRooms(checkIn, checkOut, roomType.id);

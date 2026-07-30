@@ -27,7 +27,7 @@ function formatTime(iso: string) {
 
 export default function PortalChat() {
   const { user, signIn } = useAuth();
-  const { name: hotelName, initial: hotelInitial } = useTenant();
+  const { name: hotelName, initial: hotelInitial, tenant } = useTenant();
   const t = useT();
 
   const [thread, setThread] = useState<ChatThread | null>(null);
@@ -73,12 +73,19 @@ export default function PortalChat() {
       // that record before opening the thread. Passing user.id straight in was
       // the bug: that is a profiles.id, not a customers.id, so the thread's
       // foreign key and RLS check both rejected it.
-      const customer = await getOrCreateOwnCustomer(user.id, {
-        full_name: user.name ?? user.email ?? "Guest",
-        email: user.email ?? "",
-        phone: user.phone_number ?? null,
-        nationality: null,
-      });
+      // Hotel yang sedang dibuka ikut disebut: seorang tamu bisa punya kontak
+      // di beberapa hotel, dan tanpa ini yang terbuka adalah percakapan hotel
+      // pertamanya — bukan hotel yang portalnya sedang ia lihat.
+      const customer = await getOrCreateOwnCustomer(
+        user.id,
+        {
+          full_name: user.name ?? user.email ?? "Guest",
+          email: user.email ?? "",
+          phone: user.phone_number ?? null,
+          nationality: null,
+        },
+        tenant?.id ?? null,
+      );
       const t = await getOrCreateThread(customer.id);
       setThread(t);
       const msgs = await getMessages(t.id);
@@ -101,15 +108,17 @@ export default function PortalChat() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, tenant?.id]);
 
-  // Open the thread once the user is known.
+  // Open the thread once the user AND the hotel are known. Menunggu hotelnya
+  // penting: dibuka lebih dulu, yang terambil adalah kontak tertua tamu ini —
+  // percakapan hotel lain.
   useEffect(() => {
-    if (user) initThread();
+    if (user && tenant?.id) initThread();
     return () => {
       if (channelRef.current) unsubscribeChannel(channelRef.current);
     };
-  }, [user, initThread]);
+  }, [user, tenant?.id, initThread]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
