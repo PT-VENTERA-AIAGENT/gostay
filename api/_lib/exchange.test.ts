@@ -19,6 +19,7 @@ interface MockState {
   tokenRequests: Array<Record<string, string>>;
   profileRows: Array<{
     id: string;
+    sso_sub?: string;
     role: string;
     is_active?: boolean;
     email?: string;
@@ -27,6 +28,8 @@ interface MockState {
   }>;
   inserts: Array<Record<string, unknown>>;
   patches: Array<Record<string, unknown>>;
+  /** The `id=eq.` a PATCH was aimed at — which profile actually got updated. */
+  patchTargets: string[];
   realm: string | undefined;
   tokenStatus: number;
   tokenError: string;
@@ -87,8 +90,17 @@ beforeAll(async () => {
 
     if (url.pathname === "/rest/v1/profiles") {
       if (req.method === "GET") {
+        // Filter the way PostgREST would. The loose version (always returning
+        // every row) hid which of the two lookups — by id, or by sso_sub — the
+        // code actually used, and that distinction is the whole point here.
+        const eq = (v: string | null) => (v ?? "").replace(/^eq\./, "");
+        const byId = url.searchParams.get("id");
+        const bySub = url.searchParams.get("sso_sub");
+        let rows = state.profileRows;
+        if (byId) rows = rows.filter((r) => r.id === eq(byId));
+        else if (bySub) rows = rows.filter((r) => r.sso_sub === eq(bySub));
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(state.profileRows));
+        res.end(JSON.stringify(rows));
         return;
       }
       if (req.method === "POST") {
@@ -105,6 +117,7 @@ beforeAll(async () => {
       }
       if (req.method === "PATCH") {
         state.patches.push(JSON.parse(body));
+        state.patchTargets.push((url.searchParams.get("id") ?? "").replace(/^eq\./, ""));
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(state.profileRows));
         return;
@@ -132,7 +145,7 @@ afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
 beforeEach(() => {
   state = {
-    tokenRequests: [], profileRows: [], inserts: [], patches: [],
+    tokenRequests: [], profileRows: [], inserts: [], patches: [], patchTargets: [],
     realm: "ventera-employees", tokenStatus: 200, tokenError: "invalid_grant",
     tenantId: null,
   };
@@ -401,5 +414,72 @@ describe("exchangeCode — guards", () => {
     const r = await exchangeCode({ code: "", code_verifier: "", origin: ORIGIN });
     expect(r.status).toBe(400);
     expect(state.tokenRequests).toHaveLength(0);
+  });
+});
+
+describe("exchangeCode — profil yang sudah memegang subjek SSO ini", () => {
+  // Tamu WhatsApp mula-mula dibuatkan identitas LOKAL ("wa:<jid>"), jadi id
+  // profilnya diturunkan dari subjek itu — bukan dari subjek SSO yang ia pakai
+  // saat akhirnya login. Mencetak token untuk id turunan berarti tamu masuk ke
+  // profil kosong: berhasil login, lalu tidak menemukan satu pun booking-nya.
+  const WA_PROFILE_ID = "11111111-2222-4333-8444-555555555555";
+  const held = (over: Record<string, unknown> = {}) => [
+    { id: WA_PROFILE_ID, sso_sub: SSO_SUB, role: "customer", is_active: true, tenant_id: "tn-1", ...over },
+  ];
+
+  it("mints the token for THAT profile, not for the derived id", async () => {
+    state.profileRows = held();
+
+    const r = await call();
+
+    const claims = verifySupabaseToken(r.body.supabase_token as string, JWT_SECRET)!;
+    expect(claims.sub).toBe(WA_PROFILE_ID);
+    expect(claims.sub).not.toBe(profileIdFor(SSO_SUB));
+  });
+
+  it("updates that same profile rather than inserting a second one beside it", async () => {
+    state.profileRows = held();
+
+    await call();
+
+    expect(state.inserts).toHaveLength(0);
+    expect(state.patchTargets).toEqual([WA_PROFILE_ID]);
+  });
+
+  it("keeps the hotel and role the database already recorded", async () => {
+    state.profileRows = held({ tenant_id: "tn-lor-kali" });
+
+    const r = await call();
+
+    expect(r.body.tenant_id).toBe("tn-lor-kali");
+    expect(r.body.role).toBe("customer");
+    // role is never PATCHed — an admin's decision outlives every login.
+    expect(state.patches[0]).not.toHaveProperty("role");
+  });
+
+  it("still uses the derived id when no profile holds the subject yet", async () => {
+    // Perilaku lama untuk semua orang: id turunan, dan sebuah insert.
+    state.profileRows = [];
+
+    const r = await call();
+
+    const claims = verifySupabaseToken(r.body.supabase_token as string, JWT_SECRET)!;
+    expect(claims.sub).toBe(profileIdFor(SSO_SUB));
+    expect(state.inserts).toHaveLength(1);
+  });
+
+  it("prefers the derived id when a row already sits there, ignoring the sso_sub scan", async () => {
+    // Kasus normal setiap staf/admin: id turunan SUDAH ada, jadi pencarian kedua
+    // tidak pernah berjalan dan tidak ada perubahan perilaku bagi mereka.
+    state.profileRows = [
+      { id: profileIdFor(SSO_SUB), sso_sub: SSO_SUB, role: "admin", is_active: true, tenant_id: "tn-1" },
+      { id: WA_PROFILE_ID, sso_sub: "wa:lain@lid", role: "customer", is_active: true },
+    ];
+
+    const r = await call();
+
+    const claims = verifySupabaseToken(r.body.supabase_token as string, JWT_SECRET)!;
+    expect(claims.sub).toBe(profileIdFor(SSO_SUB));
+    expect(state.patchTargets).toEqual([profileIdFor(SSO_SUB)]);
   });
 });

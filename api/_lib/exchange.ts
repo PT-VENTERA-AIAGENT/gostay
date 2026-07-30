@@ -222,7 +222,9 @@ async function buildSupabaseSession(
   if (!process.env.SUPABASE_JWT_SECRET) return null;
 
   const sub = claims.sub as string;
-  const profileId = profileIdFor(sub);
+  // Dugaan awal: id turunan subjeknya. Bisa digantikan di bawah oleh profil yang
+  // SUDAH memegang sso_sub ini — lihat ProvisionResult.profileId.
+  let profileId = profileIdFor(sub);
   const issuedAt = Math.floor(Date.now() / 1000);
 
   // Null until the database says otherwise. Nothing in the SSO token can grant
@@ -241,6 +243,14 @@ async function buildSupabaseSession(
       tenantSlug,
       signupContext,
     });
+    // Ditetapkan SEBELUM cabang mana pun keluar: token HARUS dicetak untuk profil
+    // yang sungguhan memegang subjek ini. Untuk hampir semua orang nilainya sama
+    // dengan id turunan di atas; yang berbeda hanyalah tamu WhatsApp yang
+    // identitas lokalnya dinaikkan ke akun SSO. Memakai id turunan di kasus itu
+    // berarti auth.uid() menunjuk profil kosong: tamu berhasil masuk, lalu tidak
+    // menemukan satu pun booking-nya.
+    if (result.profileId) profileId = result.profileId;
+
     if (!result.ok) {
       // Sign-in still succeeds; the user simply sees empty data rather than a
       // dead login. Surfacing it here beats failing silently at query time.

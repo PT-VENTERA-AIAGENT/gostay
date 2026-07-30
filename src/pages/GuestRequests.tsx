@@ -60,7 +60,7 @@ export default function GuestRequests() {
   const [priority, setPriority] = useState<GuestRequestPriority>("normal");
   const [roomNumber, setRoomNumber] = useState("");
 
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -102,7 +102,9 @@ export default function GuestRequests() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: GuestRequestStatus }) =>
-      updateRequestStatus(id, status),
+      // Token dikirimkan supaya tamu dikabari lewat WhatsApp; tanpa itu statusnya
+      // berubah dalam sunyi seperti sebelumnya.
+      updateRequestStatus(id, status, session?.supabase_token ?? null),
     onSuccess: (_data, { status }) => {
       qc.invalidateQueries({ queryKey: guestRequestKeys.all });
       toast({ title: `Status diubah ke ${statusConfig[status].label}` });

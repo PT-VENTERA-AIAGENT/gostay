@@ -43,6 +43,17 @@ export interface ProvisionResult {
   isActive: boolean;
   /** The profile's authoritative hotel membership; null means prospective owner. */
   tenantId: string | null;
+  /**
+   * Profil MANA yang sebenarnya milik subjek SSO ini.
+   *
+   * Hampir selalu sama dengan `profileIdFor(sub)` yang dikirim pemanggil. Beda
+   * hanya ketika sebuah profil sudah ada lebih dulu dengan `sso_sub` ini tapi
+   * ber-id lain — kasus tamu WhatsApp yang mula-mula dibuatkan identitas lokal
+   * (`wa:<jid>`) lalu dinaikkan ke akun SSO sungguhan. Pemanggil HARUS memakai
+   * nilai ini saat mencetak token, atau `auth.uid()` menunjuk profil kosong dan
+   * tamu masuk tanpa membawa satu pun booking-nya.
+   */
+  profileId?: string;
   error?: string;
 }
 
@@ -289,18 +300,39 @@ async function upsertProfile(
     };
   }
 
-  const rows = (await existing.json()) as Array<{
+  let rows = (await existing.json()) as Array<{
     id: string;
     role: AppRole;
     is_active: boolean;
     tenant_id: string | null;
   }>;
+  // Id turunan biasanya benar. Yang tersisa: sebuah profil yang SUDAH memegang
+  // sso_sub ini tapi ber-id lain, karena id-nya diturunkan dari subjek yang
+  // BERBEDA saat dibuat. Itulah tamu WhatsApp yang mula-mula punya identitas
+  // lokal (`wa:<jid>`) lalu dinaikkan ke akun SSO sungguhan: profilnya membawa
+  // seluruh riwayatnya — kontak, booking, percakapan — dan membuat profil baru
+  // di sebelahnya berarti tamu masuk ke akun kosong. `profiles.sso_sub` unik,
+  // jadi pencarian ini menunjuk paling banyak satu baris.
+  let effectiveProfileId = input.profileId;
+  if (rows.length === 0 && input.ssoSub) {
+    const bySub = await fetch(
+      `${url}/rest/v1/profiles?sso_sub=eq.${encodeURIComponent(input.ssoSub)}&select=id,role,is_active,tenant_id`,
+      { headers },
+    );
+    if (bySub.ok) {
+      const subRows = (await bySub.json()) as typeof rows;
+      if (subRows.length > 0) {
+        rows = subRows;
+        effectiveProfileId = subRows[0].id;
+      }
+    }
+  }
 
   if (rows.length > 0) {
     // The row is already there. Refresh the contact fields, but never touch
     // `role`: it is owned by the database, and an admin's decision to promote
     // or demote must outlive every subsequent login.
-    const patch = await fetch(`${url}/rest/v1/profiles?id=eq.${encodeURIComponent(input.profileId)}`, {
+    const patch = await fetch(`${url}/rest/v1/profiles?id=eq.${encodeURIComponent(effectiveProfileId)}`, {
       method: "PATCH",
       headers: { ...headers, Prefer: "return=representation" },
       body: JSON.stringify({
@@ -319,6 +351,7 @@ async function upsertProfile(
         ok: true, created: false,
         role: rows[0].role, isActive: rows[0].is_active !== false,
         tenantId: rows[0].tenant_id ?? null,
+        profileId: effectiveProfileId,
         error: `update_failed_${patch.status}`,
       };
     }
@@ -328,6 +361,7 @@ async function upsertProfile(
       role: rows[0].role,
       isActive: rows[0].is_active !== false,
       tenantId: rows[0].tenant_id ?? null,
+      profileId: effectiveProfileId,
     };
   }
 
