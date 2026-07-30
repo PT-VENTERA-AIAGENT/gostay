@@ -313,15 +313,27 @@ export async function getOrCreateCustomer(
  */
 export async function getOrCreateOwnCustomer(
   profileId: string,
-  payload: Omit<CustomerInsert, "profile_id">
+  payload: Omit<CustomerInsert, "profile_id">,
+  /**
+   * Hotel yang sedang dibuka. WAJIB diisi dari portal.
+   *
+   * Tanpa ini, pencarian hanya lewat `profile_id` dan mengambil baris TERTUA —
+   * yaitu kontak di hotel pertama orang itu, berapa pun hotel yang sedang
+   * dikunjungi. Persis begitulah tamu di portal Lor Kali membuka percakapan
+   * Kopi Rintik lengkap dengan daftar kamar hotel itu: `customers` memang satu
+   * baris per (orang, hotel), tapi tak seorang pun menyebutkan hotel mana.
+   */
+  tenantId?: string | null
 ): Promise<Customer> {
   // limit(1) rather than maybeSingle(): if a profile ever has more than one
   // customer row (e.g. staff created one by email before the guest self-served),
   // maybeSingle() throws and takes chat/booking down with it. Take the oldest.
-  const { data: rows, error: lookupError } = await supabase
+  let lookup = supabase
     .from("customers")
     .select("*")
-    .eq("profile_id", profileId)
+    .eq("profile_id", profileId);
+  if (tenantId) lookup = lookup.eq("tenant_id", tenantId);
+  const { data: rows, error: lookupError } = await lookup
     .order("created_at", { ascending: true })
     .limit(1);
   if (lookupError) throw lookupError;

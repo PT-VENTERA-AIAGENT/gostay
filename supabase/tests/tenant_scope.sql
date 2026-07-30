@@ -61,6 +61,17 @@ select tests.eq(
   (select count(distinct t.slug)::text from room_types rt join tenants t on t.id = rt.tenant_id),
   '1');
 
+-- Kontak & percakapan: seorang tamu boleh MEMBACA miliknya di semua hotel
+-- (itu memang datanya sendiri), tapi portal harus membuka yang di hotel ini.
+-- Yang dijaga di sini: baris untuk hotel yang dikunjungi memang ADA dan bisa
+-- ditemukan dengan menyaring tenant — sebab tanpa penyaringan itu, klien
+-- mengambil kontak TERTUA dan membuka percakapan hotel lain.
+select tests.eq(
+  'tamu: punya tepat satu kontak di hotel yang dikunjungi',
+  (select count(*)::text from customers c join tenants t on t.id = c.tenant_id
+    where c.profile_id = :'guest'::uuid and t.slug = :'visited'),
+  '1');
+
 -- ── STAF tidak boleh digeser oleh header ─────────────────────────────────────
 -- Ini batas keamanan, bukan soal tampilan: header datang dari browser, jadi
 -- kalau ia bisa memindahkan staf, satu header sudah cukup untuk membuka data
