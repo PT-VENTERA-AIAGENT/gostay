@@ -78,6 +78,25 @@ export function callablePhone(phoneJid: string, replyJid?: string): string | nul
   return digits.length >= 8 ? digits : null;
 }
 
+/**
+ * Apakah angka ini benar-benar nomor telepon, jadi layak dikirim ke Ventera?
+ *
+ * Yang harus disingkirkan adalah angka sebuah LID: `callablePhone` mengembalikan
+ * angka LID itu sendiri sebagai cadangan ketika WhatsApp tidak memberi nomor
+ * pendamping, dan angka itu TERLIHAT seperti nomor (15 digit) padahal bukan.
+ * Membandingkannya dengan angka LID-nya adalah satu-satunya cara membedakan.
+ *
+ * Panjang 8–15 mengikuti E.164; sebuah LID biasanya 15 digit, jadi panjang saja
+ * tidak cukup — pembandingan dengan LID-nya lah yang menentukan.
+ */
+export function isProvisionablePhone(digits: string, phoneJid: string): boolean {
+  if (digits.length < 8 || digits.length > 15) return false;
+  if (phoneJid.toLowerCase().includes("@lid") && digits === phoneDigits(phoneJid)) {
+    return false; // angka LID, bukan nomor telepon
+  }
+  return true;
+}
+
 export function phoneDigits(jid: string): string {
   // Strip ANY server suffix — @s.whatsapp.net, and also @lid (WhatsApp's privacy
   // "Linked ID" address, which is not a real phone number) — then keep digits.
@@ -179,14 +198,26 @@ export async function resolveOrProvisionGuest(
     if (!allowed) throw new WaRateLimitError();
 
   // 3. Identity for this guest. Prefer a real Ventera SSO account (a returning
-  //    guest is then the same person on web + WA). But a guest may present a
-  //    privacy `@lid` address instead of a phone — Ventera rightly rejects that —
-  //    and a provisioning hiccup must never block booking or chat. So fall back to
-  //    a local, WA-scoped subject keyed on the JID; profiles.id derives from it
-  //    deterministically either way. A local guest simply can't log into the web
-  //    portal with it (they interact over WhatsApp), which is fine.
+  //    guest is then the same person on web + WA), because that account is the
+  //    ONLY thing that lets them sign in to the portal later and see the booking
+  //    they made over WhatsApp.
+  //
+  //    Provision on `contactDigits`, NOT `digits`. For a guest whose chat is
+  //    LID-addressed, `digits` is the LID's own 15 digits — not a phone number
+  //    at all — and Ventera rightly rejects it, so EVERY LID guest fell through
+  //    to the local fallback and ended up unable to log in. WhatsApp sends the
+  //    real number alongside the message (`remoteJidAlt`), and `contactDigits`
+  //    is exactly that number; using it is the difference between a guest who
+  //    can sign in and one who cannot.
+  //
+  //    The fallback stays for the case that genuinely has no number: a LID with
+  //    no companion. It keeps booking and chat working (profiles.id derives from
+  //    the subject either way) — such a guest simply cannot sign in to the web
+  //    portal until a message of theirs carries the number.
+    const provisionable = isProvisionablePhone(contactDigits, phoneJid);
     try {
-      sub = await provisionVentera(digits, displayName);
+      if (!provisionable) throw new WaProvisionError("no_real_phone_yet");
+      sub = await provisionVentera(contactDigits, displayName);
     } catch (e) {
       console.error(`[wa/guest] Ventera provision → local fallback: ${(e as Error).message}`);
       sub = `wa:${phoneJid}`;

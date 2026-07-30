@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
-import { resolveOrProvisionGuest, WaRateLimitError, phoneDigits, callablePhone, usableName } from "./guest";
+import { resolveOrProvisionGuest, WaRateLimitError, phoneDigits, callablePhone, usableName, isProvisionablePhone } from "./guest";
 import { profileIdFor } from "../identity";
 
 const PHONE_JID = "628123456789@s.whatsapp.net";
@@ -324,5 +324,49 @@ describe("usableName — a name worth showing staff", () => {
 
   it("keeps a name that merely contains punctuation", () => {
     expect(usableName("~Rifqi")).toBe("~Rifqi");
+  });
+});
+
+describe("isProvisionablePhone — hanya nomor sungguhan yang layak dikirim ke SSO", () => {
+  it("menolak angka LID, yang terlihat seperti nomor tapi bukan", () => {
+    // 15 digit, jadi panjang saja tidak bisa membedakannya.
+    expect(isProvisionablePhone("181248240648388", "181248240648388@lid")).toBe(false);
+  });
+
+  it("menerima nomor pendamping yang WhatsApp kirim untuk tamu LID", () => {
+    expect(isProvisionablePhone("6285187586500", "181248240648388@lid")).toBe(true);
+  });
+
+  it("menerima nomor biasa dari chat non-LID", () => {
+    expect(isProvisionablePhone("628123456789", "628123456789@s.whatsapp.net")).toBe(true);
+  });
+
+  it("menolak yang terlalu pendek atau terlalu panjang untuk sebuah nomor", () => {
+    expect(isProvisionablePhone("6281", "6281@s.whatsapp.net")).toBe(false);
+    expect(isProvisionablePhone("6281234567890123456", "x@s.whatsapp.net")).toBe(false);
+  });
+});
+
+describe("tamu LID — akun SSO yang membuatnya bisa login", () => {
+  const LID_JID = "181248240648388@lid";
+  const COMPANION = "6285187586500@s.whatsapp.net";
+
+  it("memakai NOMOR ASLI tamu, bukan angka LID, saat membuat akun SSO", async () => {
+    // Inti bug yang membuat SEMUA tamu LID tak bisa login: angka LID dikirim ke
+    // Ventera, Ventera menolaknya, dan setiap tamu jatuh ke sso_sub lokal.
+    await resolveOrProvisionGuest(LID_JID, TENANT, "Sellora", COMPANION);
+
+    expect(state.venteraCalls).toHaveLength(1);
+    expect(state.venteraCalls[0].body).toMatchObject({ phone: "6285187586500" });
+  });
+
+  it("tidak memanggil SSO sama sekali untuk LID tanpa nomor pendamping", async () => {
+    // Tak ada nomor untuk didaftarkan; memanggil SSO dengan angka LID hanya
+    // menghasilkan penolakan. Percakapannya tetap harus jalan.
+    const out = await resolveOrProvisionGuest(LID_JID, TENANT, "Sellora");
+
+    expect(state.venteraCalls).toHaveLength(0);
+    expect(out.ssoSub).toBe(`wa:${LID_JID}`);
+    expect(out.profileId).toBe(profileIdFor(`wa:${LID_JID}`));
   });
 });

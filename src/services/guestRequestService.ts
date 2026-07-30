@@ -150,7 +150,12 @@ export async function createRoomServiceOrder(
 
 export async function updateRequestStatus(
   id: string,
-  status: GuestRequestStatus
+  status: GuestRequestStatus,
+  /**
+   * Token sesi staf, untuk mengabari tamu lewat WhatsApp. Tanpa token, statusnya
+   * tetap tersimpan dan tamunya saja yang tidak dikabari.
+   */
+  token?: string | null
 ): Promise<GuestRequest> {
   const { data, error } = await db
     .from("guest_requests")
@@ -159,7 +164,36 @@ export async function updateRequestStatus(
     .select()
     .single();
   if (error) throw error;
+
+  // Kabari tamu. Sengaja SESUDAH statusnya tersimpan dan tanpa di-await hasilnya
+  // sebagai penentu: pekerjaan staf sudah selesai saat baris DB berubah, dan
+  // gangguan pada gateway WhatsApp tidak boleh membuat tombol "Selesai" gagal.
+  // Sebelum ini tidak ada notifikasi apa pun — tamu memesan lewat WhatsApp lalu
+  // tidak pernah diberi kabar, dan satu-satunya cara ia tahu adalah menunggu.
+  void notifyGuestOfStatus(id, token);
+
   return data as GuestRequest;
+}
+
+/** Kirim kabar perubahan status ke tamu; kegagalan hanya dicatat di konsol. */
+async function notifyGuestOfStatus(requestId: string, token?: string | null): Promise<void> {
+  if (!token) return;
+  try {
+    const res = await fetch("/api/wa/connect?action=notify-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ requestId }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    // `status_not_notifiable` dan `request_has_no_guest` bukan masalah: status
+    // 'open' memang tidak perlu dikabari, dan permintaan walk-in tak punya
+    // kontak. Sisanya patut terlihat.
+    if (body.ok === false && body.error && !["status_not_notifiable", "request_has_no_guest"].includes(body.error)) {
+      console.error("[guestRequests] gagal mengabari tamu:", body.error);
+    }
+  } catch (e) {
+    console.error("[guestRequests] gagal mengabari tamu:", (e as Error).message);
+  }
 }
 
 /**

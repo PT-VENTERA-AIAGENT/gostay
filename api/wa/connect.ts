@@ -17,6 +17,7 @@ import { serviceConfig, serviceHeaders, serviceGet } from "../_lib/wa/client";
 import { createSession, getSessionQr, getSessionStatus, deleteSession } from "../_lib/wa/gateway";
 import resetChatHandler from "../_lib/wa/reset-chat";
 import { deliverStaffReply } from "../_lib/wa/staff-reply";
+import { notifyRequestStatus } from "../_lib/wa/request-notify";
 import { authHeader, readJson, type VercelReq, type VercelRes } from "../_lib/admin/http";
 
 /**
@@ -132,6 +133,39 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     // the way — it replaces 502 bodies with its own error page, so the browser
     // never saw the JSON and staff got a blank "Bad gateway" instead of the
     // reason their message did not reach the guest.
+    res.status(200).json(result);
+    return;
+  }
+
+  // Kabari tamu bahwa permintaannya bergerak (Diproses / Selesai / Batal).
+  //
+  // Menumpang route ini karena api/ sudah di batas 12 function plan Hobby —
+  // alasan yang sama dengan ?action=reply di atas. Hotel pemanggil diambil dari
+  // sesinya, lalu dicocokkan dengan hotel pemilik permintaan di dalam
+  // notifyRequestStatus, jadi menebak sebuah id tidak bisa dipakai untuk
+  // mengirim pesan ke tamu hotel lain.
+  if (action === "notify-request") {
+    if ((req.method ?? "GET") !== "POST") {
+      res.status(405).json({ ok: false, error: "method_not_allowed" });
+      return;
+    }
+    const guardNotify = await requireTenantMember(authHeader(req), undefined);
+    if (guardNotify.ok === false) {
+      res.status(guardNotify.status).json({ ok: false, error: guardNotify.error });
+      return;
+    }
+    const body = readJson(req);
+    const requestId = typeof body.requestId === "string" ? body.requestId : "";
+    if (!requestId) {
+      res.status(400).json({ ok: false, error: "missing_request_id" });
+      return;
+    }
+    const result = await notifyRequestStatus({
+      requestId,
+      tenantId: guardNotify.member.tenantId,
+    });
+    // Selalu 200: gagal mengabari adalah OUTCOME yang dibaca klien dari `ok`,
+    // bukan kesalahan server — dan status permintaannya sendiri sudah tersimpan.
     res.status(200).json(result);
     return;
   }
