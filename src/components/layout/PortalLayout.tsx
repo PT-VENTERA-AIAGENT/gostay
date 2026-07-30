@@ -25,7 +25,14 @@ export default function PortalLayout() {
   const { pathname } = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
   const { session, user, role, signOut } = useAuth();
-  const { name: hotelName, initial: hotelInitial, tenant, isLoading: tenantLoading } = useTenant();
+  const {
+    name: hotelName,
+    initial: hotelInitial,
+    tenant,
+    isLoading: tenantLoading,
+    wrongHotel,
+    requestedSlug,
+  } = useTenant();
   const t = useT();
 
   // A signed-in user who belongs to no hotel is a prospective OWNER, not a guest
@@ -48,6 +55,20 @@ export default function PortalLayout() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {session && <RealtimeSync scope="guest" />}
+      {/*
+        Tautan meminta satu hotel, yang tampil hotel lain. Dikatakan terang-
+        terangan, karena diam justru bentuk kegagalan yang paling merugikan di
+        sini: tamu membaca nama, kamar, dan tarif hotel yang bukan tujuannya
+        tanpa tahu ia salah tempat, lalu memesan di sana.
+      */}
+      {wrongHotel && (
+        <div className="bg-destructive/10 border-b border-destructive/30 px-4 md:px-8 py-3 text-sm text-destructive">
+          <strong>{t("Hotel yang Anda tuju tidak dapat dibuka.")}</strong>{" "}
+          {t("Tautan ini menunjuk")} <code>{requestedSlug}</code>,{" "}
+          {t("tetapi yang dapat kami tampilkan adalah")} <strong>{hotelName}</strong>.{" "}
+          {t("Periksa kembali tautan dari hotel tersebut, atau hubungi mereka lewat WhatsApp.")}
+        </div>
+      )}
       {/* Header */}
       <header className="bg-card border-b border-border px-4 md:px-8 py-3 md:py-4 flex items-center justify-between sticky top-0 z-30 backdrop-blur-sm bg-card/95">
         <Link to="/portal" className="flex items-center gap-2">

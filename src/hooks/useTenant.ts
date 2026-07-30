@@ -47,6 +47,45 @@ export async function uploadHotelLogo(tenantId: string, file: File): Promise<str
   return supabase.storage.from("hotel-logos").getPublicUrl(path).data.publicUrl;
 }
 
+/** Bentuk minimal yang dibutuhkan aturan pemilihan hotel — cukup untuk diuji. */
+export interface TenantChoice {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+/**
+ * Hotel mana yang dimaksud halaman ini, di antara baris yang boleh dibaca.
+ *
+ * Urutannya: slug kunjungan ini lebih dulu, baru hotel profilnya, baru baris apa
+ * adanya. Dipisahkan dari hook supaya aturannya bisa diuji sendiri — inilah yang
+ * dulu tidak ada, dan ketiadaannya membuat tamu melihat hotel yang salah.
+ */
+export function pickTenant<T extends TenantChoice>(
+  rows: readonly T[],
+  slug: string | null,
+  profileTenantId: string | null | undefined,
+): T | null {
+  if (rows.length === 0) return null;
+  return (
+    (slug ? rows.find((t) => t.slug === slug) : undefined) ??
+    rows.find((t) => t.id === profileTenantId) ??
+    rows[0]
+  );
+}
+
+/**
+ * Tautan ini meminta hotel A, tapi yang terbuka hotel B.
+ *
+ * Terjadi bila slug-nya tidak dikenal, hotelnya nonaktif, atau barisnya tak
+ * terbaca. Dulu keadaan ini tidak punya nama: portal diam-diam menampilkan hotel
+ * lain, dan tamu membaca nama, kamar, serta tarif yang bukan tujuannya tanpa satu
+ * pun tanda bahwa ia salah tempat — lalu memesan di sana.
+ */
+export function isWrongHotel(slug: string | null, picked: TenantChoice | null): boolean {
+  return Boolean(slug && picked && picked.slug !== slug);
+}
+
 /**
  * The hotel (tenant) this page is about.
  *
@@ -78,20 +117,24 @@ export function useTenant() {
       const { data, error } = await supabase.from("tenants").select(TENANT_COLUMNS);
       if (error) throw error;
 
-      const rows = (data ?? []) as Tenant[];
-      if (rows.length === 0) return null;
-      return (
-        (slug ? rows.find((t) => t.slug === slug) : undefined) ??
-        rows.find((t) => t.id === session?.tenant_id) ??
-        rows[0]
-      );
+      return pickTenant((data ?? []) as Tenant[], slug, session?.tenant_id);
     },
   });
 
   const name = query.data?.name ?? FALLBACK_NAME;
   const initial = name.trim().charAt(0).toUpperCase() || "G";
 
-  return { ...query, tenant: query.data ?? null, name, initial };
+  const wrongHotel = isWrongHotel(slug, query.data ?? null);
+
+  return {
+    ...query,
+    tenant: query.data ?? null,
+    name,
+    initial,
+    /** Slug yang diminta tautan ini, bila ada. */
+    requestedSlug: slug,
+    wrongHotel,
+  };
 }
 
 /**
