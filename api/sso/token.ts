@@ -1,4 +1,5 @@
 import { exchangeCode } from "../_lib/exchange";
+import { exchangePortalToken } from "../_lib/wa/portal-session";
 
 interface VercelRequest {
   method?: string;
@@ -30,8 +31,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         code_verifier?: string;
         tenant_slug?: string;
         signup_context?: "owner" | "guest";
+        portal_token?: string;
       }
     | undefined;
+
+  // Tamu masuk lewat tautan WhatsApp, bukan SSO. Menumpang route ini karena
+  // api/ sudah di batas 12 function plan Hobby — dan karena tempatnya memang
+  // di sini: inilah satu-satunya berkas yang mencetak sesi.
+  if (body?.portal_token) {
+    const guest = await exchangePortalToken(body.portal_token);
+    res.status(guest.status).json(guest.body);
+    return;
+  }
 
   const result = await exchangeCode({
     code: body?.code ?? "",
