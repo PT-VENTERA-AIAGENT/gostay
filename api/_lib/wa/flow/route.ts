@@ -99,13 +99,18 @@ export async function routeFlow(params: FlowRouteParams): Promise<FlowRouteResul
   // rather than logging an error on every inbound message.
   if (!isConfigured()) return NOT_HANDLED;
 
+  // isInhouse() is documented as "called at most once per message", and several
+  // steps below may each need the answer. Memoising here makes that contract
+  // structurally true instead of something every new branch has to remember.
+  const p: FlowRouteParams = { ...params, isInhouse: once(params.isInhouse) };
+
   try {
-    if (params.pending?.kind === "flow") {
-      return await resume(params, params.pending.payload);
+    if (p.pending?.kind === "flow") {
+      return await resume(p, p.pending.payload);
     }
     // Another conversation is mid-flight — it keeps the message.
-    if (params.pending) return NOT_HANDLED;
-    return await start(params);
+    if (p.pending) return NOT_HANDLED;
+    return await start(p);
   } catch (e) {
     console.error("[wa/flow] routing failed:", (e as Error).message);
     return NOT_HANDLED;
@@ -210,6 +215,16 @@ async function resume(
   if (!nodeAcceptsInput(flow.definition, nodeId, params.input)) {
     const switched = await startElsewhere(params, flow.id);
     if (switched) return switched;
+
+    // ── The guest typed THIS flow's own trigger word again ────────────────
+    // startElsewhere excludes the running flow on purpose, so a guest parked on
+    // the greeting's "1/2/3" who says "Halo" again matched nothing and was told
+    // their choice was not recognised — being scolded for saying hello, which is
+    // how this reads to the guest. Saying the trigger again plainly means "start
+    // over", so that is what happens. Bounded by the same start budget as any
+    // other start, so repetition cannot loop.
+    const restarted = await restartSame(params, flow);
+    if (restarted) return restarted;
   }
 
   return execute(params, flow, nodeId, { ...params.vars, ...saved });
@@ -244,6 +259,41 @@ async function startElsewhere(
     ...params.vars,
     is_inhouse: state.isInhouse ? "ya" : "tidak",
   });
+}
+
+/**
+ * Restart the flow the guest is already in, when they typed its trigger again.
+ *
+ * Returns null when the word is not this flow's, so the caller re-prompts the
+ * waiting node as before. The start budget applies: a guest really can say the
+ * trigger a few times, and a loop still cannot run away.
+ */
+async function restartSame(
+  params: FlowRouteParams,
+  flow: StoredFlow,
+): Promise<FlowRouteResult | null> {
+  const state = await resolveState([flow], params);
+  const choice = selectFlow([flow], params.input, state);
+  // "blocked" cannot sensibly happen — they are mid-run, so they qualified —
+  // but if it does, re-prompting is kinder than a lecture about eligibility.
+  if (choice.kind !== "run") return null;
+
+  if (!(await checkFlowStartBudget(flow.id, params.phoneJid))) {
+    console.warn(`[wa/flow] restart budget exhausted for ${flow.id} / ${params.phoneJid}`);
+    return { handled: true };
+  }
+
+  await clearPending(params.tenantId, params.phoneJid);
+  return execute(params, flow, null, {
+    ...params.vars,
+    is_inhouse: state.isInhouse ? "ya" : "tidak",
+  });
+}
+
+/** Call `fn` at most once, reusing its answer for every later caller. */
+function once<T>(fn: () => Promise<T>): () => Promise<T> {
+  let cached: Promise<T> | null = null;
+  return () => (cached ??= fn());
 }
 
 // ─── Running + persisting ────────────────────────────────────────────────────

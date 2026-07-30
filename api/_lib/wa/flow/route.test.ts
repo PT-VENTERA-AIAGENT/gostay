@@ -530,3 +530,76 @@ describe("routeFlow — failure and handoff", () => {
     expect(sent).toEqual(["Kami sambungkan ke staf."]);
   });
 });
+
+describe("routeFlow — a guest parked on a choice who says hello again", () => {
+  // Reported from production: the greeting asked "1/2/3", the guest typed "Halo",
+  // and got "Mohon maaf, pilihannya belum kami kenali" — scolded for saying hello.
+  // startElsewhere excludes the running flow, so the greeting could never claim
+  // its own trigger back.
+  const greeting = flow({
+    id: "greet",
+    triggerKeywords: ["halo", "hai"],
+    priority: 90,
+    definition: coerceFlow({
+      version: 1,
+      nodes: [
+        { id: "t", type: "trigger", data: {} },
+        { id: "c", type: "choice", data: { text: "Ada yang bisa kami bantu?", options: [
+          { id: "o1", label: "Pesan kamar" },
+          { id: "o2", label: "Bicara dengan staf" },
+        ] } },
+      ],
+      edges: [{ id: "e", source: "t", target: "c" }],
+    }),
+  });
+  const parked = { kind: "flow" as const, payload: { flowId: "greet", nodeId: "c", vars: {} } };
+
+  beforeEach(() => {
+    store.listActiveFlows.mockResolvedValue([greeting]);
+    store.getFlow.mockResolvedValue(greeting);
+  });
+
+  it("starts the greeting over instead of rejecting the word", async () => {
+    const r = await routeFlow(params({ input: "Halo", pending: parked }));
+
+    expect(r.handled).toBe(true);
+    expect(sent[0]).toContain("Ada yang bisa kami bantu?");
+    expect(sent[0]).not.toMatch(/belum kami kenali/i);
+    expect(pending.clearPending).toHaveBeenCalled();
+  });
+
+  it("treats any of the flow's triggers the same way", async () => {
+    const r = await routeFlow(params({ input: "hai", pending: parked }));
+
+    expect(r.handled).toBe(true);
+    expect(sent[0]).toContain("Ada yang bisa kami bantu?");
+  });
+
+  it("bounds repetition with the start budget rather than restarting forever", async () => {
+    inbound.checkFlowStartBudget.mockResolvedValue(false);
+
+    const r = await routeFlow(params({ input: "Halo", pending: parked }));
+
+    expect(r.handled).toBe(true);
+    expect(sent).toEqual([]); // silent, not a restart and not a re-prompt
+  });
+
+  it("still re-asks for a word that is neither an option nor a trigger", async () => {
+    const r = await routeFlow(params({ input: "hmmm apa ya", pending: parked }));
+
+    expect(sent[0]).toMatch(/belum kami kenali/i);
+    expect(pending.clearPending).not.toHaveBeenCalled();
+  });
+
+  it("asks about the stay at most once even after checking two flows", async () => {
+    const gated = simple("rs", "Menu room service:", ["menu"], "inhouse");
+    const gatedGreeting = { ...greeting, requires: "inhouse" as const };
+    store.listActiveFlows.mockResolvedValue([gated, gatedGreeting]);
+    store.getFlow.mockResolvedValue(gatedGreeting);
+    isInhouse.mockResolvedValue(true);
+
+    await routeFlow(params({ input: "Halo", pending: parked }));
+
+    expect(isInhouse).toHaveBeenCalledTimes(1);
+  });
+});
