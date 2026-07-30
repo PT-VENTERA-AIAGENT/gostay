@@ -94,7 +94,16 @@ invoice". Salah — layanan itu hanya router callback. Sejak commit `3172def`:
 
 - **Buat invoice**: GoStay → `POST https://api.xendit.co/v2/invoices`
   langsung. Kunci: `XENDIT_API_KEY_PRODUCTION` / `XENDIT_API_KEY_SANDBOX`
-  (override URL uji: `XENDIT_API_URL`). `external_id = GOSTAY-<referensi>`.
+  (override URL uji: `XENDIT_API_URL`).
+- **`external_id = GOSTAY-<HOTEL>-<referensi>`**, mis.
+  `GOSTAY-LOR-KALI-BK-20260730-D39D`. Dua syarat yang harus benar sekaligus:
+  awalan `GOSTAY-` TIDAK boleh bergeser (router callback memilih tujuan dari
+  situ), dan nama hotel ada supaya satu ledger Xendit yang melayani banyak hotel
+  masih bisa dibaca manusia. Pembacaan baliknya
+  (`referenceFromExternalId`) mencari `BK-` **terakhir**, jadi (a) invoice lama
+  berbentuk `GOSTAY-<referensi>` tetap terbaca — kalau ini regresi, tamu bayar
+  dan settlement-nya tak pernah menemukan booking-nya — dan (b) hotel yang
+  namanya sendiri memuat "BK-" tidak membuatnya salah baca.
 - **Settlement**: Xendit memanggil SATU callback URL global → **"Xendit
   Unified Callback Gateway"** milik Ventera → merutekan berdasar prefix
   `GOSTAY-` → `POST {app}/api/payment/webhook` dengan header
@@ -102,7 +111,31 @@ invoice". Salah — layanan itu hanya router callback. Sejak commit `3172def`:
   Token mana yang cocok menentukan stamp `live`/`test` — sandbox tak pernah
   bisa tercatat live. Idempoten via UNIQUE `payments.gateway_ref`.
 - **Mode per hotel**: `hotel_payment_config` (live/test/off), default global di
-  `payment_config`.
+  `payment_config`. `is_active=false` MEMAKSA `test` — sebuah hotel tidak bisa
+  bertransaksi live karena kelalaian.
+- **Lunas → reservasi terkonfirmasi**: trigger `recompute_booking_payment`
+  (migration 019, diperluas 044) menaikkan `bookings.status` dari `pending` ke
+  `confirmed` begitu `payment_status` jadi `paid`. Hanya MAJU — reservasi yang
+  sudah `checked_in`/`cancelled` tidak pernah ditarik kembali. Sebelum 044
+  statusnya tertinggal `pending` walau uang sudah masuk, dan bot WhatsApp
+  menjanjikan konfirmasi otomatis yang tak ada kodenya.
+
+### Naik ke produksi (live)
+
+Terbukti jalan end-to-end di sandbox 30 Jul 2026: invoice → bayar → callback →
+`payments` → fee 7% → `hotel_balance` → reservasi `confirmed`. Untuk live:
+
+1. `XENDIT_API_KEY_PRODUCTION` dan `INTERNAL_TOKEN_PRODUCTION` terisi di Vercel
+   (sudah). Jangan tertukar: token mana yang cocok itulah yang menentukan stamp
+   `live`/`test`, jadi token salah = pembayaran live tercatat sebagai test.
+2. Router callback Ventera harus melayani prefix `GOSTAY-` untuk akun Xendit
+   **produksi**, bukan hanya sandbox. Ini SATU-SATUNYA bagian yang belum pernah
+   diuji live; kalau terlewat, tamu membayar dan reservasinya tetap menunggu.
+3. Di Xendit produksi, callback URL invoice mengarah ke router Ventera itu.
+4. Baru setelah 1–3: `hotel_payment_config.mode = 'live'` untuk hotel yang
+   dituju (dan `payment_config.mode` bila ingin default global live).
+5. Uji dengan nominal kecil pada satu hotel dulu, lalu periksa `payments.payment_env
+   = 'live'` dan `balance_ledger` bertambah net-of-fee.
 
 ## 3. Saldo hotel & tarik saldo
 

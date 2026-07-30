@@ -35,6 +35,8 @@ const booking = {
   total_amount: 1_000_000,
   amount_paid: 250_000,
   customer_email: "guest@hotel.com",
+  hotel_slug: "lor-kali",
+  hotel_name: "Lor Kali",
 };
 
 beforeEach(() => {
@@ -58,17 +60,42 @@ beforeEach(() => {
 describe("externalIdFor / referenceFromExternalId", () => {
   it("prefixes every invoice with GOSTAY- so cross-project reports can attribute it", () => {
     // The whole point of the prefix: an invoice in a shared gateway ledger must
-    // be recognisably GoStay's without any extra lookup.
+    // be recognisably GoStay's without any extra lookup. The Ventera callback
+    // router selects its destination on this prefix, so it must not shift.
     expect(externalIdFor("BK-1001")).toBe("GOSTAY-BK-1001");
-    expect(externalIdFor("BK-1001").startsWith("GOSTAY-")).toBe(true);
+    expect(externalIdFor("BK-1001", "lor-kali").startsWith("GOSTAY-")).toBe(true);
+  });
+
+  it("names the hotel, so one Xendit ledger serving many hotels stays readable", () => {
+    expect(externalIdFor("BK-20260730-D39D", "lor-kali")).toBe("GOSTAY-LOR-KALI-BK-20260730-D39D");
+  });
+
+  it("falls back to the bare form when the hotel slug is unknown", () => {
+    expect(externalIdFor("BK-1001", null)).toBe("GOSTAY-BK-1001");
+    expect(externalIdFor("BK-1001", "   ")).toBe("GOSTAY-BK-1001");
   });
 
   it("round-trips reference → external_id → reference", () => {
     expect(referenceFromExternalId(externalIdFor("BK-42"))).toBe("BK-42");
+    expect(referenceFromExternalId(externalIdFor("BK-20260730-D39D", "lor-kali")))
+      .toBe("BK-20260730-D39D");
+  });
+
+  it("still reads invoices minted BEFORE the hotel segment existed", () => {
+    // Invoices already outstanding carry the old shape. If this regressed, a
+    // guest could pay one and the settlement would never find its booking.
+    expect(referenceFromExternalId("GOSTAY-BK-20260728-F77A")).toBe("BK-20260728-F77A");
+  });
+
+  it("is not fooled by a hotel whose own name contains the reference marker", () => {
+    expect(referenceFromExternalId("GOSTAY-BK-RESIDENCE-BK-20260730-D39D"))
+      .toBe("BK-20260730-D39D");
   });
 
   it("recovers the reference even after a -R<n> retry suffix", () => {
     expect(referenceFromExternalId("GOSTAY-BK-1001-R2")).toBe("BK-1001");
+    expect(referenceFromExternalId("GOSTAY-LOR-KALI-BK-20260730-D39D-R2"))
+      .toBe("BK-20260730-D39D");
   });
 });
 
@@ -92,8 +119,11 @@ describe("handleCreateInvoice", () => {
   it("asks the gateway for a GOSTAY-prefixed external_id", async () => {
     await handleCreateInvoice({ bookingReference: "BK-1001" });
     const [input] = gateway.createInvoiceViaGateway.mock.calls[0];
-    expect(input.externalId).toBe("GOSTAY-BK-1001");
+    // Hotelnya disebut, dan awalan GOSTAY- yang dipakai router callback tetap di
+    // depan — dua-duanya wajib, jadi dua-duanya diperiksa.
+    expect(input.externalId).toBe("GOSTAY-LOR-KALI-BK-1001");
     expect(input.externalId.startsWith("GOSTAY-")).toBe(true);
+    expect(referenceFromExternalId(input.externalId)).toBe("BK-1001");
   });
 
   it("uses the SANDBOX environment for a test-mode hotel", async () => {
