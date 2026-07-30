@@ -1,0 +1,62 @@
+// Aturan pemilihan hotel di portal, dipisahkan dari React supaya bisa diuji
+// tanpa merender apa pun.
+//
+// Yang dijaga di sini adalah bug produksi 30 Jul 2026: seorang tamu membuka
+// tautan Lor Kali, berhasil login, dan disuguhi Kopi Rintik — hotel tempat ia
+// pertama kali muncul. `profiles.tenant_id` hanya bisa menyimpan SATU hotel,
+// sementara seorang tamu bisa menjadi tamu di beberapa hotel sekaligus.
+import { describe, it, expect } from "vitest";
+import { pickTenant, isWrongHotel, type TenantChoice } from "./useTenant";
+
+const lorKali: TenantChoice = { id: "t-lor", slug: "lor-kali", name: "Lor Kali" };
+const kopiRintik: TenantChoice = { id: "t-kopi", slug: "gostay", name: "Kopi Rintik" };
+const puncak: TenantChoice = { id: "t-puncak", slug: "hotel-puncak-bebas", name: "Hotel Puncak Bebas" };
+
+describe("pickTenant", () => {
+  it("follows the hotel whose link the guest arrived on", () => {
+    // Inti bugnya: tanpa aturan ini, tamu melihat hotel pertamanya.
+    const picked = pickTenant([kopiRintik, puncak, lorKali], "lor-kali", "t-kopi");
+    expect(picked).toBe(lorKali);
+  });
+
+  it("falls back to the profile's own hotel when the link names none", () => {
+    const picked = pickTenant([kopiRintik, lorKali], null, "t-kopi");
+    expect(picked).toBe(kopiRintik);
+  });
+
+  it("takes the only row for staff, who read exactly one hotel", () => {
+    expect(pickTenant([kopiRintik], null, undefined)).toBe(kopiRintik);
+  });
+
+  it("returns null when nothing is readable, rather than inventing a hotel", () => {
+    expect(pickTenant([], "lor-kali", "t-kopi")).toBeNull();
+  });
+
+  it("does not silently substitute another hotel for an unknown slug", () => {
+    // Slug tak dikenal tetap memulangkan sesuatu (agar portal punya isi), TAPI
+    // isWrongHotel di bawah yang memastikan keadaan itu dikatakan, bukan
+    // disembunyikan.
+    const picked = pickTenant([kopiRintik], "hotel-yang-tidak-ada", "t-kopi");
+    expect(picked).toBe(kopiRintik);
+    expect(isWrongHotel("hotel-yang-tidak-ada", picked)).toBe(true);
+  });
+});
+
+describe("isWrongHotel", () => {
+  it("is true when the link asked for a hotel we did not open", () => {
+    expect(isWrongHotel("lor-kali", kopiRintik)).toBe(true);
+  });
+
+  it("is false when the link got what it asked for", () => {
+    expect(isWrongHotel("lor-kali", lorKali)).toBe(false);
+  });
+
+  it("is false when the visit named no hotel at all", () => {
+    // Staf membuka dashboard tanpa ?hotel= — tidak ada yang salah di situ.
+    expect(isWrongHotel(null, kopiRintik)).toBe(false);
+  });
+
+  it("says nothing while the hotel is still loading", () => {
+    expect(isWrongHotel("lor-kali", null)).toBe(false);
+  });
+});
