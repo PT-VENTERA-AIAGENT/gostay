@@ -272,10 +272,20 @@ async function identityReferencesExist(
   if (!identity.profile_id || !identity.customer_id) return false;
 
   const [profile, customer] = await Promise.all([
-    serviceGet(
-      `profiles?id=eq.${encodeURIComponent(identity.profile_id)}` +
-        `&tenant_id=eq.${encodeURIComponent(tenantId)}&select=id&limit=1`,
-    ),
+    // Profil TIDAK disaring per-tenant, dan itu bukan kelalaian.
+    //
+    // Satu nomor = satu profil di SEMUA hotel (profileIdFor menurunkannya dari
+    // subjek SSO, yang tak tahu-menahu soal hotel), sedangkan
+    // `profiles.tenant_id` hanya menyimpan SATU nilai — hotel tempat ia pertama
+    // kali muncul. Menyaringnya dengan tenant yang sedang melayani berarti
+    // seorang tamu yang pernah menghubungi hotel lain SELALU dinyatakan "tidak
+    // ada", jalur cepat di atas tak pernah diambil, dan pemulihan nomor yang
+    // hanya hidup di jalur itu tak pernah berjalan — tamu Sellora tercatat
+    // dengan angka LID sebagai nomor teleponnya selama berhari-hari karena ini.
+    //
+    // Yang memang per-tenant adalah `customers`: baris kontak milik hotel ini,
+    // dan itu tetap diperiksa di bawah.
+    serviceGet(`profiles?id=eq.${encodeURIComponent(identity.profile_id)}&select=id&limit=1`),
     serviceGet(
       `customers?id=eq.${encodeURIComponent(identity.customer_id)}` +
         `&tenant_id=eq.${encodeURIComponent(tenantId)}&select=id&limit=1`,

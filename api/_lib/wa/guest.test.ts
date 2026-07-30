@@ -15,7 +15,7 @@ interface MockState {
   // wa_guest_identities the GET should return (the resolve short-circuit).
   identityRows: Array<{ id: string; sso_sub: string | null; profile_id: string | null; customer_id: string | null }>;
   // profiles / customers the respective GETs return (empty = "not provisioned yet").
-  profileRows: Array<{ id: string; role: string; is_active: boolean }>;
+  profileRows: Array<{ id: string; role: string; is_active: boolean; tenant_id?: string }>;
   customerRows: Array<{ id: string }>;
 
   // Recorded writes / calls.
@@ -23,6 +23,8 @@ interface MockState {
   rpcCalls: Array<Record<string, unknown>>;
   profileInserts: Array<Record<string, unknown>>;
   customerInserts: Array<Record<string, unknown>>;
+  /** PATCH ke customers — di sini pemulihan nomor terlihat. */
+  customerPatches: Array<Record<string, unknown>>;
   identityInserts: Array<Record<string, unknown>>;
   identityPatches: Array<Record<string, unknown>>;
 
@@ -88,7 +90,17 @@ beforeAll(async () => {
 
     // ── profiles ──
     if (url.pathname === "/rest/v1/profiles") {
-      if (req.method === "GET") return json(200, state.profileRows);
+      if (req.method === "GET") {
+        // Hormati filter tenant_id kalau ada. Mock yang mengabaikannya
+        // menyembunyikan justru bug ini: sebuah profil dengan tenant LAIN akan
+        // tampak "ada" untuk kueri yang disaring per-tenant, padahal PostgREST
+        // tidak akan mengembalikannya.
+        const want = (url.searchParams.get("tenant_id") ?? "").replace(/^eq\./, "");
+        const rows = want
+          ? state.profileRows.filter((r) => r.tenant_id === want)
+          : state.profileRows;
+        return json(200, rows);
+      }
       if (req.method === "POST") {
         const row = JSON.parse(body);
         state.profileInserts.push(row);
@@ -104,6 +116,10 @@ beforeAll(async () => {
         const row = JSON.parse(body);
         state.customerInserts.push(row);
         return json(201, [{ id: "cust-new-1", ...row }]);
+      }
+      if (req.method === "PATCH") {
+        state.customerPatches.push(JSON.parse(body));
+        return json(200, []);
       }
     }
 
@@ -134,6 +150,7 @@ beforeEach(() => {
     rpcCalls: [],
     profileInserts: [],
     customerInserts: [],
+    customerPatches: [],
     identityInserts: [],
     identityPatches: [],
     rateAllowed: true,
@@ -368,5 +385,53 @@ describe("tamu LID — akun SSO yang membuatnya bisa login", () => {
     expect(state.venteraCalls).toHaveLength(0);
     expect(out.ssoSub).toBe(`wa:${LID_JID}`);
     expect(out.profileId).toBe(profileIdFor(`wa:${LID_JID}`));
+  });
+});
+
+describe("tamu yang pernah menghubungi hotel LAIN", () => {
+  // Satu nomor = satu profil di semua hotel, tapi `profiles.tenant_id` hanya
+  // menyimpan SATU nilai: hotel tempat ia pertama kali muncul. Dulu pemeriksaan
+  // referensi menyaring profil dengan tenant yang sedang melayani, sehingga tamu
+  // seperti ini SELALU dinyatakan "belum lengkap": jalur cepat tak pernah
+  // diambil, dan pemulihan nomor yang hanya hidup di jalur itu tak pernah jalan.
+  const LID_JID = "181248240648388@lid";
+  const COMPANION = "6285187586500@s.whatsapp.net";
+  const HOTEL_LAIN = "22222222-2222-4222-8222-222222222222";
+
+  beforeEach(() => {
+    state.identityRows = [
+      { id: "idn-1", sso_sub: `wa:${LID_JID}`, profile_id: "prof-1", customer_id: "cust-1" },
+    ];
+    // Profilnya milik hotel LAIN; kontaknya milik hotel yang sedang melayani.
+    state.profileRows = [{ id: "prof-1", role: "customer", is_active: true, tenant_id: HOTEL_LAIN }];
+    state.customerRows = [{ id: "cust-1" }];
+  });
+
+  it("takes the short-circuit instead of re-provisioning on every message", async () => {
+    const out = await resolveOrProvisionGuest(LID_JID, TENANT, "Sellora", COMPANION);
+
+    expect(out.customerId).toBe("cust-1");
+    expect(out.profileId).toBe("prof-1");
+    expect(state.venteraCalls).toHaveLength(0);
+    expect(state.profileInserts).toHaveLength(0);
+    expect(state.customerInserts).toHaveLength(0);
+  });
+
+  it("repairs the contact number, which the tenant filter used to prevent", async () => {
+    // Inti keluhan produksi: customers.phone tercatat sebagai angka LID, dan
+    // tetap begitu berhari-hari meski setiap pesan membawa nomor aslinya.
+    await resolveOrProvisionGuest(LID_JID, TENANT, "Sellora", COMPANION);
+
+    expect(state.customerPatches.some((p) => p.phone === "6285187586500")).toBe(true);
+  });
+
+  it("still re-provisions when the CONTACT genuinely belongs to another hotel", async () => {
+    // Kontak memang per-hotel: kalau baris kontaknya tidak ada di hotel ini,
+    // tamu ini belum punya kontak di sini dan harus dibuatkan.
+    state.customerRows = [];
+
+    await resolveOrProvisionGuest(LID_JID, TENANT, "Sellora", COMPANION);
+
+    expect(state.customerInserts).toHaveLength(1);
   });
 });
