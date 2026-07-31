@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, PhoneIncoming, PhoneOutgoing, Flag, Loader2, Mic } from "lucide-react";
+import { Plus, Search, PhoneIncoming, PhoneOutgoing, Flag, Loader2, Mic, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { motion } from "framer-motion";
@@ -21,10 +21,19 @@ const tabs = [
   { key: "followup", label: "Follow-ups" },
 ];
 
+/** Kolom migration 049 — belum masuk tipe yang digenerate. */
+function extra(call: unknown): { transcript: string | null; source: string } {
+  const c = call as { transcript?: string | null; source?: string };
+  return { transcript: c.transcript ?? null, source: c.source ?? "manual" };
+}
+
 export default function CallLogs() {
   const t = useT();
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
+  // Log yang transkripnya sedang dibuka. Satu saja — transkrip itu panjang,
+  // dan membuka dua sekaligus hanya membuat halaman jadi sulit dibaca.
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const { data: callLogs = [], isLoading, error } = useCallLogs({
     search: search || undefined,
@@ -122,24 +131,56 @@ export default function CallLogs() {
               </tr>
             </thead>
             <motion.tbody variants={staggerContainer} initial="hidden" animate="show">
-              {filtered.map((call) => (
-                <motion.tr key={call.id} variants={staggerItem} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
-                  <td className="px-4 py-3">
-                    {call.direction === "inbound" ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><PhoneIncoming className="w-3 h-3" /> In</span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> Out</span>
+              {filtered.map((call) => {
+                const { transcript, source } = extra(call);
+                const opened = openId === call.id;
+                return (
+                  <>
+                    <motion.tr
+                      key={call.id}
+                      variants={staggerItem}
+                      onClick={() => transcript && setOpenId(opened ? null : call.id)}
+                      className={cn(
+                        "border-b border-border last:border-0 hover:bg-muted/50 transition-colors",
+                        transcript && "cursor-pointer",
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        {call.direction === "inbound" ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><PhoneIncoming className="w-3 h-3" /> In</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> Out</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono text-foreground">{call.caller_phone}</td>
+                      <td className="px-4 py-3 text-sm">{call.customers ? <span className="text-foreground font-medium">{call.customers.full_name}</span> : <span className="text-muted-foreground italic">{t("Unknown")}</span>}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(call.created_at).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{formatDuration(call.duration_seconds)}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">
+                        {source === "ai" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded mr-1.5 align-middle"><Bot className="w-3 h-3" /> AI</span>
+                        )}
+                        {call.summary ?? "—"}
+                        {transcript && (
+                          <span className="ml-1.5 text-xs text-primary underline underline-offset-2">
+                            {opened ? t("tutup transkrip") : t("lihat transkrip")}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{call.profiles?.full_name}</td>
+                      <td className="px-4 py-3">{call.follow_up && <span className="inline-flex items-center gap-1 text-xs font-medium text-warning bg-warning/10 px-2 py-0.5 rounded-full"><Flag className="w-3 h-3" /> {call.follow_up_due ?? ""}</span>}</td>
+                    </motion.tr>
+                    {opened && transcript && (
+                      <tr key={`${call.id}-transcript`} className="border-b border-border last:border-0 bg-muted/30">
+                        <td colSpan={8} className="px-6 py-4">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">{t("Transkrip percakapan")}</p>
+                          <pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed max-h-72 overflow-y-auto">{transcript}</pre>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-mono text-foreground">{call.caller_phone}</td>
-                  <td className="px-4 py-3 text-sm">{call.customers ? <span className="text-foreground font-medium">{call.customers.full_name}</span> : <span className="text-muted-foreground italic">{t("Unknown")}</span>}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(call.created_at).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDuration(call.duration_seconds)}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">{call.summary ?? "—"}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{call.profiles?.full_name}</td>
-                  <td className="px-4 py-3">{call.follow_up && <span className="inline-flex items-center gap-1 text-xs font-medium text-warning bg-warning/10 px-2 py-0.5 rounded-full"><Flag className="w-3 h-3" /> {call.follow_up_due ?? ""}</span>}</td>
-                </motion.tr>
-              ))}
+                  </>
+                );
+              })}
               {filtered.length === 0 && (
                 <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">{t("No call logs found")}</td></tr>
               )}
@@ -149,8 +190,11 @@ export default function CallLogs() {
 
         {/* Mobile cards */}
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="lg:hidden space-y-3">
-          {filtered.map((call) => (
-            <motion.div key={call.id} variants={staggerItem} className="bg-card rounded-xl border border-border p-4">
+          {filtered.map((call) => {
+            const { transcript, source } = extra(call);
+            const opened = openId === call.id;
+            return (
+            <motion.div key={call.id} variants={staggerItem} onClick={() => transcript && setOpenId(opened ? null : call.id)} className="bg-card rounded-xl border border-border p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-mono text-foreground">{call.caller_phone}</span>
                 {call.direction === "inbound" ? (
@@ -159,7 +203,15 @@ export default function CallLogs() {
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-info bg-info/10 px-2 py-0.5 rounded-full"><PhoneOutgoing className="w-3 h-3" /> Out</span>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{call.summary ?? "—"}</p>
+              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                {source === "ai" && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded mr-1.5 align-middle"><Bot className="w-3 h-3" /> AI</span>
+                )}
+                {call.summary ?? "—"}
+              </p>
+              {opened && transcript && (
+                <pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed max-h-60 overflow-y-auto bg-muted/30 rounded-lg p-3 mb-2">{transcript}</pre>
+              )}
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{call.customers?.full_name ?? "Unknown"} · {call.profiles?.full_name}</span>
                 <span>{formatDuration(call.duration_seconds)}</span>
@@ -170,7 +222,8 @@ export default function CallLogs() {
                 </div>
               )}
             </motion.div>
-          ))}
+            );
+          })}
         </motion.div>
       </div>
     </PageTransition>

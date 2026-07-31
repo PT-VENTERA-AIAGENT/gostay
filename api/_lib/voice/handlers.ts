@@ -13,10 +13,9 @@
 //               find-or-create tamu CRM per nomor — tenant-scoped, sehingga
 //               nomor yang sama tidak pernah menggandakan tamu.
 
-import { verifySupabaseToken } from "../identity";
+import { verifySupabaseToken, profileIdFor } from "../identity";
 import { safeEqual } from "../payment/token";
 import { serviceGet, serviceInsert } from "../wa/client";
-import { getOrCreateBotProfile } from "../wa/crm";
 
 // ─── session ─────────────────────────────────────────────────────────────────
 
@@ -116,6 +115,29 @@ export interface CallEndedResult {
   customerCreated?: boolean;
 }
 
+/**
+ * Profil agen "Resepsionis AI" per hotel — pola yang sama dengan bot WA
+ * (crm.ts getOrCreateBotProfile), sub berbeda supaya kolom Agen di Log
+ * Panggilan menyebut kanalnya dengan benar: telepon AI, bukan WhatsApp.
+ */
+async function getOrCreateVoiceBotProfile(tenantId: string): Promise<string> {
+  const id = profileIdFor(`voice-bot:${tenantId}`);
+  const found = await serviceGet(`profiles?id=eq.${encodeURIComponent(id)}&select=id`);
+  if (found.ok && ((await found.json()) as unknown[]).length > 0) return id;
+  const ins = await serviceInsert("profiles", {
+    id,
+    sso_sub: `voice-bot:${tenantId}`,
+    email: `voice-bot-${tenantId}@bot.gostay.local`,
+    full_name: "Resepsionis AI",
+    role: "staff",
+    tenant_id: tenantId,
+    is_active: true,
+  });
+  // 409 = panggilan lain membuatnya lebih dulu; sama-sama selesai.
+  if (!ins.ok && ins.status !== 409) throw new Error(`voice_bot_profile_${ins.status}`);
+  return id;
+}
+
 async function tenantIdForSlug(slug: string): Promise<string | null> {
   const res = await serviceGet(
     `tenants?slug=eq.${encodeURIComponent(slug)}&select=id&limit=1`,
@@ -193,7 +215,7 @@ export async function handleVoiceCallEnded(
     typeof body.caller_name === "string" ? body.caller_name : null,
   );
 
-  const botId = await getOrCreateBotProfile(tenantId);
+  const botId = await getOrCreateVoiceBotProfile(tenantId);
   const direction = body.direction === "outbound" ? "outbound" : "inbound";
   const duration = Number(body.duration_seconds);
   const followUp = body.follow_up === true;

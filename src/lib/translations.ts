@@ -29,6 +29,11 @@ export const EN: Record<string, string> = {
   "Saldo tersedia": "Available balance",
   "Total pendapatan reservasi": "Total reservation income",
   "Fee GoStay": "GoStay fee",
+
+  // ── Log Panggilan / Resepsionis AI ───────────────────────────────────────
+  "lihat transkrip": "view transcript",
+  "tutup transkrip": "hide transcript",
+  "Transkrip percakapan": "Conversation transcript",
   "Total ditarik": "Total withdrawn",
   "Pendapatan reservasi masuk ke saldo setelah dipotong fee GoStay": "Reservation income is added to the balance after the GoStay fee is deducted",
   "Setiap pembayaran reservasi otomatis dipotong": "Every reservation payment is automatically deducted by",
