@@ -58,12 +58,14 @@ export function randomReferenceSuffix(length = 8): string {
   return out;
 }
 
-/** Kode merchant dari slug hotel: huruf besar, non-alfanumerik → '-'. */
+/**
+ * Kode merchant dari slug hotel: huruf besar, TANPA pemisah apa pun
+ * ("lor-kali" → "LORKALI"). Satu segmen utuh membuat external_id di dashboard
+ * Xendit dan log internal terbaca sebagai GOSTAY-LORKALI-…, bukan potongan
+ * yang ambigu terhadap tanda hubung pemisah bagian reference.
+ */
 export function merchantCodeFor(hotelSlug: string | null | undefined): string {
-  const code = (hotelSlug ?? "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const code = (hotelSlug ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, "");
   return code || "HOTEL";
 }
 
@@ -79,16 +81,19 @@ export function jakartaYyyymmdd(now: Date = new Date()): string {
 }
 
 /**
- * Reference baru: GOSTAY-{MERCHANT}-{YYYYMMDD}-{ACAK}.
+ * Reference baru: {MERCHANT}-{YYYYMMDD}-{ACAK}.
  *
- * Jenis transaksi sengaja TIDAK dikodekan di sini — pemetaan reference → booking
- * hidup di tabel nexus_references (pelajaran Sellix dengan prefix ASB-*).
+ * Sengaja TANPA segmen "GOSTAY": Nexus sendiri yang menambahkan kode app di
+ * external_id provider (`GOSTAY-<reference>`), jadi menuliskannya di sini
+ * menghasilkan GOSTAY-GOSTAY-… di dashboard Xendit dan log internal.
+ * Jenis transaksi juga TIDAK dikodekan — pemetaan reference → booking hidup di
+ * tabel nexus_references (pelajaran Sellix dengan prefix ASB-*).
  */
 export function newNexusReference(
   hotelSlug: string | null | undefined,
   now: Date = new Date(),
 ): string {
-  return `GOSTAY-${merchantCodeFor(hotelSlug)}-${jakartaYyyymmdd(now)}-${randomReferenceSuffix()}`;
+  return `${merchantCodeFor(hotelSlug)}-${jakartaYyyymmdd(now)}-${randomReferenceSuffix()}`;
 }
 
 // ─── HTTP ─────────────────────────────────────────────────────────────────────

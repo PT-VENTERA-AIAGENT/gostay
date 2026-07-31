@@ -184,11 +184,11 @@ describe("handleCreateInvoice", () => {
     expect(JSON.parse(body).amount).toBe(750_000);
   });
 
-  it("mints a contract-shaped reference: GOSTAY-{MERCHANT}-{YYYYMMDD}-{ACAK}", async () => {
+  it("mints a reference {MERCHANT}-{YYYYMMDD}-{ACAK} — tanpa kata GOSTAY (Nexus yang menambahkannya)", async () => {
     await handleCreateInvoice({ bookingReference: "BK-1001" });
     const [, reference, body] = nexusHttp.createNexusPayment.mock.calls[0];
     // Crockford Base32: tanpa I, L, O, U. Jenis transaksi TIDAK dikodekan.
-    expect(reference).toMatch(/^GOSTAY-LOR-KALI-\d{8}-[0-9A-HJKMNP-TV-Z]{8}$/);
+    expect(reference).toMatch(/^LORKALI-\d{8}-[0-9A-HJKMNP-TV-Z]{8}$/);
     expect(JSON.parse(body).reference).toBe(reference);
   });
 

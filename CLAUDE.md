@@ -70,7 +70,9 @@ App code Nexus: `gostay`; merchant = hotel (external_ref = tenant_id).
 
 - **Buat invoice**: `handleCreateInvoice` → Nexus `POST /v1/payments`
   (`api/_lib/payment/nexus.ts`; kunci `NEXUS_API_KEY_SANDBOX|PRODUCTION`).
-  Reference `GOSTAY-{HOTEL}-{YYYYMMDD}-{ACAK}`; pemetaan reference→booking di
+  Reference `{HOTEL}-{YYYYMMDD}-{ACAK}` (hotel tanpa pemisah, mis. `LORKALI`;
+  TANPA kata GOSTAY — Nexus sendiri yang menambahkan kode app di external_id,
+  jadi di Xendit terbaca `GOSTAY-LORKALI-…`); pemetaan reference→booking di
   tabel `nexus_references` (migration 048) — body request disimpan dan dikirim
   ulang byte-per-byte saat retry (Idempotency-Key Nexus terikat hash body).
 - **Settlement**: Nexus → `POST /api/payment/nexus`, tanda tangan

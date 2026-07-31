@@ -33,9 +33,9 @@ describe("reference", () => {
     }
   });
 
-  it("merchant code: slug hotel → huruf besar, non-alfanumerik jadi '-'", () => {
-    expect(merchantCodeFor("lor-kali")).toBe("LOR-KALI");
-    expect(merchantCodeFor("hotel bintang 5!")).toBe("HOTEL-BINTANG-5");
+  it("merchant code: slug hotel → huruf besar, TANPA pemisah apa pun", () => {
+    expect(merchantCodeFor("lor-kali")).toBe("LORKALI");
+    expect(merchantCodeFor("hotel bintang 5!")).toBe("HOTELBINTANG5");
     expect(merchantCodeFor(null)).toBe("HOTEL");
   });
 
@@ -45,11 +45,13 @@ describe("reference", () => {
     expect(jakartaYyyymmdd(new Date("2026-07-30T16:59:00Z"))).toBe("20260730");
   });
 
-  it("bentuk penuh: GOSTAY-{MERCHANT}-{YYYYMMDD}-{ACAK}, charset aman, ≤64 char", () => {
+  it("bentuk penuh: {MERCHANT}-{YYYYMMDD}-{ACAK} — tanpa 'GOSTAY' (Nexus yang menambahkannya)", () => {
     const ref = newNexusReference("lor-kali", new Date("2026-07-31T03:00:00Z"));
-    expect(ref).toMatch(/^GOSTAY-LOR-KALI-20260731-[0-9A-HJKMNP-TV-Z]{8}$/);
+    expect(ref).toMatch(/^LORKALI-20260731-[0-9A-HJKMNP-TV-Z]{8}$/);
     expect(ref).toMatch(/^[A-Z0-9-]+$/);
     expect(ref.length).toBeLessThanOrEqual(64);
+    // external_id di provider menjadi GOSTAY-LORKALI-… — persis satu kata GOSTAY.
+    expect(`GOSTAY-${ref}`).not.toContain("GOSTAY-GOSTAY");
   });
 });
 
