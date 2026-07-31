@@ -24,7 +24,7 @@ import { getOrCreateCustomer } from "@/services/bookingService";
 import { createCallLog } from "@/services/callLogService";
 import type { CallLogInsert, RoomType } from "@/types/database.types";
 
-type Status = "idle" | "connecting" | "live" | "saving" | "saved";
+type Status = "idle" | "connecting" | "live" | "saving" | "saved" | "save_failed";
 interface Line {
   who: "ai" | "guest";
   text: string;
@@ -67,6 +67,7 @@ export default function VoiceAI() {
   const micRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const startedAtRef = useRef<number>(0);
+  const durationRef = useRef<number>(0);
   const roomTypesRef = useRef<RoomType[]>([]);
   const linesRef = useRef<Line[]>([]);
   linesRef.current = lines;
@@ -261,9 +262,20 @@ export default function VoiceAI() {
   }
 
   async function stopAndSave() {
-    const durationSeconds = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
+    durationRef.current = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
     teardown();
+    await saveLog();
+  }
+
+  /**
+   * Menyimpan jejak percakapan. SENGAJA dua tahap yang tidak saling menjatuhkan:
+   * kegagalan membuat tamu CRM tidak boleh ikut menenggelamkan log panggilan —
+   * log adalah jejak utamanya. Dan kalau penyimpanan tetap gagal, transkrip
+   * masih di layar dan tombol "Coba simpan lagi" mengulang fungsi ini.
+   */
+  async function saveLog() {
     setStatus("saving");
+    setError(null);
     try {
       const convo = linesRef.current;
       const transcript = convo.map((l) => `${l.who === "ai" ? "AI" : "Tamu"}: ${l.text}`).join("\n");
@@ -272,22 +284,27 @@ export default function VoiceAI() {
         `[Resepsionis AI] ${firstAsk ? `Penelepon: ${firstAsk.slice(0, 160)}` : "Percakapan uji tanpa ucapan tamu"}`;
 
       // Nomor (simulasi) diisi → tamu CRM ikut tercatat, konvensi walk-in/WA.
+      // Best-effort: gagal di sini hanya kehilangan tautan tamu, bukan log-nya.
       let customerId: string | null = null;
       if (callerPhone.trim()) {
-        const customer = await getOrCreateCustomer({
-          full_name: callerPhone.trim(),
-          email: null,
-          phone: callerPhone.trim(),
-          nationality: null,
-          profile_id: null,
-        });
-        customerId = customer.id;
+        try {
+          const customer = await getOrCreateCustomer({
+            full_name: callerPhone.trim(),
+            email: null,
+            phone: callerPhone.trim(),
+            nationality: null,
+            profile_id: null,
+          });
+          customerId = customer.id;
+        } catch (e) {
+          console.error("[voice-ai] tamu CRM gagal dibuat:", (e as Error).message);
+        }
       }
 
       const payload = {
         caller_phone: callerPhone.trim() || "simulasi-browser",
         direction: "inbound",
-        duration_seconds: durationSeconds,
+        duration_seconds: durationRef.current,
         summary,
         customer_id: customerId,
         follow_up: followUp,
@@ -303,8 +320,8 @@ export default function VoiceAI() {
       setStatus("saved");
       toast({ title: "Tersimpan", description: "Percakapan masuk ke Log Panggilan (sumber: AI)." });
     } catch (e) {
-      setStatus("idle");
-      setError(`Percakapan selesai tapi gagal disimpan: ${(e as Error).message}`);
+      setStatus("save_failed");
+      setError(`Log belum tersimpan: ${(e as Error).message}`);
     }
   }
 
@@ -359,6 +376,10 @@ export default function VoiceAI() {
             ) : status === "saving" ? (
               <button disabled className="bg-muted text-muted-foreground px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" /> Menyimpan…
+              </button>
+            ) : status === "save_failed" ? (
+              <button onClick={saveLog} className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
+                <Loader2 className="w-4 h-4" /> Coba simpan lagi
               </button>
             ) : (
               <button onClick={stopAndSave} className="bg-destructive text-destructive-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
