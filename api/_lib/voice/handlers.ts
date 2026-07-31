@@ -135,12 +135,16 @@ async function findOrCreateCustomerByPhone(
   phone: string,
   name: string | null,
 ): Promise<{ id: string; created: boolean }> {
-  const digits = phone.replace(/\D/g, "");
+  // Kanonik: awalan 0 → 62, lalu cocokkan EKOR nomor — data lama menyimpan
+  // "+62…", "62…", dan "08…" berdampingan untuk orang yang sama.
+  const raw = phone.replace(/\D/g, "");
+  const digits = raw.startsWith("0") ? `62${raw.slice(1)}` : raw;
   if (!digits) throw new Error("caller_phone_invalid");
+  const tail = digits.startsWith("62") ? digits.slice(2) : digits;
 
   const found = await serviceGet(
     `customers?tenant_id=eq.${encodeURIComponent(tenantId)}` +
-      `&phone=ilike.${encodeURIComponent(`%${digits}%`)}&select=id&limit=1`,
+      `&phone=ilike.${encodeURIComponent(`%${tail}`)}&select=id&limit=1`,
   );
   if (!found.ok) throw new Error(`customer_lookup_${found.status}`);
   const rows = (await found.json()) as Array<{ id: string }>;
