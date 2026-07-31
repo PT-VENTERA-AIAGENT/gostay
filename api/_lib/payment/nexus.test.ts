@@ -151,7 +151,7 @@ describe("ensureNexusMerchant / listNexusPaymentsUpdatedSince", () => {
       return new Response("{}", { status: 201 });
     }) as unknown as typeof fetch;
     await ensureNexusMerchant("sandbox", { tenantId: "tn-1", hotelSlug: "lor-kali", hotelName: "Lor Kali" }, fakeFetch);
-    expect(sent).toEqual({ external_ref: "tn-1", code: "LOR-KALI", name: "Lor Kali" });
+    expect(sent).toEqual({ external_ref: "tn-1", code: "LORKALI", name: "Lor Kali" });
   });
 
   it("membaca daftar rekonsiliasi dari amplop { data: [...] }", async () => {
