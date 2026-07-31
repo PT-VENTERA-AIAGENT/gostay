@@ -3,7 +3,7 @@
 // helpers already established for the WhatsApp webhook (api/_lib/wa/client.ts) —
 // they are domain-neutral CRUD wrappers, not WA-specific.
 
-import { serviceGet, serviceInsert, isConfigured } from "../wa/client";
+import { serviceGet, serviceInsert, serviceUpdate, isConfigured } from "../wa/client";
 import type { PaymentMode } from "./xendit";
 
 export { isConfigured };
@@ -90,8 +90,10 @@ export interface RecordPaymentInput {
   tenantId: string;
   bookingId: string;
   amount: number;
-  gatewayRef: string;   // invoice id
+  gatewayRef: string;   // invoice id (Xendit) / payment id (Nexus)
   mode: PaymentMode;    // stamped as payment_env
+  /** Prosesor yang menyelesaikannya. Default 'xendit' (jalur callback lama). */
+  gateway?: "xendit" | "nexus";
 }
 
 /**
@@ -105,18 +107,127 @@ export interface RecordPaymentInput {
  */
 export async function recordGatewayPayment(input: RecordPaymentInput): Promise<"recorded" | "duplicate"> {
   if (await gatewayRefExists(input.gatewayRef)) return "duplicate";
+  const gateway = input.gateway ?? "xendit";
   const res = await serviceInsert("payments", {
     tenant_id: input.tenantId,
     booking_id: input.bookingId,
     amount: input.amount,
     method: "transfer",
-    gateway: "xendit",
+    gateway,
     gateway_ref: input.gatewayRef,
     payment_env: input.mode,
-    note: `Gateway ${input.mode} — ${input.gatewayRef}`,
+    note: `Gateway ${gateway} ${input.mode} — ${input.gatewayRef}`,
   });
   // A concurrent webhook that wins the race trips the UNIQUE index → 409.
   if (res.status === 409) return "duplicate";
   if (!res.ok) throw new Error(`payment_insert_failed_${res.status}`);
   return "recorded";
+}
+
+// ─── Ventera-Nexus (migration 048) ───────────────────────────────────────────
+// Pemetaan reference → booking, idempotensi callback, dan kursor rekonsiliasi.
+// Jenis transaksi tidak dikodekan di dalam reference (kontrak Nexus §3), jadi
+// tabel inilah satu-satunya cara membaca sebuah callback kembali ke booking-nya.
+
+export interface NexusReferenceRow {
+  reference: string;
+  booking_id: string;
+  tenant_id: string;
+  environment: "sandbox" | "production";
+  amount: number;
+  request_body: string;
+  nexus_payment_id: string | null;
+  checkout_url: string | null;
+  status: string;
+}
+
+const NEXUS_REF_SELECT =
+  "reference,booking_id,tenant_id,environment,amount,request_body,nexus_payment_id,checkout_url,status";
+
+export async function getNexusReference(reference: string): Promise<NexusReferenceRow | null> {
+  const res = await serviceGet(
+    `nexus_references?reference=eq.${encodeURIComponent(reference)}&select=${NEXUS_REF_SELECT}&limit=1`,
+  );
+  if (!res.ok) throw new Error(`nexus_reference_read_failed_${res.status}`);
+  const rows = (await res.json()) as NexusReferenceRow[];
+  return rows[0] ?? null;
+}
+
+/**
+ * Pembayaran Nexus yang masih berjalan untuk sebuah booking, bila ada. Dipakai
+ * handleCreateInvoice agar tamu yang meminta tautan dua kali menerima INVOICE
+ * YANG SAMA — bukan invoice kedua yang berlomba dengan yang pertama.
+ */
+export async function getOpenNexusReference(
+  bookingId: string,
+  environment: string,
+  amount: number,
+): Promise<NexusReferenceRow | null> {
+  const res = await serviceGet(
+    `nexus_references?booking_id=eq.${encodeURIComponent(bookingId)}` +
+      `&environment=eq.${encodeURIComponent(environment)}` +
+      `&amount=eq.${amount}` +
+      `&status=in.(created,requires_payment,pending)` +
+      `&select=${NEXUS_REF_SELECT}&order=created_at.desc&limit=1`,
+  );
+  if (!res.ok) throw new Error(`nexus_reference_read_failed_${res.status}`);
+  const rows = (await res.json()) as NexusReferenceRow[];
+  return rows[0] ?? null;
+}
+
+export async function insertNexusReference(row: {
+  reference: string;
+  booking_id: string;
+  tenant_id: string;
+  environment: string;
+  amount: number;
+  request_body: string;
+}): Promise<void> {
+  const res = await serviceInsert("nexus_references", row);
+  if (!res.ok) throw new Error(`nexus_reference_insert_failed_${res.status}`);
+}
+
+export async function updateNexusReference(
+  reference: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const res = await serviceUpdate(
+    `nexus_references?reference=eq.${encodeURIComponent(reference)}`,
+    { ...patch, updated_at: new Date().toISOString() },
+  );
+  if (!res.ok) throw new Error(`nexus_reference_update_failed_${res.status}`);
+}
+
+/**
+ * Catat sebuah X-Nexus-Event-Id. True bila BARU (proses lanjut), false bila
+ * sudah pernah (callback duplikat/percobaan ulang — balas 200 tanpa efek).
+ */
+export async function markNexusEventProcessed(eventId: string): Promise<boolean> {
+  const res = await serviceInsert("nexus_processed_events", { event_id: eventId });
+  if (res.status === 409) return false;
+  if (!res.ok) throw new Error(`nexus_event_insert_failed_${res.status}`);
+  return true;
+}
+
+/** Kursor rekonsiliasi per environment; null bila belum pernah jalan. */
+export async function getNexusReconcileCursor(environment: string): Promise<string | null> {
+  const res = await serviceGet(
+    `nexus_reconcile_state?environment=eq.${encodeURIComponent(environment)}&select=last_success&limit=1`,
+  );
+  if (!res.ok) throw new Error(`nexus_cursor_read_failed_${res.status}`);
+  const rows = (await res.json()) as Array<{ last_success: string | null }>;
+  return rows[0]?.last_success ?? null;
+}
+
+/** Disimpan HANYA setelah seluruh halaman selesai diproses (kontrak §7). */
+export async function setNexusReconcileCursor(
+  environment: string,
+  lastSuccessIso: string,
+): Promise<void> {
+  const res = await serviceInsert(
+    "nexus_reconcile_state",
+    { environment, last_success: lastSuccessIso, updated_at: new Date().toISOString() },
+    "resolution=merge-duplicates,return=minimal",
+  );
+  if (!res.ok) throw new Error(`nexus_cursor_write_failed_${res.status}`);
 }

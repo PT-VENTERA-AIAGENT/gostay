@@ -63,19 +63,33 @@ yang sudah migrasi LID "sukses" (dapat messageId) tapi tidak pernah tiba.
   gateway; kiriman yang tertahan DIANTRE (FIFO per kontak), tidak dibuang —
   dulu dibuang, dan itu sebabnya pesan ke-2 dan ke-3 tak pernah tiba.
 
-## Pembayaran — riwayatnya menyesatkan
+## Pembayaran — via Ventera-Nexus (sejak 31 Jul 2026)
 
-- **Buat invoice**: GoStay memanggil **Xendit LANGSUNG**
-  (`api.xendit.co/v2/invoices`, kunci `XENDIT_API_KEY_PRODUCTION` /
-  `XENDIT_API_KEY_SANDBOX`). Komentar lama soal "gateway membuat invoice"
-  salah — layanan Ventera itu hanya router callback.
-- **Settlement**: Xendit → "Xendit Unified Callback Gateway" milik Ventera
-  (merutekan berdasar prefix `GOSTAY-` di external_id) → GoStay
-  `POST /api/payment/webhook` dengan `x-internal-token` =
-  `INTERNAL_TOKEN_PRODUCTION` | `INTERNAL_TOKEN_SANDBOX` (token yang cocok
-  menentukan stamp live/test).
+Kontrak resmi: repo `PT-VENTERA-AIAGENT/ventera-nexus` → `docs/INTEGRASI.md`.
+App code Nexus: `gostay`; merchant = hotel (external_ref = tenant_id).
+
+- **Buat invoice**: `handleCreateInvoice` → Nexus `POST /v1/payments`
+  (`api/_lib/payment/nexus.ts`; kunci `NEXUS_API_KEY_SANDBOX|PRODUCTION`).
+  Reference `GOSTAY-{HOTEL}-{YYYYMMDD}-{ACAK}`; pemetaan reference→booking di
+  tabel `nexus_references` (migration 048) — body request disimpan dan dikirim
+  ulang byte-per-byte saat retry (Idempotency-Key Nexus terikat hash body).
+- **Settlement**: Nexus → `POST /api/payment/nexus`, tanda tangan
+  `X-Nexus-Signature` = HMAC(secret, "{ts}.{raw body}")
+  (`NEXUS_SIGNING_SECRET_*`; environment sah = yang secret-nya cocok, header
+  tidak dipercaya). Idempoten pada `X-Nexus-Event-Id`
+  (`nexus_processed_events`); status tidak pernah mundur.
+- **Rekonsiliasi** (yang MENJAMIN; callback hanya percepatan):
+  `GET /api/payment/reconcile` — cron Vercel harian (batas plan Hobby; kontrak
+  minta 15 menit — kalau naik Pro ganti jadwalnya) + bisa dipicu manual dengan
+  `x-internal-token`. Kursor per environment di `nexus_reconcile_state`.
+- **Jalur LAMA masih hidup untuk invoice pra-migrasi**: Xendit → gateway
+  callback Ventera → `POST /api/payment/webhook` (`x-internal-token` =
+  `INTERNAL_TOKEN_*`). Jangan dihapus selama masih ada invoice lama outstanding.
+  JANGAN memindahkan URL webhook akun Xendit production ke nexus-webhook tanpa
+  rencana: akun Xendit production-nya DIPAKAI BERSAMA GoStay & Nexus.
 - **Saldo hotel**: fee platform **7%** (700 bps, `payment_config`), kredit
-  net-of-fee via trigger DB (migration 031/036), tarik saldo = tabel `payouts`.
+  net-of-fee via trigger DB (migration 031/036) — jalan untuk gateway `nexus`
+  maupun `xendit`; tarik saldo = tabel `payouts`.
 
 ## Peran & RLS
 
