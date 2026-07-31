@@ -6,13 +6,13 @@
 // Secret: WA_OUTBOUND_WEBHOOK_SECRET (separate from the booking bot secret).
 
 import { timingSafeEqual } from "node:crypto";
-import { serviceConfig, serviceGet, serviceInsert } from "../../_lib/wa/client";
+import { serviceConfig, serviceGet, serviceInsert } from "../wa/client";
 import {
   parseMessages,
   isDirectChat,
   sessionIdOf,
   receivedAtOf,
-} from "../../_lib/wa/inbound";
+} from "../wa/inbound";
 import { handleLeadConversation } from "./converse";
 
 function outboundSession() {

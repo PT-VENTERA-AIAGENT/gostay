@@ -25,6 +25,7 @@ import RoomTypes from "./pages/RoomTypes";
 import RoomTypeDetail from "./pages/RoomTypeDetail";
 import Chat from "./pages/Chat";
 import CallLogs from "./pages/CallLogs";
+import VoiceAI from "./pages/VoiceAI";
 import NewCallLog from "./pages/NewCallLog";
 import GuestRequests from "./pages/GuestRequests";
 import Analytics from "./pages/Analytics";
@@ -147,6 +148,7 @@ const App = () => (
               <Route path="/rooms/types/:id" element={<RoomTypeDetail />} />
               <Route path="/chat" element={<Chat />} />
               <Route path="/calls" element={<CallLogs />} />
+              <Route path="/voice-ai" element={<VoiceAI />} />
               <Route path="/calls/new" element={<NewCallLog />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/reviews" element={<Reviews />} />
