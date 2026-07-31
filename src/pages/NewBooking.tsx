@@ -60,7 +60,9 @@ export default function NewBooking() {
   const total = rate * nights;
 
   const datesValid = Boolean(checkIn && checkOut) && nights > 0;
-  const canSubmit = Boolean(fullName.trim() && email.trim() && datesValid && roomTypeId && (availableRooms?.length ?? 0) > 0) && !submitting;
+  // Email ATAU telepon — tamu walk-in sering hanya meninggalkan nomor HP, dan
+  // mewajibkan email berarti tamu offline tidak pernah masuk CRM.
+  const canSubmit = Boolean(fullName.trim() && (email.trim() || phone.trim()) && datesValid && roomTypeId && (availableRooms?.length ?? 0) > 0) && !submitting;
 
   const roomsForType = useMemo(() => availableRooms ?? [], [availableRooms]);
 
@@ -94,7 +96,7 @@ export default function NewBooking() {
       // reuses an existing guest instead of creating a duplicate.
       const customer = linkedCustomer ?? await getOrCreateCustomer({
         full_name: fullName.trim(),
-        email: email.trim(),
+        email: email.trim() || null,
         phone: phone.trim() || null,
         nationality: nationality.trim() || null,
         profile_id: null,
@@ -193,7 +195,7 @@ export default function NewBooking() {
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/50 disabled:text-muted-foreground" placeholder="Guest name" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Email")}</label>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Email")} <span className="text-muted-foreground font-normal">({t("optional if phone is filled")})</span></label>
                   <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={Boolean(linkedCustomer)}
                     className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/50 disabled:text-muted-foreground" placeholder="guest@email.com" />
                 </div>
