@@ -6,7 +6,7 @@
 // pertama kali muncul. `profiles.tenant_id` hanya bisa menyimpan SATU hotel,
 // sementara seorang tamu bisa menjadi tamu di beberapa hotel sekaligus.
 import { describe, it, expect } from "vitest";
-import { pickTenant, isWrongHotel, type TenantChoice } from "./useTenant";
+import { pickTenant, isWrongHotel, slugHintFor, type TenantChoice } from "./useTenant";
 
 const lorKali: TenantChoice = { id: "t-lor", slug: "lor-kali", name: "Lor Kali" };
 const kopiRintik: TenantChoice = { id: "t-kopi", slug: "gostay", name: "Kopi Rintik" };
@@ -39,6 +39,34 @@ describe("pickTenant", () => {
     const picked = pickTenant([kopiRintik], "hotel-yang-tidak-ada", "t-kopi");
     expect(picked).toBe(kopiRintik);
     expect(isWrongHotel("hotel-yang-tidak-ada", picked)).toBe(true);
+  });
+});
+
+describe("slugHintFor", () => {
+  // Bug produksi 31 Jul 2026: admin Lor Kali login di laptop lain dan disuguhi
+  // dashboard berkop Kopi Rintik. Browser segar tak punya localStorage, jadi
+  // slug jatuh ke VITE_TENANT_SLUG build produksi ("gostay" = Kopi Rintik) —
+  // dan sejak 045 admin yang pernah jadi tamu di sana BISA membaca barisnya,
+  // sehingga pickTenant memilihnya mengalahkan hotel si admin sendiri.
+  it("kills the browser-supplied slug for admin and staff", () => {
+    expect(slugHintFor("admin", "gostay")).toBeNull();
+    expect(slugHintFor("staff", "gostay")).toBeNull();
+  });
+
+  it("keeps the slug for guests, whose visits it exists to serve", () => {
+    expect(slugHintFor("customer", "lor-kali")).toBe("lor-kali");
+  });
+
+  it("keeps the slug for anonymous visitors, who have no role yet", () => {
+    expect(slugHintFor(null, "lor-kali")).toBe("lor-kali");
+  });
+
+  it("with the hint dead, an admin lands on their own hotel", () => {
+    // Rangkaian penuh gejalanya: baris Kopi Rintik terbaca (045), slug build
+    // menunjuk ke sana, tapi admin Lor Kali tetap membuka Lor Kali.
+    const slug = slugHintFor("admin", "gostay");
+    const picked = pickTenant([kopiRintik, lorKali], slug, "t-lor");
+    expect(picked).toBe(lorKali);
   });
 });
 

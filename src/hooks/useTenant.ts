@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { currentTenantSlug } from "@/lib/tenant";
+import type { UserRole } from "@/types/database.types";
 
 export interface Tenant {
   id: string;
@@ -87,6 +88,24 @@ export function isWrongHotel(slug: string | null, picked: TenantChoice | null): 
 }
 
 /**
+ * Petunjuk slug yang boleh dipakai untuk peran ini.
+ *
+ * Slug kunjungan datang dari browser — URL `?hotel=`, localStorage bekas
+ * kunjungan lama, atau `VITE_TENANT_SLUG` yang ter-bake di build. Semuanya
+ * konteks TAMU. Bagi staf/admin, petunjuk itu harus mati: migration 046 sudah
+ * mengunci bacaan data mereka ke hotelnya sendiri, tapi shell UI masih mengikuti
+ * slug — dan sejak 045 seorang admin yang juga pernah jadi tamu di hotel lain
+ * BISA membaca baris tenants hotel itu. Gabungan keduanya membuat admin Lor Kali
+ * membuka dashboard berkop "Kopi Rintik" hanya karena browsernya membawa slug
+ * default build. Nama hotel yang salah di atas data hotel yang benar lebih
+ * berbahaya daripada keduanya salah: QR WhatsApp pun di-scan atas nama hotel
+ * yang keliru.
+ */
+export function slugHintFor(role: UserRole | null, slug: string | null): string | null {
+  return role === "admin" || role === "staff" ? null : slug;
+}
+
+/**
  * The hotel (tenant) this page is about.
  *
  * Staff read exactly one row — their own hotel — so the choice is trivial for
@@ -98,13 +117,13 @@ export function isWrongHotel(slug: string | null, picked: TenantChoice | null): 
  *
  * So the hotel is chosen, in order:
  *   1. the slug this visit is for (`?hotel=`, remembered for the visit) —
- *      the guest arrived through a specific hotel's door;
+ *      the guest arrived through a specific hotel's door — GUESTS ONLY;
  *   2. the profile's own hotel, for staff and for a guest with no hint;
  *   3. whatever single row came back, which is the staff case anyway.
  */
 export function useTenant() {
-  const { session } = useAuth();
-  const slug = currentTenantSlug();
+  const { session, role } = useAuth();
+  const slug = slugHintFor(role, currentTenantSlug());
 
   const query = useQuery({
     queryKey: ["tenant", session?.profile_id ?? "anon", slug ?? "-"],
