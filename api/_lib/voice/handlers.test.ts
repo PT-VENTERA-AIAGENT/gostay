@@ -170,6 +170,15 @@ describe("handleVoiceCallEnded", () => {
     });
   });
 
+  it("normalises 08… to 62… and matches by tail — no duplicate for +62 guests", async () => {
+    stubDb({ customerExists: true });
+    const r = await handleVoiceCallEnded(SECRET, { ...payload, caller_phone: "083862927534" });
+    expect(r).toMatchObject({ ok: true, customerCreated: false });
+    const lookup = client.serviceGet.mock.calls.find((c) => String(c[0]).startsWith("customers?"))![0] as string;
+    // Ekor tanpa kode negara: cocok untuk "+62838…", "62838…", maupun "0838…".
+    expect(decodeURIComponent(lookup)).toContain("phone=ilike.%83862927534");
+  });
+
   it("links an EXISTING guest instead of duplicating them", async () => {
     stubDb({ customerExists: true });
     const r = await handleVoiceCallEnded(SECRET, payload);

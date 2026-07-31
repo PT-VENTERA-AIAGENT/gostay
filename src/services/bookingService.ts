@@ -289,11 +289,22 @@ export async function searchCustomers(query: string): Promise<Customer[]> {
  * tanpa email disimpan dengan placeholder `phone-<nomor>@noreply.ventera.id` —
  * konvensi yang sama dengan tamu yang diprovisi dari WhatsApp.
  */
+
+/**
+ * Digit nomor Indonesia dalam bentuk kanonik: awalan 0 → 62. "083862927534"
+ * dan "+6283862927534" adalah ORANG YANG SAMA, dan tanpa normalisasi ini tamu
+ * yang sudah tersimpan "+62…" digandakan setiap kali staf mengetik "08…".
+ */
+export function canonicalPhoneDigits(phone: string | null | undefined): string {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  return digits.startsWith("0") ? `62${digits.slice(1)}` : digits;
+}
+
 export async function getOrCreateCustomer(
   payload: Omit<CustomerInsert, "email"> & { email?: string | null }
 ): Promise<Customer> {
   const email = (payload.email ?? "").trim();
-  const phoneDigits = (payload.phone ?? "").replace(/\D/g, "");
+  const phoneDigits = canonicalPhoneDigits(payload.phone);
 
   if (email) {
     const { data: byEmail } = await supabase
@@ -305,12 +316,14 @@ export async function getOrCreateCustomer(
   }
 
   if (phoneDigits) {
-    // ilike pada digit, bukan eq: data lama menyimpan "+62…" dan "62…"
-    // berdampingan, dan dua bentuk itu adalah tamu yang sama.
+    // Cocokkan EKOR nomor (tanpa kode negara/awalan), bukan string utuh:
+    // data lama menyimpan "+62…", "62…", dan "08…" berdampingan untuk tamu
+    // yang sama, dan ekor digitlah bagian yang stabil di antara semuanya.
+    const tail = phoneDigits.startsWith("62") ? phoneDigits.slice(2) : phoneDigits;
     const { data: byPhone } = await supabase
       .from("customers")
       .select("*")
-      .ilike("phone", `%${phoneDigits}%`)
+      .ilike("phone", `%${tail}`)
       .limit(1);
     if (byPhone?.[0]) return byPhone[0];
   }
@@ -323,6 +336,7 @@ export async function getOrCreateCustomer(
     .from("customers")
     .insert({
       ...payload,
+      phone: phoneDigits || payload.phone || null,
       email: email || `phone-${phoneDigits}@noreply.ventera.id`,
     })
     .select()
