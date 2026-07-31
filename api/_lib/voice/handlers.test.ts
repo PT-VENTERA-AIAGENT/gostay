@@ -45,20 +45,25 @@ describe("handleVoiceSession", () => {
     );
   }
 
-  it("mints an ephemeral session for an active staff JWT", async () => {
+  it("mints an ephemeral session (bentuk GA client_secrets) for an active staff JWT", async () => {
     profileRow("staff");
-    const fakeFetch = (async (_url: string, init: RequestInit) => {
+    const fakeFetch = (async (url: string, init: RequestInit) => {
+      // Jalur beta /v1/realtime/sessions sudah 404 di produksi — GA wajib.
+      expect(url).toContain("/v1/realtime/client_secrets");
       const sent = JSON.parse(String(init.body));
-      expect(sent.model).toBe("gpt-realtime"); // default
+      expect(sent.session).toMatchObject({ type: "realtime", model: "gpt-realtime" });
+      expect(sent.session.audio.output.voice).toBe("marin");
       const h = init.headers as Record<string, string>;
       expect(h.Authorization).toBe("Bearer sk-uji");
-      return jsonResponse({ client_secret: { value: "ek_abc" } });
+      return jsonResponse({ value: "ek_abc", expires_at: 1234567890 });
     }) as unknown as typeof fetch;
 
     const r = await handleVoiceSession(`Bearer ${staffJwt()}`, fakeFetch);
     expect(r).toMatchObject({ ok: true, status: 200 });
     if (r.ok) {
+      // Dinormalkan ke client_secret.value — kontrak yang dibaca halaman.
       expect((r.payload.client_secret as { value: string }).value).toBe("ek_abc");
+      expect(r.payload.model).toBe("gpt-realtime");
     }
   });
 

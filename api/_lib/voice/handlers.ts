@@ -20,12 +20,14 @@ import { getOrCreateBotProfile } from "../wa/crm";
 
 // ─── session ─────────────────────────────────────────────────────────────────
 
-const OPENAI_REALTIME_SESSIONS_URL = "https://api.openai.com/v1/realtime/sessions";
+// Endpoint GA. Jalur beta lama (/v1/realtime/sessions) sudah PENSIUN — ia
+// menjawab 404 "Invalid URL", ditemukan saat verifikasi produksi 31 Jul 2026.
+const OPENAI_REALTIME_CLIENT_SECRETS_URL = "https://api.openai.com/v1/realtime/client_secrets";
 
 function realtimeConfig() {
   return {
     apiKey: process.env.OPENAI_API_KEY,
-    sessionsUrl: process.env.VOICE_REALTIME_SESSIONS_URL ?? OPENAI_REALTIME_SESSIONS_URL,
+    sessionsUrl: process.env.VOICE_REALTIME_SESSIONS_URL ?? OPENAI_REALTIME_CLIENT_SECRETS_URL,
     model: process.env.VOICE_REALTIME_MODEL ?? "gpt-realtime",
     voice: process.env.VOICE_REALTIME_VOICE ?? "marin",
   };
@@ -76,14 +78,31 @@ export async function handleVoiceSession(
   const res = await fetchImpl(sessionsUrl, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, voice }),
+    // Bentuk GA: konfigurasi sesi dibungkus `session`, suara di audio.output.
+    body: JSON.stringify({
+      session: {
+        type: "realtime",
+        model,
+        audio: { output: { voice } },
+      },
+    }),
   });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     console.error(`[voice] mint sesi gagal HTTP ${res.status}:`, JSON.stringify(body).slice(0, 300));
     return { ok: false, status: 502, error: "realtime_session_failed" };
   }
-  return { ok: true, status: 200, payload: { ...body, model } };
+  // GA membalas { value, expires_at, session } — dinormalkan ke bentuk yang
+  // dibaca halaman (client_secret.value), supaya klien tidak peduli versi API.
+  const value = typeof body.value === "string" ? body.value : undefined;
+  return {
+    ok: true,
+    status: 200,
+    payload: {
+      client_secret: { value, expires_at: body.expires_at },
+      model,
+    },
+  };
 }
 
 // ─── call-ended ──────────────────────────────────────────────────────────────

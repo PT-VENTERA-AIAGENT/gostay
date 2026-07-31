@@ -129,8 +129,8 @@ export default function VoiceAI() {
       pushLine("guest", String(ev.transcript ?? ""));
       return;
     }
-    // Transkrip jawaban AI.
-    if (type === "response.audio_transcript.done") {
+    // Transkrip jawaban AI — nama event GA dan beta didengarkan dua-duanya.
+    if (type === "response.output_audio_transcript.done" || type === "response.audio_transcript.done") {
       pushLine("ai", String(ev.transcript ?? ""));
       return;
     }
@@ -210,9 +210,11 @@ export default function VoiceAI() {
       dc.onopen = () => {
         send({
           type: "session.update",
+          // Bentuk sesi GA: type wajib, transkripsi input di audio.input.
           session: {
+            type: "realtime",
             instructions: receptionistInstructions(tenantName, types),
-            input_audio_transcription: { model: "whisper-1" },
+            audio: { input: { transcription: { model: "whisper-1" } } },
             tools: [
               {
                 type: "function",
@@ -240,7 +242,8 @@ export default function VoiceAI() {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       const model = sess.model ?? "gpt-realtime";
-      const sdpRes = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
+      // Endpoint SDP GA (/v1/realtime/calls); jalur beta lama sudah 404.
+      const sdpRes = await fetch(`https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(model)}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${sess.client_secret.value}`, "Content-Type": "application/sdp" },
         body: offer.sdp,
