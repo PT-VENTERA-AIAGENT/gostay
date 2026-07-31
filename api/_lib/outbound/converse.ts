@@ -3,8 +3,8 @@
 // Returns { reply, action } and handles side-effects (update status, log, escalate).
 
 import Anthropic from "@anthropic-ai/sdk";
-import { serviceGet, serviceInsert, serviceUpdate } from "../../_lib/wa/client";
-import { sendText } from "../../_lib/wa/send";
+import { serviceGet, serviceInsert, serviceUpdate } from "../wa/client";
+import { sendText } from "../wa/send";
 
 export type ConversationAction =
   | "continue"

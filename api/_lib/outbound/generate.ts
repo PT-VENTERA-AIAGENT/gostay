@@ -3,9 +3,9 @@
 // The admin previews it in /admin/campaigns/:id before approving.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { requirePlatformAdmin } from "../../_lib/admin/platform-auth";
-import { authHeader, readJson, type VercelReq, type VercelRes } from "../../_lib/admin/http";
-import { serviceConfig, serviceHeaders, serviceGet, serviceInsert } from "../../_lib/wa/client";
+import { requirePlatformAdmin } from "../admin/platform-auth";
+import { authHeader, readJson, type VercelReq, type VercelRes } from "../admin/http";
+import { serviceConfig, serviceHeaders, serviceGet, serviceInsert } from "../wa/client";
 
 interface Lead {
   id: string;

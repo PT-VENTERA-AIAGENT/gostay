@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, PhoneIncoming, PhoneOutgoing, Flag, Loader2 } from "lucide-react";
+import { Plus, Search, PhoneIncoming, PhoneOutgoing, Flag, Loader2, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { motion } from "framer-motion";
@@ -67,9 +67,14 @@ export default function CallLogs() {
             <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("Call Logs")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{callLogs.length} logged · {followUpCount} follow-ups</p>
           </div>
-          <Link to="/calls/new" className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 self-start">
-            <Plus className="w-4 h-4" /> Log Call
-          </Link>
+          <div className="flex items-center gap-2 self-start">
+            <Link to="/voice-ai" className="border border-border text-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors flex items-center gap-2">
+              <Mic className="w-4 h-4" /> Resepsionis AI
+            </Link>
+            <Link to="/calls/new" className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Log Call
+            </Link>
+          </div>
         </div>
 
         <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">

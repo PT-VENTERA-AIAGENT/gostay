@@ -2,10 +2,10 @@
 // Admin-only. Requires the draft to be approved=true before sending.
 // Updates lead status → 'contacted' and draft → sent=true.
 
-import { requirePlatformAdmin } from "../../_lib/admin/platform-auth";
-import { authHeader, readJson, type VercelReq, type VercelRes } from "../../_lib/admin/http";
-import { serviceConfig, serviceHeaders, serviceGet, serviceInsert, serviceUpdate } from "../../_lib/wa/client";
-import { sendText } from "../../_lib/wa/send";
+import { requirePlatformAdmin } from "../admin/platform-auth";
+import { authHeader, readJson, type VercelReq, type VercelRes } from "../admin/http";
+import { serviceConfig, serviceHeaders, serviceGet, serviceInsert, serviceUpdate } from "../wa/client";
+import { sendText } from "../wa/send";
 
 function outboundSession(): string {
   return (process.env.WA_OUTBOUND_SESSION_ID ?? "").trim();
