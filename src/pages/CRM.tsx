@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/contexts/AuthContext";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -96,13 +97,33 @@ function getLastStay(customer: CustomerWithBookings): string | null {
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
-async function fetchCustomers(): Promise<CustomerWithBookings[]> {
-  const { data, error } = await supabase
+async function fetchCustomers(profileId: string | undefined): Promise<CustomerWithBookings[]> {
+  // Daftar tamu DIKUNCI ke tenant si penonton. RLS saja tidak cukup di sini:
+  // kebijakan "customer melihat data miliknya sendiri" tidak mengenal tenant
+  // (portal memang membutuhkannya), jadi staf yang juga pernah menjadi TAMU di
+  // hotel lain melihat baris customer + booking pribadinya di hotel lain ikut
+  // masuk daftar — dan Total Pendapatan CRM menjumlah pendapatan hotel lain.
+  // Terjadi nyata: CRM Lor Kali menampilkan Rp3.965.000 padahal pendapatan
+  // hotelnya Rp2.265.000 — selisihnya booking pribadi si admin di hotel lain.
+  let tenantId: string | null = null;
+  if (profileId) {
+    const { data: me } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", profileId)
+      .maybeSingle();
+    tenantId = (me?.tenant_id as string | null) ?? null;
+  }
+
+  let query = supabase
     .from("customers")
     .select(
       `*, bookings(*, rooms(room_types(name)))`
     )
     .order("created_at", { ascending: false });
+  if (tenantId) query = query.eq("tenant_id", tenantId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((row) => ({
     ...(row as Customer),
@@ -242,9 +263,10 @@ export default function CRM() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithBookings | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
 
+  const { user } = useAuth();
   const { data: customers = [], isLoading, error } = useQuery<CustomerWithBookings[]>({
-    queryKey: ["crm-customers"],
-    queryFn: fetchCustomers,
+    queryKey: ["crm-customers", user?.id],
+    queryFn: () => fetchCustomers(user?.id),
     staleTime: 60_000,
   });
 

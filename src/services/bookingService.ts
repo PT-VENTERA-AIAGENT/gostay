@@ -277,26 +277,54 @@ export async function searchCustomers(query: string): Promise<Customer[]> {
 }
 
 /**
- * Staff-side lookup. Matching on email only works for a caller who can see every
+ * Staff-side lookup. Matching only works for a caller who can see every
  * customer row — "Staff/admin can view all customers" in 002_rls_policies.sql.
  * A signed-in guest sees only their own record, so the lookup would always miss
  * and they would accumulate a duplicate customer row per booking. The portal
  * uses getOrCreateOwnCustomer below instead.
+ *
+ * Email boleh kosong: tamu walk-in/telepon sering hanya meninggalkan nomor HP,
+ * dan mewajibkan email berarti tamu offline tidak pernah masuk CRM. Pencarian
+ * mencoba email dulu, lalu telepon; kolom email database NOT NULL, jadi tamu
+ * tanpa email disimpan dengan placeholder `phone-<nomor>@noreply.ventera.id` —
+ * konvensi yang sama dengan tamu yang diprovisi dari WhatsApp.
  */
 export async function getOrCreateCustomer(
-  payload: CustomerInsert
+  payload: Omit<CustomerInsert, "email"> & { email?: string | null }
 ): Promise<Customer> {
-  const { data: existing } = await supabase
-    .from("customers")
-    .select("*")
-    .eq("email", payload.email)
-    .maybeSingle();
+  const email = (payload.email ?? "").trim();
+  const phoneDigits = (payload.phone ?? "").replace(/\D/g, "");
 
-  if (existing) return existing;
+  if (email) {
+    const { data: byEmail } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
+    if (byEmail) return byEmail;
+  }
+
+  if (phoneDigits) {
+    // ilike pada digit, bukan eq: data lama menyimpan "+62…" dan "62…"
+    // berdampingan, dan dua bentuk itu adalah tamu yang sama.
+    const { data: byPhone } = await supabase
+      .from("customers")
+      .select("*")
+      .ilike("phone", `%${phoneDigits}%`)
+      .limit(1);
+    if (byPhone?.[0]) return byPhone[0];
+  }
+
+  if (!email && !phoneDigits) {
+    throw new Error("Guest needs an email or a phone number.");
+  }
 
   const { data, error } = await supabase
     .from("customers")
-    .insert(payload)
+    .insert({
+      ...payload,
+      email: email || `phone-${phoneDigits}@noreply.ventera.id`,
+    })
     .select()
     .single();
   if (error) throw error;

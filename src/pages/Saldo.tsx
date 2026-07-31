@@ -35,7 +35,7 @@ export default function Saldo() {
   const stats = [
     { icon: Wallet, label: t("Saldo tersedia"), value: available, accent: "text-primary", highlight: true },
     { icon: TrendingUp, label: t("Total pendapatan reservasi"), value: balance?.lifetime_gross ?? 0, accent: "text-foreground" },
-    { icon: Scissors, label: `${t("Fee Ventera")} (${feePct}%)`, value: balance?.lifetime_fee ?? 0, accent: "text-destructive" },
+    { icon: Scissors, label: `${t("Fee GoStay")} (${feePct}%)`, value: balance?.lifetime_fee ?? 0, accent: "text-destructive" },
     { icon: Banknote, label: t("Total ditarik"), value: balance?.lifetime_withdrawn ?? 0, accent: "text-foreground" },
   ];
 
@@ -49,7 +49,7 @@ export default function Saldo() {
               <Wallet className="w-6 h-6 text-primary" /> {t("Saldo")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {t("Pendapatan reservasi masuk ke saldo setelah dipotong fee Ventera")} {feePct}%.
+              {t("Pendapatan reservasi masuk ke saldo setelah dipotong fee GoStay")} {feePct}%.
             </p>
           </div>
           <button
@@ -83,7 +83,7 @@ export default function Saldo() {
         <div className="bg-muted/40 border border-border rounded-xl p-4 mb-5 flex gap-3 text-sm text-muted-foreground">
           <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
           <p>
-            {t("Setiap pembayaran reservasi otomatis dipotong")} <span className="font-semibold text-destructive">{feePct}%</span> {t("untuk pemeliharaan Ventera")}.{" "}
+            {t("Setiap pembayaran reservasi otomatis dipotong")} <span className="font-semibold text-destructive">{feePct}%</span> {t("untuk pemeliharaan GoStay")}.{" "}
             {t("Contoh: pembayaran")} <span className="font-medium text-foreground">{formatIDR(1_000_000)}</span> → {t("fee")} <span className="font-medium text-destructive">{formatIDR(1_000_000 * feePct / 100)}</span>, {t("masuk saldo")} <span className="font-medium text-success">{formatIDR(1_000_000 * (1 - feePct / 100))}</span>.
           </p>
         </div>
