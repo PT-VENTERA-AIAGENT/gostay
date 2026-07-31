@@ -5,16 +5,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // (../wa/crm). Verifikasi JWT (../identity) tetap ASLI — token diuji dengan
 // tanda tangan sungguhan, karena gerbang itulah yang dites.
 
-const { client, crm } = vi.hoisted(() => ({
+const { client } = vi.hoisted(() => ({
   client: { serviceGet: vi.fn(), serviceInsert: vi.fn() },
-  crm: { getOrCreateBotProfile: vi.fn() },
 }));
 
 vi.mock("../wa/client", () => client);
-vi.mock("../wa/crm", () => crm);
 
 import { handleVoiceSession, handleVoiceCallEnded } from "./handlers";
-import { mintSupabaseToken } from "../identity";
+import { mintSupabaseToken, profileIdFor } from "../identity";
+
+/** Id deterministik profil "Resepsionis AI" milik tenant uji. */
+const VOICE_BOT_ID = () => profileIdFor("voice-bot:tn-1");
 
 const SECRET = "voice-secret-uji";
 
@@ -34,7 +35,6 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = "sk-uji";
   process.env.VOICE_WEBHOOK_SECRET = SECRET;
   delete process.env.VOICE_REALTIME_MODEL;
-  crm.getOrCreateBotProfile.mockResolvedValue("bot-profile-1");
 });
 
 // ─── session ─────────────────────────────────────────────────────────────────
@@ -123,6 +123,7 @@ describe("handleVoiceCallEnded", () => {
   function stubDb(opts: { customerExists?: boolean } = {}) {
     client.serviceGet.mockImplementation(async (path: string) => {
       if (path.startsWith("tenants?")) return jsonResponse([{ id: "tn-1" }]);
+      if (path.startsWith("profiles?")) return jsonResponse([]); // profil bot belum ada
       if (path.startsWith("customers?")) {
         return jsonResponse(opts.customerExists ? [{ id: "cust-lama" }] : []);
       }
@@ -130,6 +131,7 @@ describe("handleVoiceCallEnded", () => {
     });
     client.serviceInsert.mockImplementation(async (table: string) => {
       if (table === "customers") return jsonResponse([{ id: "cust-baru" }], 201);
+      if (table === "profiles") return jsonResponse([], 201);
       if (table === "call_logs") return jsonResponse([{ id: "log-1" }], 201);
       throw new Error(`unexpected insert ${table}`);
     });
@@ -156,10 +158,14 @@ describe("handleVoiceCallEnded", () => {
       phone: "62812000111",
     });
 
+    // Profil agen "Resepsionis AI" dibuat untuk tenant ini…
+    const [, botRow] = client.serviceInsert.mock.calls.find((c) => c[0] === "profiles")!;
+    expect(botRow).toMatchObject({ full_name: "Resepsionis AI", role: "staff", tenant_id: "tn-1" });
+
     const [, logRow] = client.serviceInsert.mock.calls.find((c) => c[0] === "call_logs")!;
     expect(logRow).toMatchObject({
       tenant_id: "tn-1",
-      agent_id: "bot-profile-1", // profil bot, bukan manusia
+      agent_id: VOICE_BOT_ID(), // …dan log-nya beratas nama profil itu
       customer_id: "cust-baru",
       direction: "inbound",
       duration_seconds: 95,

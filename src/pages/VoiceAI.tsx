@@ -215,7 +215,9 @@ export default function VoiceAI() {
           session: {
             type: "realtime",
             instructions: receptionistInstructions(tenantName, types),
-            audio: { input: { transcription: { model: "whisper-1" } } },
+            // language dikunci "id": pada ucapan pendek Whisper suka menebak
+            // bahasa lain (transkrip pengguna pertama keluar berbahasa Korea).
+            audio: { input: { transcription: { model: "whisper-1", language: "id" } } },
             tools: [
               {
                 type: "function",
