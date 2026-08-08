@@ -23,27 +23,26 @@
 //   3. The output is scanned before it is sent. Anything shaped like a phone
 //      number, an email, or a booking reference means something went wrong
 //      upstream, and the reply is replaced rather than delivered.
+//   4. The FIGURES in the answer are checked against what the tools actually
+//      returned (./number-guard). Layers 1–3 never looked at them, so a model
+//      that read "Deluxe Rp450.000" and wrote "Rp420.000" passed every check.
+//      A rate, a night count or a room count the tools did not produce is the
+//      same class of failure as a leaked phone number, and gets the same
+//      treatment: replaced, not delivered.
 //
-// Layer 1 is the one that actually holds. The other two are for the day someone
+// Layer 1 is the one that actually holds. The others are for the day someone
 // adds a FIFTH tool without reading this comment.
 
 import { checkAvailability, renderAvailability, todayJakarta } from "./availability";
 import { findKnowledge } from "./knowledge";
 import { isoOrNull } from "./ai";
 import { listRoomTypes } from "./booking";
-
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_MODEL = "gpt-4o-mini";
+import { groundedNumbers, ungroundedNumbers } from "./number-guard";
+import { recordAiReply, type AiReplyStatus } from "./ai-log";
+import { chatCompletion, hasChatProvider, type ChatToolCall } from "../ai/chat";
 
 /** Bounded so a confused model cannot loop the webhook into a timeout. */
 const MAX_TOOL_ROUNDS = 3;
-
-function config() {
-  return {
-    apiKey: process.env.OPENAI_API_KEY,
-    endpoint: process.env.OPENAI_API_URL ?? OPENAI_CHAT_COMPLETIONS_URL,
-  };
-}
 
 // ─── Tool definitions ────────────────────────────────────────────────────────
 // Descriptions are written for the MODEL, not for us: they say when to call the
@@ -278,18 +277,51 @@ export interface ConciergeResult {
  * Answer a guest's question, grounded in the hotel's real data.
  *
  * Never throws and never returns an empty string: a webhook must always be able
- * to reply, and "I'll get a human" is a valid reply. Without OPENAI_API_KEY it
- * degrades to that immediately rather than pretending.
+ * to reply, and "I'll get a human" is a valid reply. With no provider configured
+ * it degrades to that immediately rather than pretending.
+ *
+ * Every outcome — answered, replaced, or failed — is recorded for the platform
+ * console (./ai-log). Recording is best-effort and no-ops when the service role
+ * is unconfigured, so it stays invisible to unit tests.
  */
 export async function askConcierge(params: {
   tenantId: string;
   brand: string;
   question: string;
 }): Promise<ConciergeResult> {
-  const { apiKey, endpoint } = config();
   const toolsUsed: string[] = [];
+  const startedAt = Date.now();
+  let provider: string | null = null;
+  let model: string | null = null;
 
-  if (!apiKey) return { text: SAFE_FALLBACK, grounded: false, toolsUsed };
+  /** Log the outcome, then hand back the result the caller expects. */
+  const done = async (
+    status: AiReplyStatus,
+    result: ConciergeResult,
+    extra?: { offenders?: string[]; error?: string },
+  ): Promise<ConciergeResult> => {
+    await recordAiReply({
+      tenantId: params.tenantId,
+      question: params.question,
+      status,
+      reply: status === "sent" || status === "ungrounded" ? result.text : null,
+      provider,
+      model,
+      toolsUsed: result.toolsUsed,
+      offenders: extra?.offenders,
+      error: extra?.error,
+      latencyMs: Date.now() - startedAt,
+    });
+    return result;
+  };
+
+  if (!hasChatProvider()) {
+    return done(
+      "failed",
+      { text: SAFE_FALLBACK, grounded: false, toolsUsed },
+      { error: "ai_chat_not_configured" },
+    );
+  }
 
   const ctx: ToolContext = { tenantId: params.tenantId, brand: params.brand };
   const messages: Array<Record<string, unknown>> = [
@@ -297,49 +329,63 @@ export async function askConcierge(params: {
     { role: "user", content: params.question },
   ];
 
+  // Everything the tools hand back, kept for the layer-4 figure check. The
+  // guest's own question counts too: a guest who says "untuk 4 orang" may have
+  // that number repeated back to them.
+  const groundingSources: string[] = [params.question];
+
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: OPENAI_MODEL,
+      let msg;
+      try {
+        const completion = await chatCompletion({
           // Low but not zero: the wording may vary, the FACTS come from tools.
           temperature: 0.2,
           messages,
           tools: TOOLS,
-        }),
-      });
-
-      if (!res.ok) {
-        console.error(`[wa/concierge] HTTP ${res.status}`);
-        return { text: SAFE_FALLBACK, grounded: false, toolsUsed };
+        });
+        msg = completion.message;
+        provider = completion.provider;
+        model = completion.model;
+      } catch (e) {
+        const reason = (e as Error).message;
+        console.error(`[wa/concierge] ${reason}`);
+        return done("failed", { text: SAFE_FALLBACK, grounded: false, toolsUsed }, { error: reason });
       }
 
-      const data = (await res.json()) as {
-        choices?: Array<{
-          message?: {
-            content?: string | null;
-            tool_calls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
-          };
-        }>;
-      };
-      const msg = data.choices?.[0]?.message;
-      if (!msg) return { text: SAFE_FALLBACK, grounded: false, toolsUsed };
-
-      const calls = msg.tool_calls ?? [];
+      const calls: ChatToolCall[] = msg.tool_calls ?? [];
       if (calls.length === 0) {
         const answer = (msg.content ?? "").trim();
-        if (!answer) return { text: SAFE_FALLBACK, grounded: false, toolsUsed };
+        if (!answer) {
+          return done(
+            "failed",
+            { text: SAFE_FALLBACK, grounded: false, toolsUsed },
+            { error: "empty_answer" },
+          );
+        }
 
         if (violatesGuardrail(answer)) {
           console.error("[wa/concierge] answer tripped the output guardrail — replaced");
-          return { text: SAFE_FALLBACK, grounded: false, toolsUsed };
+          return done("blocked_pii", { text: SAFE_FALLBACK, grounded: false, toolsUsed });
+        }
+
+        // Layer 4: a rate or a count the tools never produced.
+        const invented = ungroundedNumbers(answer, groundedNumbers(groundingSources));
+        if (invented.length > 0) {
+          console.error(
+            `[wa/concierge] answer quoted figures no tool returned (${invented.join(", ")}) — replaced`,
+          );
+          return done(
+            "blocked_numbers",
+            { text: SAFE_FALLBACK, grounded: false, toolsUsed },
+            { offenders: invented },
+          );
         }
         // Grounded only if it actually looked something up. An answer produced
         // without a single tool call is the model talking from memory, which is
         // the failure mode this module exists to prevent.
-        return { text: answer, grounded: toolsUsed.length > 0, toolsUsed };
+        const grounded = toolsUsed.length > 0;
+        return done(grounded ? "sent" : "ungrounded", { text: answer, grounded, toolsUsed });
       }
 
       // Record the assistant turn verbatim; the API rejects tool results that do
@@ -356,19 +402,22 @@ export async function askConcierge(params: {
           // run the tool with defaults rather than failing the whole answer.
         }
         toolsUsed.push(name);
-        messages.push({
-          role: "tool",
-          tool_call_id: call.id,
-          content: await runTool(name, args, ctx),
-        });
+        const output = await runTool(name, args, ctx);
+        groundingSources.push(output);
+        messages.push({ role: "tool", tool_call_id: call.id, content: output });
       }
     }
 
     // Ran out of rounds without a final answer.
     console.error(`[wa/concierge] no answer after ${MAX_TOOL_ROUNDS} tool rounds`);
-    return { text: SAFE_FALLBACK, grounded: false, toolsUsed };
+    return done(
+      "failed",
+      { text: SAFE_FALLBACK, grounded: false, toolsUsed },
+      { error: `no_answer_after_${MAX_TOOL_ROUNDS}_rounds` },
+    );
   } catch (e) {
-    console.error("[wa/concierge] exception:", (e as Error).message);
-    return { text: SAFE_FALLBACK, grounded: false, toolsUsed };
+    const reason = (e as Error).message;
+    console.error("[wa/concierge] exception:", reason);
+    return done("failed", { text: SAFE_FALLBACK, grounded: false, toolsUsed }, { error: reason });
   }
 }

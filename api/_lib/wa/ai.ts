@@ -5,11 +5,9 @@
 // message (and whatever slots earlier turns already filled), it returns a
 // structured BookingIntent the webhook can act on.
 //
-// House pattern (mirrors api/_lib/exchange.ts and provision.ts):
-//   - env is read lazily inside config(), never at module scope, because the
-//     Vite dev middleware only populates process.env after import time;
-//   - the OpenAI key is OPENAI_API_KEY, deliberately WITHOUT a VITE_ prefix so
-//     it can never be inlined into the browser bundle.
+// Which vendor serves the call is env-configured — see api/_lib/ai/chat.ts. The
+// keys stay deliberately WITHOUT a VITE_ prefix so they can never be inlined
+// into the browser bundle.
 //
 // It never throws: on a missing key, a network failure, or unparseable model
 // output it falls back to a deterministic regex/keyword extractor, so the caller
@@ -28,19 +26,7 @@ export interface BookingIntent extends BookingSlots {
   confidence: number;
 }
 
-// The one endpoint we call. Overridable via env only so the test suite can point
-// it at a local mock server (same trick as SSO_ISSUER in exchange.ts); in
-// production it is always this constant.
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_MODEL = "gpt-4o-mini";
-
-// Read lazily, never at module scope — see the file header.
-function config() {
-  return {
-    apiKey: process.env.OPENAI_API_KEY,
-    endpoint: process.env.OPENAI_API_URL ?? OPENAI_CHAT_COMPLETIONS_URL,
-  };
-}
+import { chatCompletion, hasChatProvider } from "../ai/chat";
 
 /**
  * Extract a booking intent + slots from a guest's WhatsApp message.
@@ -59,39 +45,21 @@ export async function extractBookingIntent(
   const knownSlots = normaliseKnown(known);
   const message = (text ?? "").trim();
 
-  const { apiKey, endpoint } = config();
-
-  if (apiKey) {
+  if (hasChatProvider()) {
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: OPENAI_MODEL,
-          temperature: 0.1,
-          response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: systemPrompt(knownSlots) },
-            { role: "user", content: message },
-          ],
-        }),
+      const { message: reply } = await chatCompletion({
+        temperature: 0.1,
+        jsonObject: true,
+        messages: [
+          { role: "system", content: systemPrompt(knownSlots) },
+          { role: "user", content: message },
+        ],
       });
 
-      if (res.ok) {
-        const data = (await res.json()) as {
-          choices?: Array<{ message?: { content?: string } }>;
-        };
-        const raw = data.choices?.[0]?.message?.content ?? "";
-        const parsed = parseModelJson(raw);
-        if (parsed) return mergeIntent(coerceIntent(parsed), knownSlots);
-      } else {
-        console.error(`[wa/ai] OpenAI extract failed: HTTP ${res.status}`);
-      }
+      const parsed = parseModelJson(reply.content ?? "");
+      if (parsed) return mergeIntent(coerceIntent(parsed), knownSlots);
     } catch (e) {
-      console.error(`[wa/ai] OpenAI extract exception: ${(e as Error).message}`);
+      console.error(`[wa/ai] extract failed: ${(e as Error).message}`);
     }
   }
 
