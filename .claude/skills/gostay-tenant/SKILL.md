@@ -30,6 +30,48 @@ lolos login tapi tidak membawa apa pun.
 Payload wizard: `name`, `slug`, `staffFullName`, `staffPhone` (digit saja,
 format 62…), `staffEmail` opsional, `botNumber` opsional.
 
+### Jebakan realm — "Nomor HP tidak terdaftar di aplikasi ini"
+
+Gejalanya paling menyesatkan di seluruh onboarding: wizard melapor **sukses**,
+akun SSO-nya benar-benar **ada**, tapi orangnya tidak bisa masuk.
+
+Sebabnya: form OTP di sso-ventera menyaring `realmId IN allowedRealms` milik
+client OIDC. Client `gostay` hanya mengizinkan **`ventera-public`**. Endpoint
+provisioning punya default sendiri — `ventera-shop`, realm pelanggan ecommerce —
+jadi pemanggil yang tidak menyebut realm menghasilkan akun di ruangan yang salah.
+
+Karena itu **setiap** pemanggil `/api/admin/users/provision` di repo ini
+menyebut realm secara eksplisit: `api/_lib/wa/guest.ts` lewat `guestRealm()`,
+`api/admin/onboard-hotel.ts` lewat `staffRealm()`. Jangan pernah menghapusnya.
+
+Kalau terlanjur salah realm, **pindahkan user-nya, jangan buat ulang**:
+
+```sql
+-- di sso-ventera (produksi: docker exec sso-ventera-postgres)
+update "User" set "realmId" = (select id from "Realm" where slug='ventera-public'),
+                  "updatedAt" = now()
+where id = '<sub>';
+```
+
+Dua alasan kenapa membuat ulang salah: `User.id` ADALAH `sub`, dan `profiles.id`
+diturunkan darinya — akun baru berarti sub baru dan baris `profiles` yang yatim.
+Lalu `LinkedAccount` unik pada `(provider, providerAccountId)`, jadi satu nomor
+hanya boleh punya satu tautan WhatsApp di SELURUH realm; akun kedua tidak akan
+bisa ber-OTP.
+
+Melihat realm yang diizinkan sebuah client:
+
+```sql
+select c.id, r.slug from "OAuthClient" c
+left join "_ClientAllowedRealms" ar on ar."A" = c.id
+left join "Realm" r on r.id = ar."B"
+where c.id = 'gostay';
+```
+
+Menambahkan `ventera-shop` ke allowedRealms `gostay` juga menghilangkan
+gejalanya — dan membuka GoStay untuk setiap pembeli Storo. Bukan pertukaran yang
+sepadan.
+
 ### Pemilik kedua dan seterusnya
 
 Lewat **User Management** (`/users`) di dashboard hotel, peran `admin`. Sejak
