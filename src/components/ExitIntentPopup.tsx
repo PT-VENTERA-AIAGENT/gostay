@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const LEADS_COLLECTOR_URL =
   "https://wfthvovlhphnrodrqxqt.supabase.co/functions/v1/leads-collector";
@@ -14,10 +15,14 @@ export function ExitIntentPopup() {
   const [isDone, setIsDone] = useState(false);
   const [hasTriggered, setHasTriggered] = useState(false);
 
+  const { user } = useAuth();
   const isLandingPage = location.pathname === "/";
 
   useEffect(() => {
-    if (import.meta.env.DEV || isLandingPage) return;
+    if (import.meta.env.DEV) return;
+    // Pembalikan yang sama dengan PromoPopup — lihat alasannya di sana.
+    if (!isLandingPage) return;
+    if (user) return;
 
     const dismissed = sessionStorage.getItem("bm_exit_dismissed");
     if (dismissed) return;
@@ -31,7 +36,7 @@ export function ExitIntentPopup() {
 
     document.addEventListener("mouseleave", handleMouseLeave);
     return () => document.removeEventListener("mouseleave", handleMouseLeave);
-  }, [hasTriggered, isLandingPage]);
+  }, [hasTriggered, isLandingPage, user]);
 
   const handleClose = () => {
     setIsOpen(false);
