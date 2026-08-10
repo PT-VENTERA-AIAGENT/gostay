@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { User, Calendar, MessageSquare, Search, Menu, X, LogOut, UtensilsCrossed, MapPinned } from "lucide-react";
+import { User, Calendar, MessageSquare, Search, Menu, X, LogOut, UtensilsCrossed, MapPinned, Eye } from "lucide-react";
 import ChatWidget from "@/components/portal/ChatWidget";
 import PortalBottomNav from "@/components/shared/PortalBottomNav";
 import ThemeToggle from "@/components/shared/ThemeToggle";
@@ -35,6 +35,9 @@ export default function PortalLayout() {
     requestedSlug,
   } = useTenant();
   const t = useT();
+  // Penanda peran, dipakai spanduk di bawah. Staf/admin selalu terkunci ke
+  // hotelnya sendiri oleh current_tenant() (046), jadi peran saja sudah cukup.
+  const isHotelMember = role === "staff" || role === "admin";
   // Tamu yang datang dari tautan WhatsApp membawa `?t=` — tukar sekali, lalu
   // BUANG dari URL. Membiarkannya berarti token itu ikut ter-bookmark, ikut
   // ter-share, dan muncul di setiap tautan yang dibagikan tamu.
@@ -223,6 +226,26 @@ export default function PortalLayout() {
           mode="wait" made the pages' stagger animations occasionally fail to
           fire, leaving content stuck at opacity 0 — the "blank until refresh"
           bug. Routing remounts the Outlet subtree per navigation anyway. */}
+      {/* Staf/admin memang boleh menjelajah portal tamu — itu satu-satunya cara
+          mereka meninjau brosur, denah, dan menu Layanan Kamar seperti yang
+          dilihat tamu. Yang tidak boleh adalah keadaan itu berlangsung diam-
+          diam: tanpa penanda, halaman menyapa pengelola hotel sebagai tamu, dan
+          dari situ lahir pemesanan atas nama diri sendiri yang mengotori CRM.
+          Spanduk ini membuat perannya tak pernah ambigu, tanpa menutup pintu. */}
+      {isHotelMember && (
+        <div className="bg-primary/10 border-b border-primary/20 px-4 md:px-8 py-2.5">
+          <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="flex items-center gap-2 text-foreground">
+              <Eye className="w-4 h-4 text-primary shrink-0" />
+              {t("Anda melihat portal tamu sebagai pengelola hotel.")}
+            </span>
+            <Link to="/dashboard" className="font-semibold text-primary hover:underline shrink-0">
+              {t("Kembali ke dasbor")}
+            </Link>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 pb-16 md:pb-0">
         <Outlet />
       </main>
