@@ -5,6 +5,7 @@ import { exchangeCode } from "./api/_lib/exchange";
 import waInbound from "./api/wa/inbound";
 import hotelCreateMine from "./api/hotel/create-mine";
 import waConnect from "./api/wa/connect";
+import paymentAction from "./api/payment/[action]";
 
 // In production /api/sso/token is served by the Vercel function in api/sso/.
 // `vite dev` does not run those, so mount the same handler on the dev server —
@@ -122,6 +123,51 @@ function hotelDevApi(): Plugin {
   };
 }
 
+
+// Pembayaran. Di produksi api/payment/[action].ts adalah fungsi Vercel; `vite
+// dev` tidak menyajikan folder api/ sama sekali, jadi tombol "Bayar sekarang" di
+// portal menjawab 404 di localhost — terbaca sebagai fitur rusak padahal hanya
+// tidak ada yang melayaninya.
+//
+// Bedanya dengan plugin lain di berkas ini: rutenya dinamis (`[action]`), jadi
+// segmen terakhir path dibaca di sini dan dioper sebagai `query.action` —
+// persis yang dilakukan Vercel di produksi.
+function paymentDevApi(): Plugin {
+  return {
+    name: "payment-dev-api",
+    configureServer(server) {
+      server.middlewares.use("/api/payment", async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const raw = Buffer.concat(chunks).toString("utf8");
+        // req.url di dalam middleware sudah relatif terhadap mount-nya:
+        // "/checkout" untuk /api/payment/checkout.
+        const action = (req.url ?? "").split("?")[0].replace(/^\//, "");
+
+        const vres = {
+          statusCode: 200,
+          status(code: number) { this.statusCode = code; res.statusCode = code; return vres; },
+          setHeader(name: string, value: string) { res.setHeader(name, value); return vres; },
+          json(body: unknown) {
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(body));
+          },
+        };
+
+        try {
+          await (paymentAction as unknown as (q: unknown, s: unknown) => Promise<void>)(
+            { method: req.method, headers: req.headers, body: raw, query: { action } },
+            vres,
+          );
+        } catch {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "dev_handler_error" }));
+        }
+      });
+    },
+  };
+}
+
 // Self-service WhatsApp linking for a hotel. In production api/wa/connect.ts is a
 // Vercel function; mount it here so the WhatsApp settings page works in local dev.
 // Handles GET/POST/DELETE and needs the URL query (?tenantId=) parsed through.
@@ -187,7 +233,7 @@ export default defineConfig(({ mode }) => {
         overlay: false,
       },
     },
-    plugins: [react(), ssoDevApi(), waDevApi(), hotelDevApi(), waConnectDevApi()],
+    plugins: [react(), ssoDevApi(), waDevApi(), hotelDevApi(), waConnectDevApi(), paymentDevApi()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
