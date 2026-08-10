@@ -37,18 +37,3 @@ export function mapXenditStatus(status: string | undefined): "paid" | "expired" 
   }
 }
 
-export interface CreateInvoiceInput {
-  externalId: string;   // GOSTAY-<booking reference> — the gateway routes on the GOSTAY- prefix
-  amount: number;
-  payerEmail?: string;
-  description?: string;
-  successRedirectUrl?: string;
-}
-
-export interface CreatedInvoice {
-  id: string;
-  invoiceUrl: string;
-  status: string;
-  amount: number;
-  externalId: string;
-}
