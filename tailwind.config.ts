@@ -98,10 +98,19 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // Bolak-balik dengan jeda di kedua ujung, bukan gulungan tanpa henti.
+        // `--marquee-shift` diisi MarqueeText dari selisih lebar sebenarnya,
+        // jadi teks berhenti tepat di ujung terakhirnya — tidak lebih.
+        marquee: {
+          "0%, 18%": { transform: "translateX(0)" },
+          "48%, 66%": { transform: "translateX(var(--marquee-shift, 0))" },
+          "96%, 100%": { transform: "translateX(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        marquee: "marquee var(--marquee-duration, 12s) ease-in-out infinite",
       },
     },
   },

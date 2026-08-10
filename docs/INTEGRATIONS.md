@@ -167,6 +167,28 @@ setujui/tolak = kewenangan platform. UI hotel: `/saldo`; konsol:
   all` (`platform_admin_scope()`, migration 035). Klien khususnya `platformDb`
   (`src/lib/supabase.ts`); halaman `/platform/*`.
 - Insiden WA lintas hotel: `wa_incidents` (043) → `/platform/incidents`.
+- Log jawaban AI lintas hotel: `ai_reply_logs` (050) → `/platform/ai-logs`.
+
+## 5b. Model AI — satu pintu, rantai failover
+
+- **Semua** pemanggil chat-completions lewat `api/_lib/ai/chat.ts`: ekstraksi
+  niat booking (`api/_lib/wa/ai.ts`), concierge tamu (`api/_lib/wa/concierge.ts`),
+  dan penulis pesan outbound (`api/_lib/outbound/{generate,converse}.ts`).
+- Vendor ditentukan env, bukan kode: `AI_CHAT_PROVIDER` = daftar berurut yang
+  dicoba kiri→kanan (`nous,openai` = Nous dulu, jatuh ke OpenAI bila gagal).
+  Provider yang API key-nya kosong dilewati, jadi key vendor non-aktif boleh
+  tetap tersimpan. Kosong = `openai`, yaitu perilaku sebelum rantai ini ada.
+- **Voice AI TIDAK ikut**: `api/_lib/voice/handlers.ts` memakai Realtime API
+  OpenAI (`/v1/realtime/client_secrets`) yang tidak punya padanan di vendor
+  lain — ia selalu butuh `OPENAI_API_KEY`.
+- Outbound tetap ditulis model kelas Claude lewat `OUTBOUND_MODELS`
+  (`~anthropic/claude-sonnet-latest` di Nous). SDK `@anthropic-ai/sdk` sudah
+  tidak dipakai kode mana pun.
+- Concierge punya **lapis ke-4**: `api/_lib/wa/number-guard.ts` mencocokkan
+  setiap angka berkonsekuensi di jawaban (tarif, persen, durasi, jumlah) dengan
+  angka yang benar-benar dikembalikan tool — per satuan, bukan global. Tidak
+  cocok = jawaban diganti `SAFE_FALLBACK`, perlakuan yang sama dengan kebocoran
+  nomor telepon.
 
 ## 6. Hosting & deploy
 

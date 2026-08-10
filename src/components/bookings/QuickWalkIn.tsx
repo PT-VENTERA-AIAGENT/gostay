@@ -193,7 +193,7 @@ export default function QuickWalkIn({ onClose }: { onClose: () => void }) {
             <div className="text-sm">
               <span className="text-muted-foreground">Total </span>
               <span className="font-bold text-foreground">{total ? formatIDR(total) : "—"}</span>
-              {nights > 0 && <span className="text-xs text-muted-foreground"> · {nightsLabel(nights, t)}</span>}
+              {nights > 0 && <span className="text-xs text-muted-foreground"> · {nightsLabel(nights, tr)}</span>}
             </div>
             <button
               onClick={submit}

@@ -1,8 +1,12 @@
-// Generate a personalized WA sales message for a single lead via Claude.
+// Generate a personalized WA sales message for a single lead.
 // Admin-only. Saves the draft to outbound_message_drafts (approved=false).
 // The admin previews it in /admin/campaigns/:id before approving.
+//
+// Routed through api/_lib/ai/chat.ts rather than the Anthropic SDK, so this
+// path shares the env-configured provider chain and its failover. The draft row
+// records the model that actually wrote it, not a hardcoded name.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { chatCompletion, OUTBOUND_MODELS } from "../ai/chat";
 import { requirePlatformAdmin } from "../admin/platform-auth";
 import { authHeader, readJson, type VercelReq, type VercelRes } from "../admin/http";
 import { serviceConfig, serviceHeaders, serviceGet, serviceInsert } from "../wa/client";
@@ -26,17 +30,16 @@ function monthsCovered(priceMin?: number): string {
   return months > 24 ? "lebih dari 2 tahun" : `${months} bulan`;
 }
 
-async function generateMessage(lead: Lead): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("anthropic_not_configured");
-
-  const client = new Anthropic({ apiKey });
+async function generateMessage(lead: Lead): Promise<{ text: string; model: string }> {
   const covered = monthsCovered(lead.booking_price_min);
 
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 350,
-    system: `Kamu sales assistant GoStay yang ramah dan profesional.
+  const { message, model } = await chatCompletion({
+    models: OUTBOUND_MODELS,
+    maxTokens: 350,
+    messages: [
+      {
+        role: "system",
+        content: `Kamu sales assistant GoStay yang ramah dan profesional.
 GoStay adalah HMS + WA Bot AI untuk hotel/villa/penginapan kecil Indonesia.
 Fitur utama: WA Bot auto-balas booking 24/7, dashboard reservasi, zero komisi.
 Harga: Starter Rp 99.000/bulan. Early bird: 3 bulan GRATIS untuk 50 pertama.
@@ -50,9 +53,10 @@ Tulis pesan WA pertama (cold outreach) yang:
 - Tutup dengan satu pertanyaan atau ajakan ringan
 - JANGAN pakai emoji berlebihan (maks 1-2)
 - JANGAN sebut harga di pesan pertama kecuali kalau sangat relevan`,
-    messages: [{
-      role: "user",
-      content: `Buat pesan WA untuk properti berikut:
+      },
+      {
+        role: "user",
+        content: `Buat pesan WA untuk properti berikut:
 Nama: ${lead.business_name}
 Kategori: ${lead.category ?? "penginapan"}
 Kota: ${lead.city ?? "Indonesia"}
@@ -61,11 +65,11 @@ ${lead.booking_price_min ? `Harga kamar: mulai Rp ${lead.booking_price_min.toLoc
 ${lead.booking_price_min ? `Satu booking nutup biaya GoStay ${covered}` : ""}
 
 Pain point yang sering: WA telat dibalas, booking manual spreadsheet, staf kelelahan.`,
-    }],
+      },
+    ],
   });
 
-  const text = msg.content[0];
-  return text.type === "text" ? text.text.trim() : "";
+  return { text: (message.content ?? "").trim(), model };
 }
 
 export default async function handler(req: VercelReq, res: VercelRes) {
@@ -91,8 +95,9 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   if (!lead) return res.status(404).json({ error: "lead_not_found" });
 
   let message: string;
+  let model: string;
   try {
-    message = await generateMessage(lead);
+    ({ text: message, model } = await generateMessage(lead));
   } catch (e) {
     return res.status(500).json({ error: (e as Error).message });
   }
@@ -103,7 +108,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   const draft = {
     lead_id: leadId,
     message,
-    model: "claude-sonnet-4-6",
+    model,
     approved: false,
     sent: false,
     ...(campaignId ? { campaign_id: campaignId } : {}),

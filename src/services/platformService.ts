@@ -729,3 +729,79 @@ export async function resolveIncident(id: string): Promise<void> {
     .eq("id", id);
   if (error) throw error;
 }
+
+// ─── Log jawaban AI (lintas hotel) ────────────────────────────────────────────
+
+export type AiReplyStatus =
+  | "sent"
+  | "ungrounded"
+  | "blocked_numbers"
+  | "blocked_pii"
+  | "failed";
+
+export interface PlatformAiReply {
+  id: string;
+  hotel: string;
+  status: AiReplyStatus;
+  question: string;
+  /** Teks yang benar-benar dikirim. Null = jawaban diganti atau gagal. */
+  reply: string | null;
+  provider: string | null;
+  model: string | null;
+  tools_used: string[];
+  /** Angka yang tidak bisa dilacak ke hasil tool. */
+  offenders: string[];
+  error: string | null;
+  latency_ms: number;
+  created_at: string;
+}
+
+/** Bentuk baris mentah dari PostgREST, sebelum diratakan. */
+interface AiReplyRow {
+  id: string;
+  status: AiReplyStatus;
+  question: string;
+  reply: string | null;
+  provider: string | null;
+  model: string | null;
+  tools_used: string[] | null;
+  offenders: string[] | null;
+  error: string | null;
+  latency_ms: number | null;
+  created_at: string;
+  tenants: { name?: string } | null;
+}
+
+/**
+ * Jawaban concierge AI di semua hotel, terbaru dulu.
+ *
+ * Ini menutup celah "bot menolak terus tapi tidak ada yang tahu": semua
+ * penolakan dulu hanya console.error di serverless, sehingga bot yang mengganti
+ * setiap jawaban dengan "boleh saya hubungkan dengan staf?" terlihat persis
+ * sama dengan bot yang bekerja normal.
+ */
+export async function listAiReplies(limit = 200): Promise<PlatformAiReply[]> {
+  const { data, error } = await db
+    .from("ai_reply_logs")
+    .select(
+      "id,status,question,reply,provider,model,tools_used,offenders,error," +
+        "latency_ms,created_at,tenants(name)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as unknown as AiReplyRow[]).map((r) => ({
+    id: r.id,
+    hotel: r.tenants?.name ?? "—",
+    status: r.status,
+    question: r.question,
+    reply: r.reply ?? null,
+    provider: r.provider ?? null,
+    model: r.model ?? null,
+    tools_used: r.tools_used ?? [],
+    offenders: r.offenders ?? [],
+    error: r.error ?? null,
+    latency_ms: r.latency_ms ?? 0,
+    created_at: r.created_at,
+  }));
+}

@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import GlobalSearch from "@/components/layout/GlobalSearch";
 import NotificationsMenu from "@/components/layout/NotificationsMenu";
+import MarqueeText from "@/components/shared/MarqueeText";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,8 +94,14 @@ export default function TopBar() {
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-primary/20 flex items-center justify-center font-semibold text-sm text-primary">
               {initialsOf(displayName)}
             </div>
-            <div className="hidden md:block text-right">
-              <p className="text-sm font-semibold text-foreground">{displayName}</p>
+            {/* Lebarnya dipatok. Tanpa itu nama panjang mendorong dirinya
+                keluar tepi kanan jendela — bukan terpotong, tapi benar-benar
+                hilang di luar layar. MarqueeText yang menjalankannya kalau
+                tidak muat. */}
+            <div className="hidden md:block max-w-[13rem] text-right">
+              <MarqueeText className="text-sm font-semibold text-foreground">
+                {displayName}
+              </MarqueeText>
               <p className="text-xs text-muted-foreground">{roleLabel}</p>
             </div>
           </DropdownMenuTrigger>

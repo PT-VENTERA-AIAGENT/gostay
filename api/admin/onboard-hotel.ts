@@ -16,6 +16,29 @@ import { serviceConfig, serviceHeaders, serviceGet, serviceInsert } from "../_li
 import { createSession, deleteSession } from "../_lib/wa/gateway";
 import { authHeader, readJson, toSlug, SLUG_RE, serviceDelete, type VercelReq, type VercelRes } from "../_lib/admin/http";
 
+/**
+ * Realm Ventera tempat staf hotel didaftarkan.
+ *
+ * Sama persis dengan alasan di `api/_lib/wa/guest.ts`: form OTP menyaring
+ * `realmId IN allowedRealms` milik client OIDC, jadi akun di realm yang tidak
+ * terdaftar untuk client `gostay` akan ADA tapi selalu dijawab "Nomor HP tidak
+ * terdaftar di aplikasi ini".
+ *
+ * Sebelumnya realm tidak disebut sama sekali di sini, sehingga endpoint
+ * provisioning memakai default-nya sendiri (`ventera-shop`, realm pelanggan
+ * ecommerce) — dan setiap staf hotel yang dibuat wizard ini mendapat akun yang
+ * tidak pernah bisa dipakai login. Kegagalannya senyap: onboarding melapor
+ * sukses, akunnya benar-benar ada, dan barulah saat orangnya mencoba masuk
+ * masalahnya muncul.
+ *
+ * Nilai ini HARUS terdaftar untuk client `gostay` di `_ClientAllowedRealms`
+ * pada sisi sso-ventera.
+ */
+function staffRealm(): string {
+  const raw = (process.env.SSO_STAFF_REALM ?? "").trim();
+  return raw || "ventera-public";
+}
+
 /** Mint (idempotently) a Ventera SSO account for a phone; returns its subject. */
 async function provisionVentera(phone: string, displayName: string): Promise<string> {
   const url = (process.env.SSO_VENTERA_PROVISION_URL ?? "").replace(/\/$/, "");
@@ -24,7 +47,7 @@ async function provisionVentera(phone: string, displayName: string): Promise<str
   const res = await fetch(`${url}/api/admin/users/provision`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, displayName }),
+    body: JSON.stringify({ phone, displayName, realm: staffRealm() }),
   });
   if (!res.ok) throw new Error(`ventera_${res.status}`);
   const data = (await res.json().catch(() => ({}))) as { sub?: string };

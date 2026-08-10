@@ -1,10 +1,15 @@
-// Claude conversation agent for outbound lead replies.
+// Conversation agent for outbound lead replies.
 // Called by inbound.ts when a lead responds to our sales WA.
 // Returns { reply, action } and handles side-effects (update status, log, escalate).
+//
+// Routed through api/_lib/ai/chat.ts instead of the Anthropic SDK, so this path
+// gets the same env-configured provider chain — and the same failover — as the
+// guest-facing bot. A Claude-class model still writes the copy: see
+// OUTBOUND_MODELS in that module.
 
-import Anthropic from "@anthropic-ai/sdk";
 import { serviceGet, serviceInsert, serviceUpdate } from "../wa/client";
 import { sendText } from "../wa/send";
+import { chatCompletion, OUTBOUND_MODELS } from "../ai/chat";
 
 export type ConversationAction =
   | "continue"
@@ -39,7 +44,7 @@ const TRIAL_LINK = process.env.VITE_APP_URL
   ? `${process.env.VITE_APP_URL}/daftar`
   : "https://app.gostay.id/daftar";
 
-function buildHistory(rows: ConvRow[]): Anthropic.MessageParam[] {
+function buildHistory(rows: ConvRow[]): Array<Record<string, unknown>> {
   return rows.map((r) => ({
     role: r.direction === "outbound" ? "assistant" : "user",
     content: r.message,
@@ -47,11 +52,6 @@ function buildHistory(rows: ConvRow[]): Anthropic.MessageParam[] {
 }
 
 async function callClaude(lead: Lead, history: ConvRow[], newMessage: string): Promise<AgentResponse> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("anthropic_not_configured");
-
-  const client = new Anthropic({ apiKey });
-
   const system = `Kamu sales agent GoStay. GoStay = HMS + WA Bot AI untuk hotel/villa/penginapan kecil Indonesia.
 Harga: Starter Rp 99.000/bulan. Early bird: 3 bulan GRATIS untuk 50 hotel pertama.
 Setup 30 menit, tanpa kontrak, tanpa kartu kredit.
@@ -80,23 +80,20 @@ Rules action:
 - Minta diskon extra / nego di luar paket → action: escalate
 - Tidak tertarik / sudah pakai sistem lain / tolak → action: close`;
 
-  const msgHistory = buildHistory(history);
-  const messages: Anthropic.MessageParam[] = [
-    ...msgHistory,
-    { role: "user", content: newMessage },
-  ];
-
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 400,
-    system,
-    messages,
+  const { message } = await chatCompletion({
+    models: OUTBOUND_MODELS,
+    maxTokens: 400,
+    messages: [
+      { role: "system", content: system },
+      ...buildHistory(history),
+      { role: "user", content: newMessage },
+    ],
   });
 
-  const raw = response.content[0];
-  if (raw.type !== "text") throw new Error("unexpected_claude_response");
+  const text = message.content ?? "";
+  if (!text.trim()) throw new Error("unexpected_claude_response");
 
-  const jsonMatch = raw.text.match(/\{[\s\S]*\}/);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("claude_no_json");
 
   const parsed = JSON.parse(jsonMatch[0]) as AgentResponse;

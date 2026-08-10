@@ -5,7 +5,7 @@ import {
   listHotels, listAllReservations, listAllGuestRequests, listRoomAvailability,
   listAllThreads, listThreadMessages, listAllBalances, getPlatformCalendar,
   getHotelDetail, getPlatformRoomBoard, getPlatformRoomCalendar,
-  listAllIncidents, resolveIncident,
+  listAllIncidents, resolveIncident, listAiReplies,
 } from "@/services/platformService";
 
 /**
@@ -37,6 +37,7 @@ export const platformKeys = {
   reservations: () => ["platform", "reservations"] as const,
   requests: () => ["platform", "requests"] as const,
   incidents: () => ["platform", "incidents"] as const,
+  aiReplies: () => ["platform", "ai-replies"] as const,
   rooms: (date: string) => ["platform", "rooms", date] as const,
   threads: () => ["platform", "threads"] as const,
   thread: (id: string) => ["platform", "thread", id] as const,
@@ -59,6 +60,11 @@ export function usePlatformGuestRequests() {
 /** Kegagalan layanan WhatsApp di semua hotel, beserta tamu yang mengalaminya. */
 export function usePlatformIncidents() {
   return useQuery({ queryKey: platformKeys.incidents(), queryFn: () => listAllIncidents(150) });
+}
+
+/** Jawaban concierge AI lintas hotel — terkirim maupun yang ditolak guardrail. */
+export function usePlatformAiReplies() {
+  return useQuery({ queryKey: platformKeys.aiReplies(), queryFn: () => listAiReplies(200) });
 }
 
 /** Tandai satu insiden sudah ditindaklanjuti. */
