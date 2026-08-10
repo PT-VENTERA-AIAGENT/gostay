@@ -13,6 +13,7 @@ import { useChatThreads } from "@/hooks/useChat";
 import { usePendingBookingsCount } from "@/hooks/useBookings";
 import { useOpenRequestsCount } from "@/hooks/useGuestRequests";
 import { useTenant } from "@/hooks/useTenant";
+import MarqueeText from "@/components/shared/MarqueeText";
 import { useT } from "@/lib/i18n";
 
 const navItems = [
@@ -103,17 +104,23 @@ export default function AppSidebar() {
             <span className="text-primary-foreground font-bold text-sm">{hotelInitial}</span>
           )}
         </div>
+        {/* Nama hotel bisa panjang ("KEMA MERBABU Glamour Camping") dan dulu
+            terpotong jadi "KEMA MERBABU G…" — potongan yang justru
+            menyembunyikan bagian pembedanya. MarqueeText menjalankannya hanya
+            kalau memang tidak muat. Lebarnya dipatok supaya sidebar tidak ikut
+            melebar mengikuti nama. */}
         <AnimatePresence>
           {!collapsed && (
-            <motion.span
+            <motion.div
               initial={{ opacity: 0, width: 0 }}
               animate={{ opacity: 1, width: "auto" }}
               exit={{ opacity: 0, width: 0 }}
-              title={hotelName}
-              className="text-lg font-bold text-foreground tracking-tight overflow-hidden whitespace-nowrap"
+              className="min-w-0 overflow-hidden"
             >
-              {hotelName}
-            </motion.span>
+              <MarqueeText className="w-[10.5rem] text-lg font-bold text-foreground tracking-tight">
+                {hotelName}
+              </MarqueeText>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
