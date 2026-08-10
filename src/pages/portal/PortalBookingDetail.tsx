@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, MapPin, CreditCard, XCircle, MessageSquare, Loader2 } from "lucide-react";
+import { ArrowLeft, MapPin, CreditCard, XCircle, MessageSquare, Loader2, Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
@@ -7,6 +7,7 @@ import CopyButton from "@/components/shared/CopyButton";
 import BookingReviewForm from "@/components/portal/BookingReviewForm";
 import { useBooking, useUpdateBookingStatus } from "@/hooks/useBookings";
 import { cn } from "@/lib/utils";
+import { createCheckoutInvoice } from "@/services/paymentService";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -47,6 +48,8 @@ export default function PortalBookingDetail() {
   const cancelBooking = useUpdateBookingStatus();
   const { toast } = useToast();
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -76,6 +79,30 @@ export default function PortalBookingDetail() {
   const rate = booking.rooms?.room_types?.base_rate;
   const sc = statusConfig[booking.status] ?? statusConfig.confirmed;
   const canCancel = CANCELLABLE.has(booking.status);
+  // Sisa tagihan masih ada, dan pesanannya belum batal/selesai. `refunded` juga
+  // dikecualikan: menawarkan "Bayar" pada pesanan yang uangnya baru dikembalikan
+  // adalah cara tercepat menagih tamu dua kali.
+  const canPay =
+    booking.payment_status !== "paid" &&
+    booking.payment_status !== "refunded" &&
+    !["cancelled", "no_show", "checked_out"].includes(booking.status) &&
+    Number(booking.total_amount) > Number(booking.amount_paid ?? 0);
+
+  async function handlePay() {
+    if (!booking) return;
+    setPayError(null);
+    setPaying(true);
+    try {
+      const url = await createCheckoutInvoice(booking.reference);
+      // Halaman pembayaran menggantikan halaman ini, bukan membuka tab baru:
+      // pemblokir pop-up peramban seluler menelan window.open tanpa jejak, dan
+      // tamu mengira tombolnya rusak.
+      window.location.href = url;
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Gagal membuat tagihan.");
+      setPaying(false);
+    }
+  }
 
   async function handleCancel() {
     setCancelError(null);
@@ -164,7 +191,25 @@ export default function PortalBookingDetail() {
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">{cancelError}</div>
         )}
 
+        {payError && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">{payError}</div>
+        )}
+
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {/* Tagihannya diterbitkan saat tombol ditekan, bukan saat pesanan
+              dibuat: invoice punya masa berlaku, dan yang dibuat lebih awal
+              sering sudah kedaluwarsa sebelum tamu sempat membukanya. */}
+          {canPay && (
+            <button
+              onClick={handlePay}
+              disabled={paying}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity btn-press touch-target disabled:opacity-60"
+            >
+              {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+              {paying ? "Menyiapkan tagihan…" : "Bayar sekarang"}
+            </button>
+          )}
+
           <Link to="/portal/chat" className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors btn-press touch-target">
             <MessageSquare className="w-4 h-4" /> Contact Hotel
           </Link>

@@ -120,3 +120,21 @@ export async function recordGatewayPayment(input: RecordPaymentInput): Promise<"
   if (!res.ok) throw new Error(`payment_insert_failed_${res.status}`);
   return "recorded";
 }
+
+/**
+ * Profil pemilik sebuah pesanan, atau null kalau pesanannya tidak ada.
+ *
+ * Dipakai satu-satunya jalur pembayaran yang dipicu peramban: tamu membuktikan
+ * dirinya dengan token Supabase-nya sendiri, lalu kepemilikan diperiksa DI SINI
+ * dengan service key — bukan dengan mempercayai nomor pesanan yang ia kirim.
+ * Tanpa langkah ini, siapa pun yang menebak sebuah `reference` bisa menerbitkan
+ * invoice atas pesanan orang lain.
+ */
+export async function bookingOwnerProfileId(reference: string): Promise<string | null> {
+  const res = await serviceGet(
+    `bookings?reference=eq.${encodeURIComponent(reference)}&select=customers(profile_id)&limit=1`,
+  );
+  if (!res.ok) throw new Error(`booking_owner_read_failed_${res.status}`);
+  const rows = (await res.json()) as Array<{ customers?: { profile_id?: string | null } | null }>;
+  return rows[0]?.customers?.profile_id ?? null;
+}

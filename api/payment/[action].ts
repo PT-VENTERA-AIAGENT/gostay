@@ -15,7 +15,8 @@
 import { readJson, type VercelReq, type VercelRes } from "../_lib/admin/http";
 import { matchGatewayToken } from "../_lib/payment/token";
 import { handleCreateInvoice, handleWebhook } from "../_lib/payment/handlers";
-import { isConfigured } from "../_lib/payment/service";
+import { isConfigured, bookingOwnerProfileId } from "../_lib/payment/service";
+import { verifySupabaseToken } from "../_lib/identity";
 
 function actionParam(req: VercelReq): string {
   const a = req.query?.action;
@@ -51,6 +52,66 @@ export default async function handler(req: VercelReq, res: VercelRes) {
       bookingReference,
       amount: typeof body.amount === "number" ? body.amount : undefined,
       successRedirectUrl: typeof body.successRedirectUrl === "string" ? body.successRedirectUrl : undefined,
+    });
+    if (result.ok === false) { res.status(result.status).json({ error: result.error }); return; }
+    res.status(200).json({
+      ok: true, invoiceUrl: result.invoiceUrl, invoiceId: result.invoiceId,
+      amount: result.amount, mode: result.mode,
+    });
+    return;
+  }
+
+  // ── checkout: seorang TAMU membayar pesanannya sendiri dari portal ──
+  //
+  // Sampai sekarang invoice hanya bisa lahir dari jalur WhatsApp, karena
+  // `create` dijaga token internal — rahasia server yang tidak boleh dipegang
+  // peramban. Akibatnya portal web menampilkan "Pending" tanpa satu pun cara
+  // membayarnya. Aksi ini menutup itu, dan sengaja TIDAK memakai token internal:
+  // tamu membuktikan dirinya dengan token Supabase-nya sendiri — token yang sama
+  // yang menjaga setiap policy RLS-nya.
+  //
+  // Kepemilikan diperiksa di server dengan service key, bukan disimpulkan dari
+  // nomor pesanan yang dikirim. Tanpa itu, siapa pun yang menebak sebuah
+  // `reference` bisa menerbitkan invoice atas pesanan orang lain.
+  if (action === "checkout") {
+    const secret = process.env.SUPABASE_JWT_SECRET;
+    const auth = headerValue(req.headers.authorization) ?? "";
+    const jwt = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    if (!secret || !jwt) { res.status(401).json({ error: "unauthorized" }); return; }
+
+    const claims = verifySupabaseToken(jwt, secret);
+    // verifySupabaseToken hanya memeriksa tanda tangan. Token kedaluwarsa tetap
+    // bertanda tangan sah, jadi masa berlakunya diperiksa di sini — kalau tidak,
+    // sesi lama yang bocor berlaku selamanya.
+    const exp = typeof claims?.exp === "number" ? claims.exp : 0;
+    const sub = typeof claims?.sub === "string" ? claims.sub : "";
+    if (!claims || !sub || exp * 1000 <= Date.now()) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    const body = readJson(req);
+    const bookingReference = String(body.bookingReference ?? body.reference ?? "");
+    if (!bookingReference) { res.status(400).json({ error: "missing_booking_reference" }); return; }
+
+    let owner: string | null;
+    try {
+      owner = await bookingOwnerProfileId(bookingReference);
+    } catch {
+      res.status(502).json({ error: "booking_lookup_failed" });
+      return;
+    }
+    // Pesanan yang tidak ada dan pesanan milik orang lain dijawab sama —
+    // membedakannya akan mengubah endpoint ini jadi alat menebak nomor pesanan.
+    if (!owner || owner !== sub) { res.status(404).json({ error: "booking_not_found" }); return; }
+
+    const result = await handleCreateInvoice({
+      bookingReference,
+      // Jumlahnya TIDAK diambil dari permintaan. Yang menentukan sisa tagihan
+      // adalah pesanan di database; menerima `amount` dari peramban berarti
+      // membiarkan tamu menetapkan harganya sendiri.
+      successRedirectUrl:
+        typeof body.successRedirectUrl === "string" ? body.successRedirectUrl : undefined,
     });
     if (result.ok === false) { res.status(result.status).json({ error: result.error }); return; }
     res.status(200).json({
