@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
@@ -9,6 +9,7 @@ import { getAvailableRooms } from "@/services/roomService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useT, dateLocale } from "@/lib/i18n";
 import { nightsLabel, guestsLabel } from "@/lib/nights";
+import { clearDraft, loadDraft } from "@/lib/bookingDraft";
 import type { RoomType } from "@/types/database.types";
 
 interface GuestInfo {
@@ -48,10 +49,15 @@ function formatDate(dateStr: string) {
 export default function BookingReview() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, signIn } = useAuth();
+  const { user, signIn, role } = useAuth();
+  // Penjagaan yang sama dengan halaman kamar, diulang di sini karena langkah ini
+  // bisa dicapai tanpa melewatinya: tautan langsung, atau tamu yang terpental ke
+  // SSO lalu kembali sebagai akun hotel — persis yang terjadi saat cookie SSO
+  // masih memegang sesi staf.
+  const isHotelMember = role === "staff" || role === "admin";
   const { tenant } = useTenant();
   const t = useT();
-  const state = location.state as ReviewState | null;
+  const state = (location.state as ReviewState | null) ?? (loadDraft() as ReviewState | null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -126,6 +132,8 @@ export default function BookingReview() {
         created_by: user.id,
       });
 
+      // Pesanannya sudah jadi; draf tidak boleh menghidupkannya kembali.
+      clearDraft();
       navigate("/portal/book/confirmation", {
         state: {
           booking,
@@ -224,6 +232,14 @@ export default function BookingReview() {
           >
             <ArrowLeft className="w-4 h-4" /> {t("Back")}
           </button>
+          {isHotelMember ? (
+            <Link
+              to="/bookings/new"
+              className="text-sm text-primary font-semibold hover:underline"
+            >
+              Anda pengelola hotel ini — buat booking dari dasbor
+            </Link>
+          ) : (
           <motion.div whileTap={{ scale: 0.98 }}>
             <button
               onClick={handleConfirm}
@@ -239,6 +255,7 @@ export default function BookingReview() {
               )}
             </button>
           </motion.div>
+          )}
         </div>
       </div>
     </PageTransition>
