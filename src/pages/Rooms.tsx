@@ -314,7 +314,7 @@ export default function Rooms() {
             never engaged: it forced its full intrinsic width and crushed the
             search box down to a sliver once there were more than a few types. */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 w-full sm:w-64 md:w-72 shrink-0 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background transition-shadow">
+          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 md:px-4 py-2 md:py-2.5 w-full sm:w-64 md:w-72 shrink-0 search-focus">
             <Search className="w-4 h-4 text-muted-foreground shrink-0" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search room number...")} className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full min-w-0" />
           </div>
