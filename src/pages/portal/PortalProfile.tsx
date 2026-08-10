@@ -7,7 +7,7 @@ import { useMyProfile, useUpdateMyProfile } from "@/hooks/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import { useToast } from "@/hooks/use-toast";
-import { tr } from "@/lib/i18n";
+import { tr, dateLocale } from "@/lib/i18n";
 
 const SSO_ACCOUNT_URL = (import.meta.env.VITE_SSO_ISSUER as string) ?? "https://sso.ventera.ai";
 
@@ -19,7 +19,7 @@ function initials(name: string) {
 
 function memberSince(iso?: string) {
   if (!iso) return null;
-  return new Date(iso).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { month: "long", year: "numeric" });
 }
 
 export default function PortalProfile() {

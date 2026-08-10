@@ -28,6 +28,19 @@ export function tr(s: string): string {
   return _lang === "en" ? EN[s] ?? s : ID[s] ?? s;
 }
 
+/**
+ * Locale untuk `toLocaleDateString`, mengikuti bahasa yang sedang dipilih.
+ *
+ * Seluruh portal tamu memakai "en-GB" secara harfiah, jadi seorang tamu
+ * Indonesia membaca "20 Aug 2026" — nyaris benar, dan justru itu yang membuatnya
+ * bertahan lama tanpa ada yang melaporkannya. Bulan singkat Indonesia berbeda
+ * ("Agu", "Okt", "Des"), dan halaman konfirmasi pemesanan adalah tempat terakhir
+ * yang boleh terasa asing.
+ */
+export function dateLocale(): string {
+  return _lang === "en" ? "en-GB" : "id-ID";
+}
+
 /** "Rp 4.6jt" in Indonesian, "Rp 4.6M" in English — abbreviations follow lang. */
 export function compactIDR(n: number): string {
   const en = _lang === "en";

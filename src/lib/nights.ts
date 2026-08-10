@@ -20,3 +20,15 @@
 export function nightsLabel(count: number, t: (s: string) => string): string {
   return `${count} ${t(count === 1 ? "night" : "nights")}`;
 }
+
+/**
+ * "2 tamu" / "2 guests" — persoalan yang sama persis, jadi ia tinggal di sini
+ * juga alih-alih di modulnya sendiri.
+ *
+ * `{guests} guest{guests !== 1 ? "s" : ""}` tersebar di layar pemesanan portal:
+ * jamaknya benar dalam bahasa Inggris, dan tidak pernah diterjemahkan. Seorang
+ * tamu Indonesia membaca "2 guests" tepat sebelum membayar.
+ */
+export function guestsLabel(count: number, t: (s: string) => string): string {
+  return `${count} ${t(count === 1 ? "guest" : "guests")}`;
+}

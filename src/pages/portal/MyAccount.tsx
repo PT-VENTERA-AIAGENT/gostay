@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useMyBookings } from "@/hooks/useBookings";
 import { useAuth } from "@/contexts/AuthContext";
-import { useT } from "@/lib/i18n";
+import { useT, dateLocale } from "@/lib/i18n";
 import type { BookingWithRelations } from "@/services/bookingService";
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
@@ -29,7 +29,7 @@ function formatIDR(n: number) {
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString(dateLocale(), { day: "numeric", month: "short", year: "numeric" });
 }
 
 function initials(name: string) {
