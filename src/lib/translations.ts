@@ -374,6 +374,44 @@ export const EN: Record<string, string> = {
 
 // English → Indonesian, for the staff pages (which are authored in English).
 export const ID: Record<string, string> = {
+
+  // ── Alur pemesanan portal tamu (Kamar → Data Diri → Tinjau → Konfirmasi) ──
+  // Halaman-halaman ini ditulis dalam bahasa Inggris dan tidak pernah
+  // diterjemahkan, jadi tamu Indonesia membaca "Guest Details" dan "2 guests"
+  // tepat sebelum membayar.
+  "Details": "Data Diri",
+  "Review": "Tinjau",
+  "Confirmation": "Konfirmasi",
+  "guest": "tamu",
+  "Adult": "Dewasa",
+  "Guest Details": "Data Tamu",
+  "Please provide your information": "Lengkapi data Anda",
+  "First Name": "Nama Depan",
+  "Last Name": "Nama Belakang",
+  "John": "Budi",
+  "Doe": "Santoso",
+  "optional": "opsional",
+  "Any special requests...": "Permintaan khusus, kalau ada…",
+  "Back": "Kembali",
+  "Review Booking": "Tinjau Pesanan",
+  "No booking data found. Please start from the rooms page.": "Data pesanan tidak ditemukan. Silakan mulai dari halaman kamar.",
+  "Browse rooms": "Lihat kamar",
+  "Review Your Booking": "Tinjau Pesanan Anda",
+  "Please review all details before confirming": "Periksa kembali semua rincian sebelum mengonfirmasi",
+  "Room Details": "Rincian Kamar",
+  "Max Occupancy": "Kapasitas Maksimal",
+  "Price Breakdown": "Rincian Harga",
+  "Submitting...": "Mengirim…",
+  "Request Booking": "Ajukan Pesanan",
+  "Sign in to book": "Masuk untuk memesan",
+  "Something went wrong. Please try again.": "Terjadi kesalahan. Silakan coba lagi.",
+  "Booking Confirmed!": "Pesanan Diterima!",
+  "Your reservation has been successfully created": "Reservasi Anda berhasil dibuat",
+  "Booking Reference": "Nomor Referensi",
+  "Confirmation sent to": "Konfirmasi dikirim ke",
+  "My Bookings": "Pesanan Saya",
+  "Back to Home": "Kembali ke Beranda",
+  "Room Service": "Layanan Kamar",
   // Dashboard
   "New Bookings": "Booking Baru",
   "Check-In": "Check-In",
