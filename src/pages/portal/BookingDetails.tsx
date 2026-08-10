@@ -6,6 +6,7 @@ import PageTransition from "@/components/shared/PageTransition";
 import type { RoomType } from "@/types/database.types";
 import { nightsLabel, guestsLabel } from "@/lib/nights";
 import { useT } from "@/lib/i18n";
+import { loadDraft, saveDraft } from "@/lib/bookingDraft";
 
 interface BookingState {
   roomType: RoomType;
@@ -36,7 +37,9 @@ export default function BookingDetails() {
   const location = useLocation();
   const navigate = useNavigate();
   const t = useT();
-  const state = location.state as BookingState | null;
+  // Draf tersimpan dipakai HANYA kalau router tidak membawa apa-apa — tamu yang
+  // baru saja kembali dari SSO, atau yang menekan F5.
+  const state = (location.state as BookingState | null) ?? (loadDraft() as BookingState | null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -65,17 +68,19 @@ export default function BookingDetails() {
   const total = nights * roomType.base_rate;
 
   function handleContinue() {
-    navigate("/portal/book/review", {
-      state: {
-        roomType,
-        checkIn,
-        checkOut,
-        guests,
-        guestInfo: { firstName, lastName, email, phone, specialRequests },
-        nights,
-        total,
-      },
-    });
+    const payload = {
+      roomType,
+      checkIn,
+      checkOut,
+      guests,
+      guestInfo: { firstName, lastName, email, phone, specialRequests },
+      nights,
+      total,
+    };
+    // Disimpan SEBELUM berpindah: langkah berikutnya bisa melempar tamu keluar
+    // ke SSO, dan saat itu location.state sudah tidak ada lagi.
+    saveDraft(payload);
+    navigate("/portal/book/review", { state: payload });
   }
 
   const canContinue = firstName.trim() && lastName.trim() && email.trim() && phone.trim();
