@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Users, MapPin, Wifi, Wind, Tv, Coffee, Bath, Mountain, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Users, MapPin, Wifi, Wind, Tv, Coffee, Bath, Mountain, Check, Loader2 } from "lucide-react";
 import { format, parseISO, addDays as addDaysFn } from "date-fns";
 import PageTransition from "@/components/shared/PageTransition";
 import { motion } from "framer-motion";
@@ -41,6 +42,10 @@ export default function PortalRoomDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { role } = useAuth();
+  // Staf/admin selalu terkunci ke hotelnya sendiri oleh current_tenant() (046),
+  // jadi peran saja sudah cukup: portal yang mereka lihat pasti hotel mereka.
+  const isHotelMember = role === "staff" || role === "admin";
 
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") ?? "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") ?? "");
@@ -243,13 +248,37 @@ export default function PortalRoomDetail() {
                 </div>
               )}
 
-              <button
-                onClick={handleBook}
-                disabled={!datesSelected || (!loadingAvail && !isAvailable)}
-                className="block w-full bg-primary text-primary-foreground py-3 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity text-center disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {!datesSelected ? "Pilih tanggal dulu" : "Book Now"}
-              </button>
+              {/* Staf dan admin hotel ini TIDAK memesan lewat portal tamu.
+                  Kalau dibiarkan, `getOrCreateOwnCustomer` membuatkan baris
+                  `customers` atas nama mereka sendiri — pengelola hotel muncul
+                  di CRM tamu hotelnya sendiri, dengan nama dari formulir
+                  ("Saya Test") yang tidak berhubungan dengan nama akunnya. Satu
+                  orang, dua identitas, dan tak ada layar yang menghubungkannya.
+                  Pemesanan atas nama tamu memang punya tempatnya sendiri, dan
+                  di sana ia tercatat `source: 'staff'` — yang benar. */}
+              {isHotelMember ? (
+                <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+                  <p className="text-foreground font-medium">Anda masuk sebagai pengelola hotel ini</p>
+                  <p className="text-muted-foreground mt-1 leading-relaxed">
+                    Pemesanan lewat portal tamu akan mencatat Anda sebagai tamu. Untuk memesankan
+                    kamar atas nama tamu, gunakan Booking Baru di dasbor.
+                  </p>
+                  <Link
+                    to="/bookings/new"
+                    className="mt-3 inline-flex items-center gap-1.5 text-primary font-semibold hover:underline"
+                  >
+                    Buat booking dari dasbor <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              ) : (
+                <button
+                  onClick={handleBook}
+                  disabled={!datesSelected || (!loadingAvail && !isAvailable)}
+                  className="block w-full bg-primary text-primary-foreground py-3 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {!datesSelected ? "Pilih tanggal dulu" : "Book Now"}
+                </button>
+              )}
 
               {nights > 0 && (
                 <div className="mt-4 pt-4 border-t border-border space-y-2 text-sm">

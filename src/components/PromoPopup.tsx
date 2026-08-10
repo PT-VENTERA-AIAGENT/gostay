@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const LEADS_COLLECTOR_URL =
   "https://wfthvovlhphnrodrqxqt.supabase.co/functions/v1/leads-collector";
@@ -13,10 +14,26 @@ export function PromoPopup() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDone, setIsDone] = useState(false);
 
+  const { user } = useAuth();
   const isLandingPage = location.pathname === "/";
 
   useEffect(() => {
-    if (import.meta.env.DEV || isLandingPage) return;
+    if (import.meta.env.DEV) return;
+
+    // Syaratnya dulu `isLandingPage` sebagai alasan untuk TIDAK tampil, dan itu
+    // terbalik pada ketiga penontonnya sekaligus:
+    //
+    //   * halaman pemasaran — satu-satunya tempat calon pemilik hotel benar-benar
+    //     ada — justru dilewati;
+    //   * tamu yang sedang memesan kamar disodori penawaran perangkat lunak
+    //     hotel, di halaman bermerek hotel itu sendiri, dan overlay-nya menutupi
+    //     tombol pesan;
+    //   * staf hotel yang sudah menjadi pelanggan berbayar dibujuk "Coba GoStay
+    //     Gratis" di tengah pekerjaannya.
+    //
+    // Sekarang: hanya di halaman pemasaran, dan hanya untuk yang belum masuk.
+    if (!isLandingPage) return;
+    if (user) return;
 
     const dismissed = sessionStorage.getItem("bm_promo_dismissed");
     if (dismissed) return;
@@ -26,7 +43,7 @@ export function PromoPopup() {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [isLandingPage]);
+  }, [isLandingPage, user]);
 
   const handleClose = () => {
     setIsOpen(false);
