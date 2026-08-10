@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/lib/i18n";
+import GuestOnlyRoute from "@/components/shared/GuestOnlyRoute";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import ErrorBoundary from "@/components/shared/ErrorBoundary";
 import { isAppHost, isLandingHost, appHref } from "@/lib/site";
@@ -276,7 +277,9 @@ const App = () => (
                 path="my-account"
                 element={
                   <ProtectedRoute>
-                    <MyAccount />
+                    <GuestOnlyRoute>
+                      <MyAccount />
+                    </GuestOnlyRoute>
                   </ProtectedRoute>
                 }
               />
@@ -284,7 +287,9 @@ const App = () => (
                 path="my-account/bookings/:id"
                 element={
                   <ProtectedRoute>
-                    <PortalBookingDetail />
+                    <GuestOnlyRoute>
+                      <PortalBookingDetail />
+                    </GuestOnlyRoute>
                   </ProtectedRoute>
                 }
               />
@@ -292,7 +297,9 @@ const App = () => (
                 path="profile"
                 element={
                   <ProtectedRoute>
-                    <PortalProfile />
+                    <GuestOnlyRoute>
+                      <PortalProfile />
+                    </GuestOnlyRoute>
                   </ProtectedRoute>
                 }
               />

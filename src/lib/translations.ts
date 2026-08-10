@@ -127,6 +127,8 @@ export const EN: Record<string, string> = {
   "Beranda": "Home",
   "Booking Saya": "My Bookings",
   "Room Service": "Room Service",
+  "Anda melihat portal tamu sebagai pengelola hotel.": "You are viewing the guest portal as hotel staff.",
+  "Kembali ke dasbor": "Back to dashboard",
   "Akun": "Account",
   "Booking": "Bookings",
   "Layanan": "Order",
