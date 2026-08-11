@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/sso";
 import { currentTenantSlug } from "@/lib/tenant";
 import { UserFacingError } from "@/lib/errors";
+import { tr } from "@/lib/i18n";
 
 /**
  * Menerbitkan invoice untuk pesanan milik tamu yang sedang masuk.
@@ -16,7 +17,7 @@ import { UserFacingError } from "@/lib/errors";
  */
 export async function createCheckoutInvoice(bookingReference: string): Promise<string> {
   const token = getSession()?.supabase_token;
-  if (!token) throw new UserFacingError("Silakan masuk lebih dulu untuk membayar.");
+  if (!token) throw new UserFacingError(tr("Silakan masuk lebih dulu untuk membayar."));
   const slug = currentTenantSlug();
 
   const res = await fetch("/api/payment/checkout", {
@@ -63,7 +64,7 @@ export async function createCheckoutInvoice(bookingReference: string): Promise<s
     if (!known[body.error ?? ""]) console.error("[payment] gagal membuat tagihan:", body.error);
     throw new UserFacingError(
       known[body.error ?? ""] ??
-        "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar, atau hubungi hotel lewat menu Pesan.",
+        tr("Halaman pembayaran belum bisa dibuka. Coba lagi sebentar, atau hubungi hotel lewat menu Pesan."),
     );
   }
   return body.invoiceUrl;

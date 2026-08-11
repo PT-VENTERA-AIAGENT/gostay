@@ -73,7 +73,7 @@ export default function BookingConfirmation() {
     try {
       window.location.href = await createCheckoutInvoice(booking.reference);
     } catch (e) {
-      setPayError(humanMessage(e, "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar."));
+      setPayError(humanMessage(e, t("Halaman pembayaran belum bisa dibuka. Coba lagi sebentar.")));
       setPaying(false);
     }
   }

@@ -52,7 +52,7 @@ export default function BookingReviewForm({ bookingId, customerId }: Props) {
       await create.mutateAsync({ customer_id: customerId, booking_id: bookingId, rating, comment: comment.trim() || null });
       toast({ title: tr("Terima kasih atas ulasannya!") });
     } catch (e) {
-      setError(humanMessage(e, "Ulasan belum terkirim. Coba lagi sebentar."));
+      setError(humanMessage(e, tr("Ulasan belum terkirim. Coba lagi sebentar.")));
     }
   }
 

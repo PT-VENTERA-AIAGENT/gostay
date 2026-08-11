@@ -156,7 +156,7 @@ export default function BookingReview() {
         navigate("/portal/book/confirmation", {
           state: {
             booking, roomType, checkIn, checkOut, guests, guestInfo, nights, total,
-            payError: humanMessage(payErr, "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar."),
+            payError: humanMessage(payErr, t("Halaman pembayaran belum bisa dibuka. Coba lagi sebentar.")),
           },
         });
         return;
@@ -166,7 +166,7 @@ export default function BookingReview() {
       // membacanya, dan tidak akan terbantu olehnya.
       const message = humanMessage(
         err,
-        "Pesanan belum bisa dibuat. Coba lagi sebentar, atau hubungi hotel lewat menu Pesan.",
+        t("Pesanan belum bisa dibuat. Coba lagi sebentar, atau hubungi hotel lewat menu Pesan."),
       );
       setSubmitError(message);
       setSubmitting(false);
