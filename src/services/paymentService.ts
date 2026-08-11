@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/sso";
+import { currentTenantSlug } from "@/lib/tenant";
 
 /**
  * Menerbitkan invoice untuk pesanan milik tamu yang sedang masuk.
@@ -15,6 +16,7 @@ import { getSession } from "@/lib/sso";
 export async function createCheckoutInvoice(bookingReference: string): Promise<string> {
   const token = getSession()?.supabase_token;
   if (!token) throw new Error("Silakan masuk lebih dulu untuk membayar.");
+  const slug = currentTenantSlug();
 
   const res = await fetch("/api/payment/checkout", {
     method: "POST",
@@ -28,7 +30,14 @@ export async function createCheckoutInvoice(bookingReference: string): Promise<s
       // daftar pesanan. Nomor referensi dibawa di query karena kepulangan dari
       // Xendit adalah pemuatan halaman baru — `location.state` React Router
       // sudah tidak ada lagi di titik itu.
-      successRedirectUrl: `${window.location.origin}/portal/book/confirmation?ref=${encodeURIComponent(bookingReference)}`,
+      // `hotel` ikut dibawa, bukan hanya `ref`.
+      //
+      // Kepulangan dari Xendit adalah pemuatan halaman baru di tab yang mungkin
+      // belum pernah menyentuh portal hotel ini, jadi tidak ada slug yang
+      // diingat. Tanpa itu `current_tenant()` menjatuhkan pilihannya ke hotel
+      // lain: kop halaman menyebut nama hotel yang salah, dan nama tipe kamar
+      // hilang jadi "—" karena baris `rooms` milik hotel ini tersaring RLS.
+      successRedirectUrl: `${window.location.origin}/portal/book/confirmation?ref=${encodeURIComponent(bookingReference)}${slug ? `&hotel=${encodeURIComponent(slug)}` : ""}`,
     }),
   });
 
