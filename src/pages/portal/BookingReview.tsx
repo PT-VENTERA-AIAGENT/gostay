@@ -11,6 +11,7 @@ import { useT, dateLocale } from "@/lib/i18n";
 import { nightsLabel, guestsLabel } from "@/lib/nights";
 import { clearDraft, loadDraft } from "@/lib/bookingDraft";
 import { createCheckoutInvoice } from "@/services/paymentService";
+import { humanMessage } from "@/lib/errors";
 import type { RoomType } from "@/types/database.types";
 
 interface GuestInfo {
@@ -155,13 +156,18 @@ export default function BookingReview() {
         navigate("/portal/book/confirmation", {
           state: {
             booking, roomType, checkIn, checkOut, guests, guestInfo, nights, total,
-            payError: payErr instanceof Error ? payErr.message : String(payErr),
+            payError: humanMessage(payErr, "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar."),
           },
         });
         return;
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("Something went wrong. Please try again.");
+      // Pesan dari Supabase menyebut nama tabel dan policy; tamu tidak boleh
+      // membacanya, dan tidak akan terbantu olehnya.
+      const message = humanMessage(
+        err,
+        "Pesanan belum bisa dibuat. Coba lagi sebentar, atau hubungi hotel lewat menu Pesan.",
+      );
       setSubmitError(message);
       setSubmitting(false);
     }

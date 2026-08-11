@@ -8,6 +8,7 @@ import BookingReviewForm from "@/components/portal/BookingReviewForm";
 import { useBooking, useUpdateBookingStatus } from "@/hooks/useBookings";
 import { cn } from "@/lib/utils";
 import { createCheckoutInvoice } from "@/services/paymentService";
+import { humanMessage } from "@/lib/errors";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -99,7 +100,7 @@ export default function PortalBookingDetail() {
       // tamu mengira tombolnya rusak.
       window.location.href = url;
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Gagal membuat tagihan.");
+      setPayError(humanMessage(e, "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar."));
       setPaying(false);
     }
   }
@@ -110,7 +111,7 @@ export default function PortalBookingDetail() {
       await cancelBooking.mutateAsync({ id: booking!.id, status: "cancelled", note: "Cancelled by guest from the portal" });
       toast({ title: tr("Booking cancelled"), description: `${booking!.reference} has been cancelled.` });
     } catch (e) {
-      setCancelError(e instanceof Error ? e.message : "Could not cancel the booking. Please contact the hotel.");
+      setCancelError(humanMessage(e, "Pembatalan belum berhasil. Hubungi hotel untuk memastikan status pesanan Anda."));
     }
   }
 
