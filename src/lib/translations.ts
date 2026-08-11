@@ -552,6 +552,10 @@ export const ID: Record<string, string> = {
   "Admin": "Admin",
   "No team members yet.": "Belum ada anggota tim.",
   "No users match this filter.": "Tidak ada pengguna yang cocok.",
+  "Users appear here after their first sign-in with Ventera SSO — accounts cannot be created from this page. Everyone starts as":
+    "Pengguna muncul di sini setelah pertama kali masuk lewat Ventera SSO — akun tidak bisa dibuat dari halaman ini. Semua orang mulai sebagai",
+  "; grant staff or admin access below. Deactivating someone revokes their access immediately.":
+    "; beri akses staf atau admin di bawah. Menonaktifkan seseorang langsung mencabut aksesnya.",
   "Reviews": "Ulasan",
   "Occupancy Rate": "Tingkat Hunian",
   "Revenue (Today)": "Pendapatan (Hari Ini)",
