@@ -372,6 +372,16 @@ export const EN: Record<string, string> = {
   "Tipe kamar dinonaktifkan": "Room type deactivated",
   "Tipe kamar diperbarui": "Room type updated",
   "Ukuran logo maksimal 2 MB": "Logo must be at most 2 MB",
+
+  // Pesan galat portal tamu. Bahasa Indonesia adalah sumbernya; entri di sini
+  // hanya dipakai saat penonton memilih English.
+  "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar, atau hubungi hotel lewat menu Pesan.": "The payment page could not be opened. Try again shortly, or contact the hotel from Messages.",
+  "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar.": "The payment page could not be opened. Try again shortly.",
+  "Pesanan belum bisa dibuat. Coba lagi sebentar, atau hubungi hotel lewat menu Pesan.": "Your booking could not be created. Try again shortly, or contact the hotel from Messages.",
+  "Pembatalan belum berhasil. Hubungi hotel untuk memastikan status pesanan Anda.": "The cancellation did not go through. Contact the hotel to confirm your booking status.",
+  "Perubahan belum tersimpan. Coba lagi sebentar.": "Your changes were not saved. Try again shortly.",
+  "Ulasan belum terkirim. Coba lagi sebentar.": "Your review was not sent. Try again shortly.",
+  "Silakan masuk lebih dulu untuk membayar.": "Please sign in first to pay.",
 };
 
 // English → Indonesian, for the staff pages (which are authored in English).

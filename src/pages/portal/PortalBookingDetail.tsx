@@ -100,7 +100,7 @@ export default function PortalBookingDetail() {
       // tamu mengira tombolnya rusak.
       window.location.href = url;
     } catch (e) {
-      setPayError(humanMessage(e, "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar."));
+      setPayError(humanMessage(e, tr("Halaman pembayaran belum bisa dibuka. Coba lagi sebentar.")));
       setPaying(false);
     }
   }
@@ -111,7 +111,7 @@ export default function PortalBookingDetail() {
       await cancelBooking.mutateAsync({ id: booking!.id, status: "cancelled", note: "Cancelled by guest from the portal" });
       toast({ title: tr("Booking cancelled"), description: `${booking!.reference} has been cancelled.` });
     } catch (e) {
-      setCancelError(humanMessage(e, "Pembatalan belum berhasil. Hubungi hotel untuk memastikan status pesanan Anda."));
+      setCancelError(humanMessage(e, tr("Pembatalan belum berhasil. Hubungi hotel untuk memastikan status pesanan Anda.")));
     }
   }
 

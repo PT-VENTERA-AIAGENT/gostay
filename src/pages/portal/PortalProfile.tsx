@@ -48,7 +48,7 @@ export default function PortalProfile() {
       await updateProfile.mutateAsync({ phone: phone.trim() || null });
       toast({ title: tr("Profile updated"), description: tr("Your phone number has been saved.") });
     } catch (e) {
-      setError(humanMessage(e, "Perubahan belum tersimpan. Coba lagi sebentar."));
+      setError(humanMessage(e, tr("Perubahan belum tersimpan. Coba lagi sebentar.")));
     }
   }
 
