@@ -21,10 +21,10 @@ import TemplatePicker from "@/components/waflow/TemplatePicker";
 // rather than copied: the file is pure data with no server-only imports, so a
 // single definition serves both the installer and the engine's transcript
 // tests. A copy would drift the first time anyone edited one side.
-import { FLOW_TEMPLATES, type FlowTemplate } from "../../../api/_lib/wa/flow/templates";
+import { FLOW_TEMPLATES, type FlowTemplate } from "@/lib/waFlowTemplates";
 // The same routine the bot's selection uses, so the console can never disagree
 // with what actually happens to a message.
-import { findKeywordClashes } from "../../../api/_lib/wa/flow/select";
+import { findKeywordClashes } from "@/lib/waFlowSelect";
 
 /**
  * The hotel's WhatsApp script: every flow, in the order the engine evaluates

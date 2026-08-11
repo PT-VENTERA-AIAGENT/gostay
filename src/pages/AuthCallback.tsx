@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { handleCallback, getSession } from "@/lib/sso";
-import { useSsoAuth, roleHome } from "@/contexts/AuthContext";
+import { postLoginDestination, useSsoAuth } from "@/contexts/AuthContext";
 
 export default function AuthCallback() {
   const [params] = useSearchParams();
@@ -22,22 +22,23 @@ export default function AuthCallback() {
       return;
     }
 
-    handleCallback(code, state).then((result) => {
+    handleCallback(code, state).then(async (result) => {
       if (!result) {
         navigate("/login?error=sso_failed", { replace: true });
         return;
       }
-      refreshSession();
+      await refreshSession();
       // handleCallback has just stored the session, role included, so read it
       // back for the routing decision. A returnTo that points at a real page
       // (a deep link the user was sent to /login from) wins; the default "/"
       // is marketing, so fall through to the role's home instead.
       const session = getSession();
       const role = session?.role ?? null;
-      const dest =
-        result.returnTo && result.returnTo !== "/"
-          ? result.returnTo
-          : roleHome(role, session?.tenant_id);
+      const dest = postLoginDestination(
+        role,
+        session?.tenant_id,
+        result.returnTo,
+      );
       navigate(dest, { replace: true });
     });
   }, []);

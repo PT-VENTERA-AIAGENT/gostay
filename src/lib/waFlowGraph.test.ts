@@ -4,7 +4,7 @@ import { fromDefinition, toDefinition } from "./waFlowGraph";
 import { coerceFlow, FLOW_VERSION, type FlowDefinition } from "@/types/waFlow";
 // The shipped templates are the most complex graphs that exist, so they are the
 // right thing to round-trip: every node type and both handle kinds appear.
-import { FLOW_TEMPLATES } from "../../api/_lib/wa/flow/templates";
+import { FLOW_TEMPLATES } from "./waFlowTemplates";
 
 const sample: FlowDefinition = {
   version: FLOW_VERSION,

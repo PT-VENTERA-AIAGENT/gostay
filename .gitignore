@@ -59,3 +59,5 @@ devtools_login.txt
 .xt_ids
 _*.mjs
 shot_*.png
+
+.env*

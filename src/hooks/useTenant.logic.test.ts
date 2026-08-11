@@ -32,13 +32,9 @@ describe("pickTenant", () => {
     expect(pickTenant([], "lor-kali", "t-kopi")).toBeNull();
   });
 
-  it("does not silently substitute another hotel for an unknown slug", () => {
-    // Slug tak dikenal tetap memulangkan sesuatu (agar portal punya isi), TAPI
-    // isWrongHotel di bawah yang memastikan keadaan itu dikatakan, bukan
-    // disembunyikan.
+  it("fails closed for an unknown slug instead of showing the first hotel", () => {
     const picked = pickTenant([kopiRintik], "hotel-yang-tidak-ada", "t-kopi");
-    expect(picked).toBe(kopiRintik);
-    expect(isWrongHotel("hotel-yang-tidak-ada", picked)).toBe(true);
+    expect(picked).toBeNull();
   });
 });
 

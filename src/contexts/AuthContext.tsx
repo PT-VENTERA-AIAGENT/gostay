@@ -6,7 +6,15 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { getSession, logout, sessionExpiryMs, startLogin, type SsoClaims, type SsoSession } from "@/lib/sso";
+import {
+  getSession,
+  logout,
+  refreshSessionAuthority,
+  sessionExpiryMs,
+  startLogin,
+  type SsoClaims,
+  type SsoSession,
+} from "@/lib/sso";
 import type { UserRole } from "@/types/database.types";
 
 /**
@@ -40,7 +48,7 @@ interface AuthContextValue {
   isLoading: boolean;
   signIn: (returnTo?: string) => void;
   signOut: () => void;
-  refreshSession: () => void;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -87,17 +95,46 @@ export function roleHome(
   return "/portal";
 }
 
+/** A hotel account never resumes into the public guest portal after SSO. */
+export function postLoginDestination(
+  role: UserRole | null,
+  tenantId: string | null | undefined,
+  returnTo: string,
+): string {
+  const isHotelMember = role === "admin" || role === "staff";
+  const returnsToPortal =
+    returnTo === "/portal" ||
+    returnTo.startsWith("/portal/") ||
+    returnTo.startsWith("/portal?");
+
+  if (isHotelMember && returnsToPortal) return "/dashboard";
+  if (returnTo && returnTo !== "/") return returnTo;
+  return roleHome(role, tenantId);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SsoSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshSession = useCallback(() => {
-    setSession(getSession());
+  const refreshSession = useCallback(async () => {
+    const stored = getSession();
+    if (!stored) {
+      setSession(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const authoritative = await refreshSessionAuthority(stored);
+    const current = getSession();
+    setSession(
+      current?.access_token === stored.access_token ? authoritative : current,
+    );
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    refreshSession();
+    void refreshSession();
   }, [refreshSession]);
 
   // When the session ends, sign the user out instead of leaving a dead token in

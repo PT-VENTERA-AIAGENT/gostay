@@ -23,9 +23,16 @@ const portalNav = [
 ];
 
 export default function PortalLayout() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
-  const { session, user, role, signOut, refreshSession } = useAuth();
+  const {
+    session,
+    user,
+    role,
+    signOut,
+    refreshSession,
+    isLoading: authLoading,
+  } = useAuth();
   const {
     name: hotelName,
     initial: hotelInitial,
@@ -38,6 +45,10 @@ export default function PortalLayout() {
   // Penanda peran, dipakai spanduk di bawah. Staf/admin selalu terkunci ke
   // hotelnya sendiri oleh current_tenant() (046), jadi peran saja sudah cukup.
   const isHotelMember = role === "staff" || role === "admin";
+  // `/portal` is public for guests, but a signed-in hotel account belongs in
+  // its dashboard. A platform admin may still open an explicit hotel preview
+  // from the platform console via `?hotel=...`.
+  const canPreviewPortal = role === "admin" && Boolean(new URLSearchParams(search).get("hotel"));
   // Tamu yang datang dari tautan WhatsApp membawa `?t=` — tukar sekali, lalu
   // BUANG dari URL. Membiarkannya berarti token itu ikut ter-bookmark, ikut
   // ter-share, dan muncul di setiap tautan yang dibagikan tamu.
@@ -54,7 +65,7 @@ export default function PortalLayout() {
       if (cancelled) return;
       url.searchParams.delete("t");
       window.history.replaceState({}, "", url.toString());
-      refreshSession();
+      await refreshSession();
       setRedeeming(false);
     })();
     return () => {
@@ -77,8 +88,20 @@ export default function PortalLayout() {
     );
   // Selagi token tautan ditukar, sesi belum ada — mengalihkan sekarang akan
   // melempar tamu ke "Buat Hotel" tepat sebelum ia berhasil masuk.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (hasNoHotel && !redeeming) {
     return <Navigate to="/create-hotel" replace />;
+  }
+
+  if (isHotelMember && !canPreviewPortal && pathname === "/portal") {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (
@@ -93,8 +116,14 @@ export default function PortalLayout() {
       {wrongHotel && (
         <div className="bg-destructive/10 border-b border-destructive/30 px-4 md:px-8 py-3 text-sm text-destructive">
           <strong>{t("Hotel yang Anda tuju tidak dapat dibuka.")}</strong>{" "}
-          {t("Tautan ini menunjuk")} <code>{requestedSlug}</code>,{" "}
-          {t("tetapi yang dapat kami tampilkan adalah")} <strong>{hotelName}</strong>.{" "}
+          {t("Tautan ini menunjuk")} <code>{requestedSlug}</code>.{" "}
+          {tenant ? (
+            <>
+              {t("tetapi yang dapat kami tampilkan adalah")} <strong>{hotelName}</strong>.{" "}
+            </>
+          ) : (
+            <>{t("Hotel ini tidak tersedia atau tautannya sudah tidak valid.")} </>
+          )}
           {t("Periksa kembali tautan dari hotel tersebut, atau hubungi mereka lewat WhatsApp.")}
         </div>
       )}

@@ -213,6 +213,15 @@ export function getSession(): SsoSession | null {
     return null;
   }
 
+  // Sessions minted before the database role/profile fields were added are
+  // not safe to use for an account portal: the browser cannot tell a hotel
+  // member from a guest. Force one clean sign-in so the current exchange can
+  // attach the authoritative role instead of silently rendering `/portal`.
+  if (!Object.prototype.hasOwnProperty.call(session, "role")) {
+    sessionStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+
   // Never carry a role the database wouldn't recognise; unknown → null, which
   // denies every gated route.
   if (session.role != null && !VALID_ROLES.includes(session.role)) {
@@ -224,6 +233,93 @@ export function getSession(): SsoSession | null {
     return null;
   }
   return session;
+}
+
+interface AuthorityRefreshOptions {
+  request?: typeof fetch;
+  url?: string;
+  anonKey?: string;
+}
+
+/**
+ * Re-read the role and tenant from the database using the session's signed
+ * Supabase token.
+ *
+ * The token exchange already returns these fields, but a failed/older exchange
+ * can leave a perfectly valid authenticated session carrying role=null or a
+ * stale role. Routing from that cached value is what left a real hotel admin in
+ * the public guest portal. `get_my_role()` and `get_my_tenant()` are the same
+ * authoritative functions RLS uses, so reconciling here cannot grant anything
+ * the database would deny.
+ */
+export async function refreshSessionAuthority(
+  session: SsoSession,
+  options: AuthorityRefreshOptions = {},
+): Promise<SsoSession> {
+  if (!session.supabase_token) return session;
+
+  const url = (
+    options.url ?? (import.meta.env.VITE_SUPABASE_URL as string) ?? ""
+  ).replace(/\/$/, "");
+  const anonKey =
+    options.anonKey ?? (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ?? "";
+  if (!url || !anonKey) return session;
+
+  const request = options.request ?? globalThis.fetch;
+  const headers = {
+    apikey: anonKey,
+    Authorization: `Bearer ${session.supabase_token}`,
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const [roleResponse, tenantResponse] = await Promise.all([
+      request(`${url}/rest/v1/rpc/get_my_role`, {
+        method: "POST",
+        headers,
+        body: "{}",
+      }),
+      request(`${url}/rest/v1/rpc/get_my_tenant`, {
+        method: "POST",
+        headers,
+        body: "{}",
+      }),
+    ]);
+
+    if (!roleResponse.ok) return session;
+
+    const rawRole = (await roleResponse.json()) as unknown;
+    const role =
+      typeof rawRole === "string" && VALID_ROLES.includes(rawRole as SsoRole)
+        ? (rawRole as SsoRole)
+        : null;
+
+    let tenantId = session.tenant_id ?? null;
+    if (tenantResponse.ok) {
+      const rawTenant = (await tenantResponse.json()) as unknown;
+      tenantId = typeof rawTenant === "string" ? rawTenant : null;
+    }
+
+    const refreshed: SsoSession = {
+      ...session,
+      role,
+      tenant_id: tenantId,
+    };
+
+    // Do not resurrect a session that was logged out/replaced while the two
+    // network requests were in flight.
+    const current = getSession();
+    if (current?.access_token === session.access_token) {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(refreshed));
+    }
+
+    return refreshed;
+  } catch {
+    // A transient Supabase problem must not destroy a session whose exchange
+    // already supplied a valid role. Keep the cached authority and retry on the
+    // next full session refresh.
+    return session;
+  }
 }
 
 export function clearSession() {
