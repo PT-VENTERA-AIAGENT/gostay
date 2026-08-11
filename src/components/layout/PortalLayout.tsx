@@ -12,6 +12,7 @@ import RealtimeSync from "@/components/shared/RealtimeSync";
 import LanguageToggle from "@/components/shared/LanguageToggle";
 import { useT } from "@/lib/i18n";
 import { loginWithPortalToken } from "@/lib/sso";
+import { portalTenantSlug } from "@/lib/tenant";
 
 const portalNav = [
   { label: "Beranda", path: "/portal", icon: Search },
@@ -78,9 +79,20 @@ export default function PortalLayout() {
   // hotel's portal (which the sole-tenant fallback would otherwise render, making
   // them look like a guest of that hotel). Staff/admin have their own dashboard;
   // guests of a real hotel (WhatsApp / portal-link) carry a tenant and stay here.
+  // Tautan portal yang menyebut hotel adalah pernyataan niat, dan niat itu
+  // menang. Seseorang yang sedang berdiri di portal KEMA adalah TAMU KEMA —
+  // bukan calon pemilik hotel. Tanpa pengecualian ini ia dilempar ke "Buat
+  // Hotel" dan diminta mendaftarkan penginapan, padahal ia hanya ingin memesan
+  // kamar; kontaknya di hotel itu justru terbentuk sendiri begitu ia memesan.
+  //
+  // Jalur ini makin mudah kena setelah `current_tenant()` gagal-tertutup (052):
+  // profil tanpa hotel tidak lagi jatuh ke hotel bawaan, jadi `tenant_id` null
+  // menjadi keadaan yang jauh lebih sering.
+  const namedHotel = portalTenantSlug();
   const hasNoHotel =
     session &&
     role === "customer" &&
+    !namedHotel &&
     (
       session.tenant_id === null ||
       // Compatibility with sessions issued before tenant_id was included.
