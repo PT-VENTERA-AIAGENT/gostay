@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, User, Mail, Phone, Check } from "lucide-react";
 import { motion } from "framer-motion";
@@ -7,6 +7,11 @@ import type { RoomType } from "@/types/database.types";
 import { nightsLabel, guestsLabel } from "@/lib/nights";
 import { useT } from "@/lib/i18n";
 import { loadDraft, saveDraft } from "@/lib/bookingDraft";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/hooks/useTenant";
+import { getOwnCustomer } from "@/services/bookingService";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 
 interface BookingState {
   roomType: RoomType;
@@ -37,6 +42,8 @@ export default function BookingDetails() {
   const location = useLocation();
   const navigate = useNavigate();
   const t = useT();
+  const { user, isLoading: authLoading, signIn } = useAuth();
+  const { tenant } = useTenant();
   // Draf tersimpan dipakai HANYA kalau router tidak membawa apa-apa — tamu yang
   // baru saja kembali dari SSO, atau yang menekan F5.
   const state = (location.state as BookingState | null) ?? (loadDraft() as BookingState | null);
@@ -46,6 +53,68 @@ export default function BookingDetails() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [specialRequests, setSpecialRequests] = useState("");
+
+  // Draf disimpan SEBELUM apa pun yang bisa membawa peramban keluar. Gerbang di
+  // bawah melakukan persis itu, dan tanpa ini kamar serta tanggalnya hilang di
+  // perjalanan ke SSO.
+  useEffect(() => {
+    if (state?.roomType) {
+      saveDraft({
+        roomType: state.roomType,
+        checkIn: state.checkIn,
+        checkOut: state.checkOut,
+        guests: state.guests,
+      });
+    }
+  }, [state]);
+
+  // Masuk DULU, mengisi formulir kemudian.
+  //
+  // Sebelumnya `signIn()` baru dipanggil di langkah terakhir, saat tamu menekan
+  // "Ajukan Pesanan" — setelah ia mengetik nama, email, dan nomor teleponnya.
+  // Padahal SSO sudah memegang ketiganya. Jadi tamu diminta mengetik data yang
+  // sistem ini sudah punya, lalu dilempar keluar tepat setelah selesai.
+  //
+  // Sekarang gerbangnya di pintu masuk: satu pengalihan, lalu kembali ke
+  // formulir yang sudah terisi.
+  useEffect(() => {
+    if (authLoading || user) return;
+    signIn(location.pathname);
+  }, [authLoading, user, signIn, location.pathname]);
+
+  // Kontak yang tersimpan di hotel ini didahulukan daripada klaim SSO: kalau
+  // tamu pernah membetulkan ejaan namanya, koreksi itu yang benar.
+  const { data: saved } = useQuery({
+    queryKey: ["own-customer", user?.id, tenant?.id],
+    queryFn: () => getOwnCustomer(user!.id, tenant?.id ?? null),
+    enabled: Boolean(user?.id),
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const full = (saved?.full_name ?? user.name ?? "").trim();
+    const [first, ...rest] = full.split(/\s+/).filter(Boolean);
+    // Hanya mengisi yang MASIH kosong. Menimpa ketikan tamu yang sedang
+    // membetulkan datanya adalah cara tercepat membuat formulir terasa melawan.
+    setFirstName((v) => v || first || "");
+    setLastName((v) => v || rest.join(" "));
+    setEmail((v) => v || saved?.email || user.email || "");
+    setPhone((v) => v || saved?.phone || user.phone_number || "");
+  }, [user, saved]);
+
+  // Selagi sesi diperiksa atau peramban sedang berangkat ke SSO, jangan
+  // menampilkan formulir kosong yang sebentar lagi ditinggalkan.
+  if (authLoading || !user) {
+    return (
+      <PageTransition>
+        <div className="max-w-3xl mx-auto px-4 md:px-8 py-16 flex flex-col items-center gap-3 text-center">
+          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">{t("Mengalihkan ke halaman masuk…")}</p>
+        </div>
+      </PageTransition>
+    );
+  }
 
   if (!state?.roomType) {
     return (
