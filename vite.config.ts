@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
+import fs from "node:fs";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { exchangeCode } from "./api/_lib/exchange";
@@ -212,9 +213,51 @@ function waConnectDevApi(): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Prefix "" loads unprefixed vars too (SSO_CLIENT_SECRET), which Vite keeps
-  // out of the bundle by design. Real environment wins over .env files.
+  // out of the bundle by design.
+  //
+  // Berkas .env repo ini MENANG atas variabel lingkungan mesin — kebalikan dari
+  // perilaku sebelumnya, dan itu disengaja.
+  //
+  // Nama seperti `SUPABASE_URL` dipakai banyak proyek. Sebuah variabel pengguna
+  // Windows bernama itu, milik proyek LAIN, membuat seluruh API dev di sini
+  // memanggil database yang salah dengan kunci GoStay — 401 di setiap rute, dan
+  // tak satu pun pesan menyebut database mana yang dituju. Berjam-jam bisa
+  // hilang mengejar "service role tidak valid" padahal kuncinya benar dan
+  // alamatnya yang keliru.
+  //
+  // Kuncinya dihapus dari process.env DULU, karena `loadEnv` sendiri
+  // mendahulukan lingkungan: membiarkannya berarti nilai mesin dibaca kembali
+  // dan menimpa berkas ini lagi.
+  //
+  // Yang TIDAK ada di berkas tetap diambil dari lingkungan, jadi
+  // `FOO=bar npm run dev` untuk variabel sekali pakai tetap bekerja.
+  const envFiles = [".env", ".env.local", `.env.${mode}`, `.env.${mode}.local`];
+  const fileKeys = new Set<string>();
+  for (const name of envFiles) {
+    const full = path.resolve(process.cwd(), name);
+    if (!fs.existsSync(full)) continue;
+    for (const line of fs.readFileSync(full, "utf8").split(/\r?\n/)) {
+      const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
+      if (m) fileKeys.add(m[1]);
+    }
+  }
+  const shadowed = new Map<string, string>();
+  for (const key of fileKeys) {
+    if (process.env[key] !== undefined) shadowed.set(key, process.env[key] as string);
+    delete process.env[key];
+  }
+
   const fileEnv = loadEnv(mode, process.cwd(), "");
   for (const [key, value] of Object.entries(fileEnv)) {
+    const was = shadowed.get(key);
+    if (was !== undefined && was !== value) {
+      // Dikatakan terang-terangan sekali: pembajakan senyap itu yang mahal.
+      console.warn(`[env] ${key} dari lingkungan mesin diabaikan; memakai nilai .env repo ini.`);
+    }
+    process.env[key] = value;
+  }
+  // Yang sempat dihapus tapi tidak ada di berkas dikembalikan apa adanya.
+  for (const [key, value] of shadowed) {
     if (process.env[key] === undefined) process.env[key] = value;
   }
 

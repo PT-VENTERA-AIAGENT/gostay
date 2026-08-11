@@ -97,7 +97,11 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     let owner: string | null;
     try {
       owner = await bookingOwnerProfileId(bookingReference);
-    } catch {
+    } catch (e) {
+      // Dicatat, bukan ditelan: tanpa ini kegagalan pembacaan tampil sebagai
+      // 502 tanpa sebab, dan satu-satunya cara mencarinya adalah menebak.
+      // Pesannya TIDAK dikirim ke pemanggil — ia menyebut bentuk data internal.
+      console.error("[payment/checkout] gagal membaca pemilik pesanan:", e);
       res.status(502).json({ error: "booking_lookup_failed" });
       return;
     }

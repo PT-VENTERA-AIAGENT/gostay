@@ -24,9 +24,11 @@ export async function createCheckoutInvoice(bookingReference: string): Promise<s
     },
     body: JSON.stringify({
       bookingReference,
-      // Tamu dikembalikan ke halaman pesanannya, bukan ke beranda: di situlah
-      // status pembayarannya berubah, dan itu yang ingin ia lihat.
-      successRedirectUrl: `${window.location.origin}/portal/my-account`,
+      // Xendit memulangkan tamu ke halaman konfirmasi pesanan ITU, bukan ke
+      // daftar pesanan. Nomor referensi dibawa di query karena kepulangan dari
+      // Xendit adalah pemuatan halaman baru — `location.state` React Router
+      // sudah tidak ada lagi di titik itu.
+      successRedirectUrl: `${window.location.origin}/portal/book/confirmation?ref=${encodeURIComponent(bookingReference)}`,
     }),
   });
 

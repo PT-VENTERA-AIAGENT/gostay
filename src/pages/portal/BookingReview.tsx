@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useT, dateLocale } from "@/lib/i18n";
 import { nightsLabel, guestsLabel } from "@/lib/nights";
 import { clearDraft, loadDraft } from "@/lib/bookingDraft";
+import { createCheckoutInvoice } from "@/services/paymentService";
 import type { RoomType } from "@/types/database.types";
 
 interface GuestInfo {
@@ -134,18 +135,31 @@ export default function BookingReview() {
 
       // Pesanannya sudah jadi; draf tidak boleh menghidupkannya kembali.
       clearDraft();
-      navigate("/portal/book/confirmation", {
-        state: {
-          booking,
-          roomType,
-          checkIn,
-          checkOut,
-          guests,
-          guestInfo,
-          nights,
-          total,
-        },
-      });
+
+      // Bayar dulu, konfirmasi kemudian.
+      //
+      // Sebelumnya alurnya berhenti di "Pesanan Diterima!" dengan tagihan yang
+      // belum dibayar dan tanpa satu pun ajakan membayarnya — tamu menutup tab
+      // merasa selesai, hotel menyimpan kamar untuk uang yang tidak pernah
+      // datang. Sekarang tamu langsung dibawa ke halaman pembayaran Xendit, dan
+      // Xendit memulangkannya ke halaman konfirmasi yang sudah berstatus lunas.
+      try {
+        const invoiceUrl = await createCheckoutInvoice(booking.reference);
+        window.location.href = invoiceUrl;
+        return;
+      } catch (payErr) {
+        // Tagihan gagal dibuat — TAPI pesanannya sudah ada. Ini tidak boleh
+        // terlihat seperti pemesanan yang gagal: tamu diantar ke halaman
+        // konfirmasi dengan pesanannya utuh dan alasan pembayarannya tertunda,
+        // lengkap dengan tombol mencoba lagi di sana.
+        navigate("/portal/book/confirmation", {
+          state: {
+            booking, roomType, checkIn, checkOut, guests, guestInfo, nights, total,
+            payError: payErr instanceof Error ? payErr.message : String(payErr),
+          },
+        });
+        return;
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : t("Something went wrong. Please try again.");
       setSubmitError(message);
@@ -249,7 +263,7 @@ export default function BookingReview() {
               {submitting ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> {t("Submitting...")}</>
               ) : user ? (
-                <>{t("Request Booking")} <Check className="w-4 h-4" /></>
+                <>{t("Lanjut ke pembayaran")} <Check className="w-4 h-4" /></>
               ) : (
                 <>{t("Sign in to book")} <Check className="w-4 h-4" /></>
               )}
