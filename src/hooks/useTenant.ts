@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import { currentTenantSlug } from "@/lib/tenant";
+import { currentTenantSlug, portalTenantSlug } from "@/lib/tenant";
 import type { UserRole } from "@/types/database.types";
 
 export interface Tenant {
@@ -68,8 +68,10 @@ export function pickTenant<T extends TenantChoice>(
   profileTenantId: string | null | undefined,
 ): T | null {
   if (rows.length === 0) return null;
+  // An explicit portal link is a tenant selector, not a hint. Never replace a
+  // missing/invalid hotel with the first row (which used to be Kopi Rintik).
+  if (slug) return rows.find((t) => t.slug === slug) ?? null;
   return (
-    (slug ? rows.find((t) => t.slug === slug) : undefined) ??
     rows.find((t) => t.id === profileTenantId) ??
     rows[0]
   );
@@ -123,7 +125,12 @@ export function slugHintFor(role: UserRole | null, slug: string | null): string 
  */
 export function useTenant() {
   const { session, role } = useAuth();
-  const slug = slugHintFor(role, currentTenantSlug());
+  // A platform admin may preview the hotel explicitly named by a portal URL.
+  // Staff and hotel admins without platform scope remain pinned to their own
+  // tenant; ordinary guests keep the normal URL/localStorage resolution.
+  const slug = role === "admin"
+    ? portalTenantSlug()
+    : slugHintFor(role, currentTenantSlug());
 
   const query = useQuery({
     queryKey: ["tenant", session?.profile_id ?? "anon", slug ?? "-"],
@@ -143,7 +150,11 @@ export function useTenant() {
   const name = query.data?.name ?? FALLBACK_NAME;
   const initial = name.trim().charAt(0).toUpperCase() || "G";
 
-  const wrongHotel = isWrongHotel(slug, query.data ?? null);
+  // `pickTenant` now fails closed for an unknown explicit slug. Wait until the
+  // query has completed before calling an empty result a wrong hotel; null is
+  // also the initial loading state.
+  const wrongHotel = query.isFetched
+    && Boolean(slug && (!query.data || query.data.slug !== slug));
 
   return {
     ...query,

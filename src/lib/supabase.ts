@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { getSession } from "@/lib/sso";
-import { currentTenantSlug } from "@/lib/tenant";
+import { currentTenantSlug, portalTenantSlug } from "@/lib/tenant";
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "";
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "";
@@ -29,14 +29,41 @@ const effectiveAnonKey = supabaseAnonKey || "placeholder-anon-key";
 // rates, published reviews. Resolved at runtime (src/lib/tenant.ts) so one
 // deployment can serve many hotels: a WhatsApp guest's `?hotel={slug}` link wins,
 // then a remembered slug, then the build-time default. It is intentionally only a
-// hint: a signed-in caller's tenant comes from their profile, never this header,
-// and the header can only ever surface another hotel's already-public brochure.
-const tenantSlug = currentTenantSlug();
+// hint: a signed-in caller's tenant comes from their profile, except for the
+// guarded platform-admin portal preview; the header only surfaces public hotel
+// data and never grants access by itself.
+/**
+ * Keep tenant context current after client-side navigation. A static
+ * `global.headers` value is captured once at module load, which is especially
+ * easy to get wrong when a portal link is opened in an already-running app.
+ * The preview marker is only sent while the tab is inside `/portal`; the
+ * database also requires the caller to be a whitelisted platform admin.
+ */
+const tenantFetch: typeof fetch = (input, init) => {
+  const headers = new Headers(
+    typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined,
+  );
+  new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
+
+  const tenantSlug = currentTenantSlug();
+  if (tenantSlug) headers.set("x-tenant-slug", tenantSlug);
+  else headers.delete("x-tenant-slug");
+
+  const previewSlug = portalTenantSlug();
+  const inPortal = typeof window !== "undefined" && window.location.pathname.startsWith("/portal");
+  if (previewSlug && inPortal) {
+    headers.set("x-portal-preview", "true");
+  } else {
+    headers.delete("x-portal-preview");
+  }
+
+  return globalThis.fetch(input, { ...init, headers });
+};
 
 export const supabase = createClient<Database>(effectiveUrl, effectiveAnonKey, {
-  // Sending it on every request (not just anon ones) is harmless: when signed
-  // in, current_tenant() prefers the profile and ignores the header.
-  ...(tenantSlug ? { global: { headers: { "x-tenant-slug": tenantSlug } } } : {}),
+  // The fetch wrapper refreshes this per request so portal navigation cannot
+  // retain a stale hotel header or preview scope.
+  global: { fetch: tenantFetch },
 
   // Supabase's third-party auth hook. Identity comes from Ventera SSO, so
   // /api/sso/token mints a Supabase-compatible JWT and we present it here on

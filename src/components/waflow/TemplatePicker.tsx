@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   FLOW_TEMPLATES, CATEGORY_META, CATEGORY_ORDER,
   type FlowTemplate, type TemplateCategory,
-} from "../../../api/_lib/wa/flow/templates";
+} from "@/lib/waFlowTemplates";
 
 /**
  * Browse the ready-made flows and pick which ones to install.

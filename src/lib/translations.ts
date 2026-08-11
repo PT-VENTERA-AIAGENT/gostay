@@ -128,6 +128,7 @@ export const EN: Record<string, string> = {
   "Booking Saya": "My Bookings",
   "Room Service": "Room Service",
   "Anda melihat portal tamu sebagai pengelola hotel.": "You are viewing the guest portal as hotel staff.",
+  "Hotel ini tidak tersedia atau tautannya sudah tidak valid.": "This hotel is unavailable or the link is no longer valid.",
   "Kembali ke dasbor": "Back to dashboard",
   "Akun": "Account",
   "Booking": "Bookings",

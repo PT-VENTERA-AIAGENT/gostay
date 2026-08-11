@@ -3,5 +3,10 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ]; then exit 1; else exit 0; fi",
-  "rewrites": [{ "source": "/((?!assets/|api/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/((?!assets/|api/|src/|node_modules/|@vite/|@id/|@fs/|@react-refresh|.*\\.[^/]+$).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

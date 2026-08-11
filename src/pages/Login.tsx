@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
-import { useAuth, roleHome } from "@/contexts/AuthContext";
+import { postLoginDestination, useAuth } from "@/contexts/AuthContext";
 import { tr } from "@/lib/i18n";
 
 /**
@@ -44,7 +44,7 @@ export default function Login() {
     if (session) {
       // Honour a real returnTo, otherwise their role's home rather than "/",
       // which is the marketing page.
-      navigate(from !== "/" ? from : roleHome(role, session.tenant_id), { replace: true });
+      navigate(postLoginDestination(role, session.tenant_id, from), { replace: true });
       return;
     }
 
