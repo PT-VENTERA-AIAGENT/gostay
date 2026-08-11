@@ -293,7 +293,7 @@ export default function CRM() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("CRM")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {isLoading ? "Loading..." : `${customers.length} ${t("guests")}`}
+              {isLoading ? t("Memuat…") : `${customers.length} ${t("guests")}`}
             </p>
           </div>
           <div className="flex items-center gap-2">

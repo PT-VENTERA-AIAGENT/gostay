@@ -128,7 +128,7 @@ export default function UserManagement() {
 
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-3">
-            <p className="text-xs text-destructive">Could not load users: {(error as Error).message}</p>
+            <p className="text-xs text-destructive">{t("Could not load users")}: {(error as Error).message}</p>
           </div>
         )}
 
