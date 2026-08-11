@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/hooks/useTenant";
 import { useToast } from "@/hooks/use-toast";
 import { tr, dateLocale } from "@/lib/i18n";
+import { humanMessage } from "@/lib/errors";
 
 const SSO_ACCOUNT_URL = (import.meta.env.VITE_SSO_ISSUER as string) ?? "https://sso.ventera.ai";
 
@@ -47,7 +48,7 @@ export default function PortalProfile() {
       await updateProfile.mutateAsync({ phone: phone.trim() || null });
       toast({ title: tr("Profile updated"), description: tr("Your phone number has been saved.") });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save your profile.");
+      setError(humanMessage(e, "Perubahan belum tersimpan. Coba lagi sebentar."));
     }
   }
 

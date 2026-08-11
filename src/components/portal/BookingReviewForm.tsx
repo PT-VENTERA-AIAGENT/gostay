@@ -3,6 +3,7 @@ import { Star, Loader2, CheckCircle } from "lucide-react";
 import { useReviewForBooking, useCreateReview } from "@/hooks/useReviews";
 import { useToast } from "@/hooks/use-toast";
 import { tr } from "@/lib/i18n";
+import { humanMessage } from "@/lib/errors";
 
 interface Props {
   bookingId: string;
@@ -51,7 +52,7 @@ export default function BookingReviewForm({ bookingId, customerId }: Props) {
       await create.mutateAsync({ customer_id: customerId, booking_id: bookingId, rating, comment: comment.trim() || null });
       toast({ title: tr("Terima kasih atas ulasannya!") });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal mengirim ulasan.");
+      setError(humanMessage(e, "Ulasan belum terkirim. Coba lagi sebentar."));
     }
   }
 

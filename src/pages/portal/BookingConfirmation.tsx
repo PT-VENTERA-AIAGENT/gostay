@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { getBookingByReference } from "@/services/bookingService";
 import { createCheckoutInvoice } from "@/services/paymentService";
+import { humanMessage } from "@/lib/errors";
 import { CheckCircle, Mail, Calendar, Home, Wallet, Loader2, Clock } from "lucide-react";
 import PageTransition, { scaleIn } from "@/components/shared/PageTransition";
 import CopyButton from "@/components/shared/CopyButton";
@@ -72,7 +73,7 @@ export default function BookingConfirmation() {
     try {
       window.location.href = await createCheckoutInvoice(booking.reference);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Gagal membuat tagihan.");
+      setPayError(humanMessage(e, "Halaman pembayaran belum bisa dibuka. Coba lagi sebentar."));
       setPaying(false);
     }
   }
