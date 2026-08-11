@@ -353,6 +353,28 @@ export async function getOrCreateCustomer(
  * used to be passed as null here, which quietly severed that chain — the row was
  * created, the booking succeeded, and the guest could then never see it again.
  */
+/**
+ * Kontak tamu ini di hotel yang sedang dibuka — hanya membaca, tidak membuat.
+ *
+ * Dipakai formulir pemesanan untuk mengisi sendiri nama, email, dan telepon.
+ * Yang tersimpan didahulukan daripada klaim SSO: kalau tamu pernah membetulkan
+ * ejaan namanya di sini, koreksi itu tidak boleh ditimpa nama dari akun.
+ *
+ * `tenantId` wajib disebut dengan alasan yang sama seperti di
+ * getOrCreateOwnCustomer: tanpa itu yang terambil kontak di hotel PERTAMA orang
+ * ini, bukan hotel yang sedang dibuka.
+ */
+export async function getOwnCustomer(
+  profileId: string,
+  tenantId?: string | null,
+): Promise<Customer | null> {
+  let q = supabase.from("customers").select("*").eq("profile_id", profileId);
+  if (tenantId) q = q.eq("tenant_id", tenantId);
+  const { data, error } = await q.order("created_at", { ascending: true }).limit(1);
+  if (error) throw error;
+  return (data?.[0] as Customer | undefined) ?? null;
+}
+
 export async function getOrCreateOwnCustomer(
   profileId: string,
   payload: Omit<CustomerInsert, "profile_id">,
