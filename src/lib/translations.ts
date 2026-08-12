@@ -122,6 +122,19 @@ export const EN: Record<string, string> = {
     "It is transferred to Ventera outside the app, and never touches the balance on this page.",
   "bulan belum dibayar": "month(s) unpaid",
 
+  // ── Langganan dibayar online lewat Xendit (056) ──────────────────────────
+  "Tagihan langganan terpisah dari saldo di halaman ini — membayarnya tidak mengurangi saldo Anda.":
+    "The subscription invoice is separate from the balance on this page — paying it does not reduce your balance.",
+  "Bayar sekarang": "Pay now",
+  "dibayar": "paid",
+  "Tautan pembayaran belum bisa dibuka. Coba lagi sebentar.":
+    "The payment link could not be opened. Please try again shortly.",
+  "Tautan pembayaran belum bisa dibuka. Coba lagi sebentar, atau hubungi Ventera.":
+    "The payment link could not be opened. Please try again shortly, or contact Ventera.",
+  "Pembayaran langganan masih memakai Xendit sandbox — tautan yang dibuka hotel tidak menerima uang sungguhan.":
+    "Subscription payments still use the Xendit sandbox — the link a hotel opens does not take real money.",
+  "untuk menyalakannya.": "to switch it on.",
+
   "Kontrol Pembayaran Hotel": "Hotel Payment Control",
   "Kontrol Pembayaran": "Payment Control",
   "Console Platform": "Platform Console",

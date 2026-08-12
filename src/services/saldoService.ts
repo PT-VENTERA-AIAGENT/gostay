@@ -48,6 +48,8 @@ export interface Payout {
 export interface PaymentConfig {
   mode: "live" | "test";
   feeBps: number;
+  /** Lingkungan untuk tagihan langganan Ventera sendiri — terpisah dari `mode` (056). */
+  subscriptionMode: "live" | "test";
 }
 
 /**
@@ -74,6 +76,7 @@ export interface SubscriptionInvoice {
   status: "unpaid" | "paid" | "waived";
   paid_at: string | null;
   paid_method: string | null;
+  gateway_note: string | null;
 }
 
 /** The caller's own hotel balance. Null until the hotel has its first income. */
@@ -106,13 +109,14 @@ export async function getPayouts(): Promise<Payout[]> {
 export async function getPaymentConfig(): Promise<PaymentConfig> {
   const { data, error } = await db
     .from("payment_config")
-    .select("mode,platform_fee_bps")
+    .select("mode,platform_fee_bps,subscription_mode")
     .eq("id", true)
     .maybeSingle();
   if (error) throw error;
   return {
     mode: data?.mode === "live" ? "live" : "test",
     feeBps: typeof data?.platform_fee_bps === "number" ? data.platform_fee_bps : 700,
+    subscriptionMode: data?.subscription_mode === "live" ? "live" : "test",
   };
 }
 
@@ -143,7 +147,7 @@ export async function getHotelBilling(): Promise<HotelBilling> {
 export async function getMySubscriptionInvoices(limit = 6): Promise<SubscriptionInvoice[]> {
   const { data, error } = await db
     .from("hotel_subscription_invoices")
-    .select("id,period,amount,status,paid_at,paid_method")
+    .select("id,period,amount,status,paid_at,paid_method,gateway_note")
     .order("period", { ascending: false })
     .limit(limit);
   if (error) throw error;

@@ -7,6 +7,9 @@ import { getHotelPaymentMode, getBookingByReference, recordGatewayPayment } from
 import { mapXenditStatus, envForMode, modeForEnv } from "./xendit";
 import { createInvoiceViaGateway } from "./gateway";
 import { matchGatewayToken } from "./token";
+import {
+  isSubscriptionExternalId, findInvoiceForCallback, markInvoicePaidFromCallback,
+} from "./subscription";
 
 const PREFIX = "GOSTAY-";
 
@@ -145,8 +148,45 @@ export async function handleWebhook(
   const externalId = String(body.external_id ?? "");
   const gatewayRef = String(body.invoice_id ?? body.id ?? "");
   const amount = Number(body.amount ?? body.paid_amount ?? 0);
+  // Yang BENAR-BENAR diterima. Pada payload invoice Xendit, `amount` adalah
+  // nominal tagihannya dan `paid_amount` yang dibayar — jadi urutannya harus
+  // terbalik dari baris di atas. Membaca `amount` di sini membuat setiap
+  // pemeriksaan kurang bayar membandingkan tagihan dengan dirinya sendiri, dan
+  // tidak akan pernah menyala. Tetap aman kalau router callback hanya mengirim
+  // salah satunya.
+  const paidAmount = Number(body.paid_amount ?? body.amount ?? 0);
   if (!externalId || !gatewayRef || !(amount > 0)) {
     return { ok: false, status: 400, error: "malformed_webhook" };
+  }
+
+  // ── Tagihan langganan Ventera (056) ──
+  //
+  // Diperiksa SEBELUM pencarian booking, dan itu bukan sekadar urutan yang
+  // rapi: referenceFromExternalId() mencari penanda "BK-" yang tidak ada di
+  // external_id langganan, jadi ia akan mengembalikan potongan string yang
+  // tidak berarti dan callback-nya jatuh sebagai booking_not_found.
+  //
+  // Cabang ini SENGAJA tidak memanggil recordGatewayPayment(): uang langganan
+  // milik Ventera. Mencatatnya sebagai `payments` akan mengkredit saldo hotel
+  // dengan uang yang ditagihkan kepadanya, lalu memotong 7% darinya.
+  if (isSubscriptionExternalId(externalId)) {
+    const invoice = await findInvoiceForCallback(gatewayRef, externalId);
+    if (!invoice) return { ok: false, status: 404, error: "subscription_invoice_not_found" };
+    const outcome = await markInvoicePaidFromCallback(invoice, gatewayRef, modeForEnv(env), paidAmount);
+    if (outcome === "recorded" || outcome === "duplicate") {
+      return { ok: true, outcome, status: 200 };
+    }
+    // "double_paid" ikut jatuh ke sini: dijawab "ignored" (200, tidak ada yang
+    // perlu diulang gateway) tapi dicatat keras di log DAN di baris tagihannya,
+    // karena artinya hotel membayar dua kali untuk bulan yang sama.
+    // Sisanya: uang sudah masuk ke Ventera tapi tagihannya SENGAJA tidak
+    // dilunasi. Dijawab 200 karena mengulang tidak akan mengubah apa pun, dan
+    // dicatat keras — ini justru keadaan yang butuh mata manusia.
+    console.error(
+      `[payment/webhook] langganan tidak dilunasi (${outcome}): invoice ${invoice.id}, ` +
+      `diterima ${paidAmount} dari ${invoice.amount}, status ${invoice.status}, ref ${gatewayRef}`,
+    );
+    return { ok: true, outcome: "ignored", status: 200 };
   }
 
   const reference = referenceFromExternalId(externalId);

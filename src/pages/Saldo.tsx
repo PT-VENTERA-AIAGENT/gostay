@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Wallet, ArrowDownToLine, TrendingUp, Scissors, Banknote, Loader2, Info, CalendarClock } from "lucide-react";
+import { Wallet, ArrowDownToLine, TrendingUp, Scissors, Banknote, Loader2, Info, CalendarClock, CreditCard } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useT } from "@/lib/i18n";
+import { humanMessage } from "@/lib/errors";
+import { createSubscriptionInvoice } from "@/services/paymentService";
 import {
   useBalance, useLedger, usePayouts, useHotelBilling, useMySubscriptionInvoices,
 } from "@/hooks/useSaldo";
@@ -43,6 +45,22 @@ export default function Saldo() {
   const feePct = (billing?.feeBps ?? 700) / 100;
   const { data: invoices = [] } = useMySubscriptionInvoices(isSubscription);
   const unpaid = invoices.filter((i) => i.status === "unpaid");
+
+  // Membayar langganan membuka halaman Xendit di tab yang sama: kepulangannya
+  // adalah pemuatan halaman baru, dan status lunasnya datang dari webhook —
+  // bukan dari peramban ini, yang bisa saja ditutup di tengah jalan.
+  const [paying, setPaying] = useState<number | null>(null);
+  const [payError, setPayError] = useState("");
+  async function pay(invoiceId: number) {
+    setPayError("");
+    setPaying(invoiceId);
+    try {
+      window.location.href = await createSubscriptionInvoice(invoiceId);
+    } catch (e) {
+      setPayError(humanMessage(e, t("Tautan pembayaran belum bisa dibuka. Coba lagi sebentar.")));
+      setPaying(null);
+    }
+  }
 
   const available = balance?.available ?? 0;
   const stats = [
@@ -98,20 +116,59 @@ export default function Saldo() {
 
         {/* Bagaimana GoStay mengambil bagiannya — beda per model tagihan */}
         {isSubscription ? (
-          <div className="bg-muted/40 border border-border rounded-xl p-4 mb-5 flex gap-3 text-sm text-muted-foreground">
-            <CalendarClock className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
-            <div className="space-y-2">
+          <div className="bg-muted/40 border border-border rounded-xl p-4 mb-5 space-y-3">
+            <div className="flex gap-3 text-sm text-muted-foreground">
+              <CalendarClock className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
               <p>
                 {t("Hotel ini membayar")} <span className="font-semibold text-foreground">{formatIDR(billing?.subscriptionAmount ?? 0)}</span> {t("per bulan, jatuh tempo tiap tanggal")} {billing?.subscriptionDay ?? 1}.{" "}
-                {t("Pembayarannya lewat transfer ke Ventera di luar aplikasi, dan tidak memotong saldo di halaman ini.")}
+                {t("Tagihan langganan terpisah dari saldo di halaman ini — membayarnya tidak mengurangi saldo Anda.")}
               </p>
-              {unpaid.length > 0 && (
-                <p className="text-warning">
-                  {unpaid.length} {t("bulan belum dibayar")}:{" "}
-                  {unpaid.map((i) => monthLabel(i.period)).join(", ")} — {formatIDR(unpaid.reduce((s, i) => s + i.amount, 0))}.
-                </p>
-              )}
             </div>
+
+            {invoices.length > 0 && (
+              <div className="divide-y divide-border/60 rounded-lg border border-border bg-card">
+                {invoices.map((inv) => (
+                  <div key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground capitalize">{monthLabel(inv.period)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatIDR(inv.amount)}
+                        {inv.paid_at && ` · ${t("dibayar")} ${formatDate(inv.paid_at)}`}
+                        {inv.paid_method === "xendit" && " · online"}
+                      </p>
+                      {/* Kurang bayar / bayar ganda: hotel yang mengalaminya
+                          harus tahu, bukan hanya Ventera. */}
+                      {inv.gateway_note && (
+                        <p className="text-xs text-warning mt-0.5">{inv.gateway_note}</p>
+                      )}
+                    </div>
+                    {inv.status === "paid" ? (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-success/15 text-success">{t("Lunas")}</span>
+                    ) : inv.status === "waived" ? (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-muted text-muted-foreground">{t("Dibebaskan")}</span>
+                    ) : (
+                      <button
+                        onClick={() => pay(inv.id)}
+                        disabled={paying !== null}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                      >
+                        {paying === inv.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <CreditCard className="w-3.5 h-3.5" />}
+                        {t("Bayar sekarang")}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {unpaid.length > 0 && (
+              <p className="text-xs text-warning">
+                {unpaid.length} {t("bulan belum dibayar")} — {formatIDR(unpaid.reduce((s, i) => s + i.amount, 0))}.
+              </p>
+            )}
+            {payError && <p className="text-xs text-destructive">{payError}</p>}
           </div>
         ) : (
           <div className="bg-muted/40 border border-border rounded-xl p-4 mb-5 flex gap-3 text-sm text-muted-foreground">
