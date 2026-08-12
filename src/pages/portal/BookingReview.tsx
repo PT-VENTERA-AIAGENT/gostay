@@ -214,7 +214,8 @@ export default function BookingReview() {
           <motion.div variants={staggerItem} className="bg-card rounded-xl border border-border p-4 md:p-5">
             <h2 className="font-semibold text-foreground mb-3">{t("Guest Information")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div><span className="text-muted-foreground">{t("Name")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.firstName} {guestInfo.lastName}</p></div>
+              {/* Nama belakang boleh kosong — dirangkai supaya tidak menyisakan spasi menggantung. */}
+              <div><span className="text-muted-foreground">{t("Name")}</span><p className="font-medium text-foreground mt-0.5">{`${guestInfo.firstName} ${guestInfo.lastName}`.trim()}</p></div>
               <div><span className="text-muted-foreground">{t("Email")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.email}</p></div>
               <div><span className="text-muted-foreground">{t("Phone")}</span><p className="font-medium text-foreground mt-0.5">{guestInfo.phone}</p></div>
               {guestInfo.specialRequests && (
