@@ -75,11 +75,11 @@ export default function SubscriptionInvoices({
         <h2 className="text-sm font-semibold text-foreground">{tr("Tagihan Langganan")}</h2>
         <button
           onClick={issueCurrent}
-          disabled={issue.isPending || hasCurrent}
+          disabled={issue.isPending}
           className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
         >
           {issue.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          {hasCurrent ? tr("Tagihan bulan ini sudah ada") : `${tr("Terbitkan tagihan")} ${periodLabel(thisPeriod)}`}
+          {hasCurrent ? tr("Terbitkan tagihan yang terlewat") : `${tr("Terbitkan tagihan")} ${periodLabel(thisPeriod)}`}
         </button>
       </div>
 
@@ -117,7 +117,7 @@ export default function SubscriptionInvoices({
                   {formatIDR(inv.amount)}
                   {inv.paid_total > 0 && inv.paid_total < inv.amount && (
                     <p className="text-xs font-normal text-warning">
-                      {tr("masuk")} {formatIDR(inv.paid_total)}
+                      {tr("sudah masuk")} {formatIDR(inv.paid_total)}
                     </p>
                   )}
                 </Td>

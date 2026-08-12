@@ -232,7 +232,14 @@ export async function undoManualPayments(invoiceId: number): Promise<void> {
     );
   }
   if (rows.length === 0) return;
-  const { error } = await db.from("subscription_payments").delete().eq("invoice_id", invoiceId);
+  // Filternya diulang di DELETE, bukan hanya di pemeriksaan di atas: callback
+  // Xendit yang mendarat di antara keduanya akan ikut terhapus, dan itu persis
+  // yang hendak dicegah. Pemeriksaan tadi tetap ada supaya pesannya jelas.
+  const { error } = await db
+    .from("subscription_payments")
+    .delete()
+    .eq("invoice_id", invoiceId)
+    .neq("method", "xendit");
   if (error) throw error;
 }
 

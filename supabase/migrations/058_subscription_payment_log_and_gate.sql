@@ -104,6 +104,9 @@ select i.tenant_id, i.id, i.amount,
        coalesce(i.updated_by, 'migration_058'), 'Disalin dari status lunas sebelum buku pembayaran ada'
   from hotel_subscription_invoices i
  where i.status = 'paid'
+   -- Tagihan Rp0 yang berstatus lunas akan ditolak check (amount > 0) dan
+   -- menggagalkan seluruh migrasi — yang diterapkan manual lewat psql.
+   and i.amount > 0
    and not exists (select 1 from subscription_payments p where p.invoice_id = i.id);
 
 -- ─── RLS ──────────────────────────────────────────────────────────────────────
@@ -188,6 +191,12 @@ language sql immutable as $$ select 7 $$;
  * mulai berlangganan; tanpa itu, hotel yang bergabung tanggal 20 dengan tenggat
  * tanggal 1 akan langsung menunggak di hari pertamanya.
  *
+ * Hotel yang dikembalikan ke `commission` LEPAS dari gerbang meski masih
+ * menunggak (CTE `cfg` menyaring billing_mode). Itu disengaja: mencabut model
+ * langganan adalah keputusan Ventera, dan tagihannya tetap terlihat di konsol
+ * penagihan — mengunci hotel yang sudah tidak berlangganan bukan penagihan,
+ * melainkan sandera.
+ *
  * Nol baris = tidak ada yang terutang.
  */
 create or replace function subscription_gate(p_tenant uuid)
@@ -218,7 +227,11 @@ language sql stable security definer set search_path = public, pg_temp as $$
     select p.period,
            greatest((p.period + ((select subscription_day from cfg) - 1) * interval '1 day')::date,
                     (select since from cfg)) as due_date,
-           coalesce(i.amount, (select subscription_amount from cfg)) as amount,
+           -- Sisa yang belum tertutup, bukan nominal penuh: hotel yang sudah
+           -- mentransfer separuh tetap dikunci, tapi layarnya harus menyebut
+           -- angka yang benar-benar harus ia bayar.
+           greatest(coalesce(i.amount, (select subscription_amount from cfg))
+                    - coalesce(i.paid_total, 0), 0) as amount,
            coalesce(i.status, 'unpaid') as status
       from periods p
       left join hotel_subscription_invoices i
@@ -234,8 +247,15 @@ language sql stable security definer set search_path = public, pg_temp as $$
    order by o.period
    limit 1;
 $$;
-revoke all on function subscription_gate(uuid) from public;
-grant execute on function subscription_gate(uuid) to authenticated, service_role;
+-- HANYA service_role. Fungsi ini SECURITY DEFINER (menembus RLS) dan menerima
+-- tenant mana pun sebagai parameter: memberikannya ke `authenticated` berarti
+-- setiap user yang login — termasuk tamu — bisa membaca tarif langganan,
+-- jatuh tempo, dan besar tunggakan hotel pesaing lewat /rest/v1/rpc. Aturan
+-- yang sama sudah dipakai hotel_fee_bps() di 055. Aplikasi staf memanggil
+-- my_subscription_gate(), yang juga SECURITY DEFINER sehingga tetap bisa
+-- memanggil yang ini sebagai pemiliknya.
+revoke all on function subscription_gate(uuid) from public, anon, authenticated;
+grant execute on function subscription_gate(uuid) to service_role;
 
 /** Gerbang untuk hotel si pemanggil sendiri — yang dipakai aplikasi staf. */
 create or replace function my_subscription_gate()

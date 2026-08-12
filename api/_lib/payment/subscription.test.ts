@@ -71,7 +71,7 @@ function stubFetch(routes: Route[], onCall?: (url: string, init?: RequestInit) =
 const INVOICE = {
   id: 7, tenant_id: "t-1", period: "2026-08-01", amount: 500000, status: "unpaid",
   gateway_ref: null, gateway_external_id: null, gateway_url: null,
-  gateway_env: null, gateway_issued_at: null, gateway_attempt: 0,
+  gateway_env: null, gateway_issued_at: null, gateway_attempt: 0, paid_total: 0,
 };
 
 describe("handleSubscriptionCheckout", () => {
@@ -276,6 +276,16 @@ describe("handleWebhook — cabang langganan", () => {
     expect(String(p.gateway_note)).toContain("Rp300.000");
     expect(String(p.gateway_note)).toContain("kurang Rp200.000");
     expect(p.note).toBeUndefined();              // catatan operator utuh
+  });
+
+  it("pembayaran kedua yang JUSTRU melunasi tidak dicap kurang bayar", async () => {
+    // Operator sudah mencatat transfer Rp200.000; tautan online Rp300.000
+    // dibayar. Membandingkan pembayaran ini sendirian dengan nominal tagihan
+    // akan menempelkan peringatan palsu pada tagihan yang justru sudah beres.
+    const calls = stubFetch(wh({ ...INVOICE, gateway_ref: "inv-xnd-1", paid_total: 200000 }));
+    await expect(handleWebhook("tok-sandbox", { ...body, amount: 500000, paid_amount: 300000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "recorded" });
+    expect(posted(calls).amount).toBe(300000);
   });
 
   it("tagihan yang keburu dibebaskan: uang tercatat, statusnya tidak diubah", async () => {

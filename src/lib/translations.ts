@@ -149,13 +149,12 @@ export const EN: Record<string, string> = {
   "hari lewat jatuh tempo": "days past due",
   "Akses ditutup dalam": "Access closes in",
   "hari lagi": "more days",
-  "Akses akan ditutup hari ini.": "Access closes today.",
   // "Pembayaran dicatat" sudah ada di bagian pembayaran di bawah.
   "Pencatatan pembayaran dibatalkan": "Payment record removed",
   "tagihan diterbitkan": "invoices issued",
   "Semua bulan sudah tertagih": "Every month is already invoiced",
   "Terbitkan tagihan yang terlewat": "Issue missed invoices",
-  "masuk": "received",
+  "sudah masuk": "received",
 
   "Kontrol Pembayaran Hotel": "Hotel Payment Control",
   "Kontrol Pembayaran": "Payment Control",

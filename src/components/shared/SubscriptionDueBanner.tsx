@@ -19,6 +19,7 @@ export default function SubscriptionDueBanner() {
   // Sudah tergerbang → yang tampil layar gerbangnya sendiri, bukan spanduk.
   if (!gate || gate.gated || gate.days_late <= 0) return null;
 
+  // gate.gated sudah menyala tepat di hari ke-7, jadi di sini sisa selalu ≥ 1.
   const sisa = MASA_TENGGANG - gate.days_late;
   return (
     <div className="mx-4 mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm md:mx-6">
@@ -26,9 +27,7 @@ export default function SubscriptionDueBanner() {
       <p className="text-foreground">
         {t("Langganan bulan ini belum dibayar")} — {gate.days_late} {t("hari lewat jatuh tempo")}.{" "}
         <span className="font-semibold">
-          {sisa <= 0
-            ? t("Akses akan ditutup hari ini.")
-            : `${t("Akses ditutup dalam")} ${sisa} ${t("hari lagi")}.`}
+          {t("Akses ditutup dalam")} {sisa} {t("hari lagi")}.
         </span>
       </p>
       <Link to="/saldo" className="ml-auto shrink-0 font-semibold text-primary hover:underline">

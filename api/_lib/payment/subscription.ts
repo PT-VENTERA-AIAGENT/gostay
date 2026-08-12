@@ -118,13 +118,20 @@ export interface SubscriptionInvoiceRow {
   gateway_env: "live" | "test" | null;
   gateway_issued_at: string | null;
   gateway_attempt: number;
+  /** Yang sudah masuk sebelum pembayaran ini (058). */
+  paid_total: number;
 }
 
 const INVOICE_COLUMNS =
-  "id,tenant_id,period,amount,status,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt";
+  "id,tenant_id,period,amount,status,paid_total,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt";
 
 function toRow(raw: any): SubscriptionInvoiceRow {
-  return { ...raw, amount: Number(raw.amount), gateway_attempt: Number(raw.gateway_attempt ?? 0) };
+  return {
+    ...raw,
+    amount: Number(raw.amount),
+    paid_total: Number(raw.paid_total ?? 0),
+    gateway_attempt: Number(raw.gateway_attempt ?? 0),
+  };
 }
 
 /** Lingkungan penagihan Ventera sendiri — terpisah dari mode pembayaran hotel. */
@@ -377,12 +384,16 @@ export async function markInvoicePaidFromCallback(
     });
     return "double_paid";
   }
-  // Toleransi setengah rupiah: pembulatan boleh, kurang bayar tidak. Trigger
-  // 058 sendiri yang menahan statusnya tetap belum lunas; di sini hanya
-  // menerangkan kenapa.
-  if (paidAmount + 0.5 < invoice.amount) {
+  // Yang dibandingkan adalah SELURUH yang sudah masuk, bukan pembayaran ini
+  // sendirian. Operator mencatat transfer Rp200.000 lalu tautan online
+  // Rp300.000 dibayar: trigger 058 menjumlahkannya jadi lunas, dan menyebut
+  // pembayaran kedua "kurang bayar" hanya karena ia lebih kecil dari tagihan
+  // akan menempelkan peringatan palsu pada tagihan yang justru sudah beres.
+  // Toleransi setengah rupiah: pembulatan boleh, kurang bayar tidak.
+  const kurang = invoice.amount - (invoice.paid_total + paidAmount);
+  if (kurang > 0.5) {
     await patchInvoice(invoice.id, {
-      gateway_note: `Pembayaran online kurang: diterima ${rp(paidAmount)} dari ${rp(invoice.amount)} — kurang ${rp(invoice.amount - paidAmount)} (${gatewayRef}).`,
+      gateway_note: `Pembayaran online kurang: diterima ${rp(paidAmount)}, total masuk ${rp(invoice.paid_total + paidAmount)} dari ${rp(invoice.amount)} — kurang ${rp(kurang)} (${gatewayRef}).`,
     });
     return "underpaid";
   }
