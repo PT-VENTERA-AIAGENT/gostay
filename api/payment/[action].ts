@@ -150,7 +150,13 @@ export default async function handler(req: VercelReq, res: VercelRes) {
 
     const body = readJson(req);
     const invoiceId = Number(body.invoiceId);
-    if (!Number.isInteger(invoiceId) || invoiceId <= 0) {
+    // `period` dipakai saat tagihannya BELUM diterbitkan operator: hotel yang
+    // sudah tergerbang harus tetap punya jalan membayar. Server tetap yang
+    // memutuskan periode itu memang terutang (lihat ensureOwnInvoice).
+    const period = typeof body.period === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.period)
+      ? body.period : undefined;
+    const punyaInvoice = Number.isInteger(invoiceId) && invoiceId > 0;
+    if (!punyaInvoice && !period) {
       res.status(400).json({ error: "missing_invoice_id" });
       return;
     }
@@ -158,7 +164,8 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     let result;
     try {
       result = await handleSubscriptionCheckout({
-        invoiceId,
+        invoiceId: punyaInvoice ? invoiceId : undefined,
+        period,
         profileId: sub,
         successRedirectUrl:
           typeof body.successRedirectUrl === "string" ? body.successRedirectUrl : undefined,
