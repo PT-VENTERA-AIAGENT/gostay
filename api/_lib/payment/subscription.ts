@@ -121,16 +121,19 @@ export interface SubscriptionInvoiceRow {
   /** Yang sudah masuk sebelum pembayaran ini (058). */
   paid_total: number;
   gateway_note: string | null;
+  /** Nominal di tautan terakhir — penentu boleh-tidaknya dipakai ulang. */
+  gateway_amount: number | null;
 }
 
 const INVOICE_COLUMNS =
-  "id,tenant_id,period,amount,status,paid_total,gateway_note,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt";
+  "id,tenant_id,period,amount,status,paid_total,gateway_note,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt,gateway_amount";
 
 function toRow(raw: any): SubscriptionInvoiceRow {
   return {
     ...raw,
     amount: Number(raw.amount),
     paid_total: Number(raw.paid_total ?? 0),
+    gateway_amount: raw.gateway_amount == null ? null : Number(raw.gateway_amount),
     gateway_attempt: Number(raw.gateway_attempt ?? 0),
   };
 }
@@ -283,8 +286,12 @@ export async function handleSubscriptionCheckout(
   // Yang ditagih adalah SISA. Hotel yang sudah mentransfer sebagian melihat
   // sisa itu di layar gerbang; menerbitkan tautan sebesar nominal penuh akan
   // menagihnya dua kali untuk bagian yang sudah ia bayar.
-  const sisa = invoice.amount - invoice.paid_total;
-  if (!(sisa > 0)) return { ok: false, status: 400, error: "nothing_to_pay" };
+  // Dibulatkan ke sen, dan ambangnya disamakan dengan
+  // recompute_subscription_invoice() di 058 (toleransi 0,5). Tanpa itu sisa
+  // Rp0,30 pada baris yang belum sempat dihitung ulang lolos ke Xendit,
+  // ditolak gateway, dan hotel mendapat 502 alih-alih kalimat yang terbaca.
+  const sisa = Math.round((invoice.amount - invoice.paid_total) * 100) / 100;
+  if (!(sisa > 0.5)) return { ok: false, status: 400, error: "nothing_to_pay" };
 
   const mode = await getSubscriptionMode();
   // Diperiksa lebih dulu supaya kunci Xendit yang belum diisi menjadi jawaban
@@ -298,16 +305,17 @@ export async function handleSubscriptionCheckout(
   // dibayar — dua-duanya masuk untuk satu bulan yang sama.
   const issuedAt = invoice.gateway_issued_at ? Date.parse(invoice.gateway_issued_at) : 0;
   const masihHidup = Date.now() - issuedAt < REUSE_WINDOW_MS;
-  // Tautan lama hanya boleh dipakai ulang kalau nominalnya masih benar. Begitu
-  // ada pembayaran sebagian masuk, tautan yang terbit sebelumnya menagih lebih
-  // dari yang tersisa — lebih baik menerbitkan yang baru (dan menerima risiko
-  // dua tautan hidup, yang setidaknya tercatat sebagai kelebihan bayar) daripada
-  // menyodorkan angka yang sudah pasti salah.
-  if (invoice.paid_total === 0 && invoice.gateway_url && invoice.gateway_ref
-      && invoice.gateway_env === mode && masihHidup) {
+  // Dipakai ulang selama masih hidup DAN nominalnya masih sama dengan sisa hari
+  // ini. Syarat kedua itu yang menahan tautan beranak: kalau pembayaran
+  // sebagian mematikan pemakaian ulang begitu saja, setiap klik Bayar
+  // menerbitkan invoice baru yang semuanya tetap bisa dibayar — hotel yang
+  // mengklik tiga kali punya tiga tautan hidup, dan kelebihan bayarnya jadi
+  // kerja tangan untuk dikembalikan.
+  if (invoice.gateway_url && invoice.gateway_ref && invoice.gateway_env === mode
+      && masihHidup && invoice.gateway_amount === sisa) {
     return {
       ok: true, invoiceUrl: invoice.gateway_url, invoiceId: invoice.gateway_ref,
-      amount: invoice.amount, mode, reused: true,
+      amount: sisa, mode, reused: true,
     };
   }
 
@@ -335,6 +343,7 @@ export async function handleSubscriptionCheckout(
     gateway_external_id: externalId,
     gateway_url: created.invoiceUrl,
     gateway_env: mode,
+    gateway_amount: sisa,
     gateway_issued_at: new Date().toISOString(),
     gateway_attempt: attempt,
   });

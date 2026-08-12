@@ -72,6 +72,7 @@ const INVOICE = {
   id: 7, tenant_id: "t-1", period: "2026-08-01", amount: 500000, status: "unpaid",
   gateway_ref: null, gateway_external_id: null, gateway_url: null,
   gateway_env: null, gateway_issued_at: null, gateway_attempt: 0, paid_total: 0,
+  gateway_amount: null, gateway_note: null,
 };
 
 describe("handleSubscriptionCheckout", () => {
@@ -132,6 +133,19 @@ describe("handleSubscriptionCheckout", () => {
     expect(body.amount).toBe(300000);
   });
 
+  it("tautan tidak beranak: klik kedua pada sisa yang sama memakai tautan yang ada", async () => {
+    // Kalau pemakaian ulang dimatikan begitu ada pembayaran sebagian, tiap klik
+    // menerbitkan invoice baru yang semuanya tetap bisa dibayar.
+    const calls = stubFetch(routes({
+      ...INVOICE, paid_total: 200000, gateway_ref: "inv-lama",
+      gateway_url: "https://pay.xendit/lama", gateway_env: "test",
+      gateway_amount: 300000, gateway_issued_at: new Date().toISOString(), gateway_attempt: 1,
+    }));
+    await expect(handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" }))
+      .resolves.toMatchObject({ reused: true, amount: 300000 });
+    expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(0);
+  });
+
   it("tidak memakai ulang tautan yang nominalnya sudah basi", async () => {
     // Tautan terbit untuk Rp500.000, lalu transfer Rp200.000 masuk. Memakai
     // ulang tautan itu berarti menyodorkan angka yang sudah pasti salah.
@@ -139,6 +153,7 @@ describe("handleSubscriptionCheckout", () => {
       ...INVOICE, paid_total: 200000, gateway_ref: "inv-lama",
       gateway_url: "https://pay.xendit/lama", gateway_env: "test",
       gateway_issued_at: new Date().toISOString(), gateway_attempt: 1,
+      gateway_amount: 500000,   // terbit sebelum transfer Rp200.000 masuk
     }));
     await expect(handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" }))
       .resolves.toMatchObject({ reused: false, amount: 300000 });
@@ -170,6 +185,7 @@ describe("handleSubscriptionCheckout", () => {
     const segar = {
       ...INVOICE, gateway_ref: "inv-lama", gateway_url: "https://pay.xendit/lama",
       gateway_env: "test", gateway_issued_at: new Date().toISOString(), gateway_attempt: 1,
+      gateway_amount: 500000,   // masih sama dengan sisa → boleh dipakai ulang
     };
     const calls = stubFetch(routes(segar));
     const res = await handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" });
@@ -183,7 +199,7 @@ describe("handleSubscriptionCheckout", () => {
     // Invoice yang diterbitkan tepat di bawah TTL harus masih dipakai ulang.
     const hampirHabis = {
       ...INVOICE, gateway_ref: "inv-lama", gateway_url: "https://pay.xendit/lama",
-      gateway_env: "test", gateway_attempt: 1,
+      gateway_env: "test", gateway_attempt: 1, gateway_amount: 500000,
       gateway_issued_at: new Date(Date.now() - (20 * 60 * 60 - 60) * 1000).toISOString(),
     };
     const calls = stubFetch(routes(hampirHabis));
@@ -214,7 +230,7 @@ describe("handleSubscriptionCheckout", () => {
   it("menerbitkan ulang dengan sufiks -R saat tautan lama sudah kedaluwarsa", async () => {
     const basi = {
       ...INVOICE, gateway_ref: "inv-lama", gateway_url: "https://pay.xendit/lama",
-      gateway_env: "test", gateway_attempt: 0,
+      gateway_env: "test", gateway_attempt: 0, gateway_amount: 500000,
       gateway_external_id: "GOSTAY-SUB-KOPI-RINTIK-202608",
       gateway_issued_at: new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(),
     };

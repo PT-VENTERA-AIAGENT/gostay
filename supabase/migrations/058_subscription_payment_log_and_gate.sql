@@ -41,7 +41,11 @@ create unique index if not exists uq_subscription_payments_gateway_ref
 
 -- Ringkasan yang diturunkan dari buku di atas.
 alter table hotel_subscription_invoices
-  add column if not exists paid_total numeric(14,2) not null default 0;
+  add column if not exists paid_total numeric(14,2) not null default 0,
+  -- Nominal yang tertulis di tautan Xendit terakhir. Dipakai untuk memutuskan
+  -- apakah tautan itu masih boleh dipakai ulang: begitu ada pembayaran
+  -- sebagian masuk, sisanya berubah dan tautan lama menagih angka yang salah.
+  add column if not exists gateway_amount numeric(14,2);
 
 -- ─── Status tagihan = ringkasan pembayarannya ─────────────────────────────────
 -- 'waived' tidak pernah diganggu: itu keputusan operator, bukan hasil hitungan.

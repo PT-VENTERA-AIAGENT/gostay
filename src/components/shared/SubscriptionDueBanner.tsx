@@ -20,7 +20,7 @@ export default function SubscriptionDueBanner() {
   // Masa tenggangnya datang dari DB bersama sisa datanya — menyalinnya sebagai
   // konstanta di sini berarti mengubahnya di satu tempat diam-diam membuat
   // hitung mundur ini berbohong.
-  const sisa = gate.grace_days - gate.days_late;
+  const sisa = Math.max(gate.grace_days - gate.days_late, 1);
   return (
     <div className="mx-4 mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm md:mx-6">
       <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
