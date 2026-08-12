@@ -25,6 +25,8 @@ export interface SubscriptionInvoice {
   paid_at: string | null;
   paid_method: string | null;
   note: string | null;
+  /** Catatan mesin: kurang bayar, bayar ganda, atau bayar atas tagihan yang dibebaskan (057). */
+  gateway_note: string | null;
   updated_by: string | null;
 }
 
@@ -84,7 +86,7 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
     db.from("hotel_subscription_invoices")
       // Nama hotel ikut ditarik di sini supaya baris tagihan tetap bisa
       // ditampilkan meski hotelnya tidak ada lagi di daftar langganan aktif.
-      .select("id,tenant_id,period,amount,status,paid_at,paid_method,note,updated_by,tenants(name,slug)")
+      .select("id,tenant_id,period,amount,status,paid_at,paid_method,note,gateway_note,updated_by,tenants(name,slug)")
       .gte("period", since)
       .order("period", { ascending: false }),
   ]);
@@ -152,7 +154,7 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
 export async function listHotelInvoices(tenantId: string, limit = 12): Promise<SubscriptionInvoice[]> {
   const { data, error } = await db
     .from("hotel_subscription_invoices")
-    .select("id,tenant_id,period,amount,status,paid_at,paid_method,note,updated_by")
+    .select("id,tenant_id,period,amount,status,paid_at,paid_method,note,gateway_note,updated_by")
     .eq("tenant_id", tenantId)
     .order("period", { ascending: false })
     .limit(limit);

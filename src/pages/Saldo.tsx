@@ -136,6 +136,11 @@ export default function Saldo() {
                         {inv.paid_at && ` · ${t("dibayar")} ${formatDate(inv.paid_at)}`}
                         {inv.paid_method === "xendit" && " · online"}
                       </p>
+                      {/* Kurang bayar / bayar ganda: hotel yang mengalaminya
+                          harus tahu, bukan hanya Ventera. */}
+                      {inv.gateway_note && (
+                        <p className="text-xs text-warning mt-0.5">{inv.gateway_note}</p>
+                      )}
                     </div>
                     {inv.status === "paid" ? (
                       <span className="text-xs font-medium px-2 py-1 rounded-full bg-success/15 text-success">{t("Lunas")}</span>

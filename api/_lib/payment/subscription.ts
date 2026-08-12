@@ -34,11 +34,20 @@ const SUB_MARKER = "SUB-";
  * mati pada detik kita boleh menerbitkan penggantinya.
  */
 const INVOICE_TTL_SECONDS = 20 * 60 * 60;
-// Margin setengah jam: `gateway_issued_at` dicatat dengan jam KITA setelah
-// Xendit membuat invoicenya, dan dua jam itu tidak identik. Tanpa margin, di
-// ujung jangka ada saat tautannya sudah ditutup Xendit sementara kita masih
-// menganggapnya hidup — hotel menekan Bayar dan mendapat halaman kedaluwarsa.
-const REUSE_WINDOW_MS = (INVOICE_TTL_SECONDS - 30 * 60) * 1000;
+// SAMA PERSIS dengan TTL, dan jangan pernah dipersempit.
+//
+// Xendit membuat invoice pada T0; kita mencatat gateway_issued_at = T1, selalu
+// beberapa detik sesudahnya. Tautannya mati di T0+TTL, dan kita menerbitkan
+// penggantinya di T1+jangka. Dengan jangka = TTL, pengganti selalu terbit
+// SESUDAH yang lama mati. Memberi margin ke bawah (TTL − 30 menit) terdengar
+// seperti kehati-hatian, tapi artinya pengganti terbit ~30 menit SEBELUM yang
+// lama mati: satu bulan tagihan punya dua tautan hidup, hotel bisa membayar
+// dua kali, dan uang keduanya masuk ke Ventera.
+//
+// Harganya: selama beberapa detik di ujung jangka, tautan yang kita sodorkan
+// bisa sudah mati. Kalau itu mau dihilangkan, simpan `expiry_date` dari jawaban
+// Xendit dan pakai itu sebagai syarat — jangan menebaknya dengan margin.
+const REUSE_WINDOW_MS = INVOICE_TTL_SECONDS * 1000;
 
 function slugSegment(hotelSlug: string): string {
   return (hotelSlug ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -331,12 +340,32 @@ export async function markInvoicePaidFromCallback(
   gatewayRef: string,
   mode: PaymentMode,
   paidAmount: number,
-): Promise<"recorded" | "duplicate" | "underpaid" | "waived" | "stale"> {
-  if (invoice.status === "paid") return "duplicate";
+): Promise<"recorded" | "duplicate" | "underpaid" | "waived" | "stale" | "double_paid"> {
+  if (invoice.status === "paid") {
+    // Pengulangan callback untuk invoice YANG SAMA itu wajar dan senyap. Tapi
+    // invoice BERBEDA yang membayar bulan yang sudah lunas berarti hotel
+    // membayar dua kali — uang keduanya masuk ke Ventera, dan tanpa cabang ini
+    // tidak ada satu baris jejak pun.
+    if (invoice.gateway_ref && invoice.gateway_ref !== gatewayRef) {
+      await patchInvoice(invoice.id, {
+        gateway_note: `Pembayaran ganda: bulan ini sudah lunas lewat ${invoice.gateway_ref}, lalu ${gatewayRef} membayar ${paidAmount} lagi.`,
+        updated_by: "xendit_callback",
+      });
+      return "double_paid";
+    }
+    return "duplicate";
+  }
   // Operator membebaskan tagihan setelah tautannya terbit, lalu hotel tetap
   // membayar. Uangnya sudah masuk; yang salah bukan pembayarannya, jadi jangan
-  // diam-diam melunasi sesuatu yang sudah dinyatakan tidak perlu dibayar.
-  if (invoice.status === "waived") return "waived";
+  // diam-diam melunasi sesuatu yang sudah dinyatakan tidak perlu dibayar —
+  // tapi wajib meninggalkan jejak di barisnya, bukan hanya di log server.
+  if (invoice.status === "waived") {
+    await patchInvoice(invoice.id, {
+      gateway_note: `Tagihan sudah dibebaskan, tapi pembayaran online ${paidAmount} tetap masuk (${gatewayRef}).`,
+      updated_by: "xendit_callback",
+    });
+    return "waived";
+  }
 
   // Toleransi setengah rupiah: pembulatan boleh, kurang bayar tidak.
   if (paidAmount + 0.5 < invoice.amount) {

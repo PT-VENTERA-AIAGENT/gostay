@@ -176,6 +176,9 @@ export async function handleWebhook(
     if (outcome === "recorded" || outcome === "duplicate") {
       return { ok: true, outcome, status: 200 };
     }
+    // "double_paid" ikut jatuh ke sini: dijawab duplicate ke gateway (tidak ada
+    // yang perlu diulang) tapi dicatat keras, karena artinya hotel membayar dua
+    // kali untuk bulan yang sama.
     // Sisanya: uang sudah masuk ke Ventera tapi tagihannya SENGAJA tidak
     // dilunasi. Dijawab 200 karena mengulang tidak akan mengubah apa pun, dan
     // dicatat keras — ini justru keadaan yang butuh mata manusia.

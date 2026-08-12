@@ -154,6 +154,21 @@ describe("handleSubscriptionCheckout", () => {
     expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(0);
   });
 
+  it("jangka pakai-ulang tidak lebih pendek dari umur invoice", async () => {
+    // Kalau jangkanya dipersempit, tautan pengganti terbit SEBELUM yang lama
+    // mati: satu bulan punya dua tautan hidup dan hotel bisa membayar dua kali.
+    // Invoice yang diterbitkan tepat di bawah TTL harus masih dipakai ulang.
+    const hampirHabis = {
+      ...INVOICE, gateway_ref: "inv-lama", gateway_url: "https://pay.xendit/lama",
+      gateway_env: "test", gateway_attempt: 1,
+      gateway_issued_at: new Date(Date.now() - (20 * 60 * 60 - 60) * 1000).toISOString(),
+    };
+    const calls = stubFetch(routes(hampirHabis));
+    await expect(handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" }))
+      .resolves.toMatchObject({ reused: true });
+    expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(0);
+  });
+
   it("mengunci umur invoice, supaya tautan lama mati sebelum penggantinya terbit", async () => {
     // Tanpa ini Xendit memakai bawaan akun (±24 jam) sementara kita memakai
     // ulang tautannya 20 jam: ada 4 jam ketika tautan LAMA masih bisa dibayar
@@ -278,12 +293,40 @@ describe("handleWebhook — cabang langganan", () => {
       .resolves.toMatchObject({ ok: true, outcome: "recorded" });
   });
 
-  it("tagihan yang keburu dibebaskan tidak dilunasi diam-diam", async () => {
+  it("tagihan yang keburu dibebaskan tidak dilunasi, tapi meninggalkan jejak", async () => {
     const calls = stubFetch([
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, status: "waived", gateway_ref: "inv-xnd-1" }] },
     ]);
     await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
       .resolves.toMatchObject({ ok: true, outcome: "ignored" });
+    const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
+    expect(patch.status).toBeUndefined();                       // tetap dibebaskan
+    expect(String(patch.gateway_note)).toContain("dibebaskan"); // tapi terlihat
+  });
+
+  it("pembayaran KEDUA atas bulan yang sudah lunas tidak lewat tanpa jejak", async () => {
+    // Dua invoice untuk bulan yang sama, dua-duanya dibayar. Kalau ini hanya
+    // dijawab "duplicate" seperti pengulangan callback biasa, hotel membayar
+    // dua kali dan tidak ada satu baris pun yang mencatatnya.
+    const calls = stubFetch([
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
+      { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [{ ...INVOICE, status: "paid", gateway_ref: "inv-PERTAMA" }] },
+    ]);
+    await expect(handleWebhook("tok-sandbox", { ...body, invoice_id: "inv-KEDUA", paid_amount: 500000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
+    const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
+    expect(String(patch.gateway_note)).toContain("inv-PERTAMA");
+    expect(String(patch.gateway_note)).toContain("inv-KEDUA");
+  });
+
+  it("pengulangan callback untuk invoice yang SAMA tetap senyap", async () => {
+    const calls = stubFetch([
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, status: "paid", gateway_ref: "inv-xnd-1" }] },
+    ]);
+    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "duplicate" });
     expect(calls.filter((c) => c.init?.method === "PATCH")).toHaveLength(0);
   });
 

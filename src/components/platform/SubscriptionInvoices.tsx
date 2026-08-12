@@ -103,7 +103,18 @@ export default function SubscriptionInvoices({
           <tbody>
             {invoices.map((inv) => (
               <tr key={inv.id} className="hover:bg-muted/30">
-                <Td className="font-medium text-foreground capitalize">{periodLabel(inv.period)}</Td>
+                <Td className="font-medium text-foreground capitalize">
+                  {periodLabel(inv.period)}
+                  {/* Uang yang masuk tapi tidak melunasi apa pun — kurang bayar,
+                      bayar ganda, atau bayar atas tagihan yang sudah dibebaskan.
+                      Ditampilkan di sini karena inilah tempat operator memang
+                      melihat tagihan; di log server ia tidak pernah terbaca. */}
+                  {inv.gateway_note && (
+                    <p className="text-xs font-normal text-warning mt-0.5 whitespace-normal max-w-xs">
+                      {inv.gateway_note}
+                    </p>
+                  )}
+                </Td>
                 <Td className="text-right tabular-nums">{formatIDR(inv.amount)}</Td>
                 <Td>
                   <span className={cn("inline-block rounded-full px-2 py-0.5 text-xs font-medium", STATUS_TONE[inv.status])}>

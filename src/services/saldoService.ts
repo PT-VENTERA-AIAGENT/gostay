@@ -76,6 +76,7 @@ export interface SubscriptionInvoice {
   status: "unpaid" | "paid" | "waived";
   paid_at: string | null;
   paid_method: string | null;
+  gateway_note: string | null;
 }
 
 /** The caller's own hotel balance. Null until the hotel has its first income. */
@@ -146,7 +147,7 @@ export async function getHotelBilling(): Promise<HotelBilling> {
 export async function getMySubscriptionInvoices(limit = 6): Promise<SubscriptionInvoice[]> {
   const { data, error } = await db
     .from("hotel_subscription_invoices")
-    .select("id,period,amount,status,paid_at,paid_method")
+    .select("id,period,amount,status,paid_at,paid_method,gateway_note")
     .order("period", { ascending: false })
     .limit(limit);
   if (error) throw error;

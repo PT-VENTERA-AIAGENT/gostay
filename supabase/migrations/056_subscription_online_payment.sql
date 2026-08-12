@@ -24,11 +24,7 @@ alter table hotel_subscription_invoices
   add column if not exists gateway_issued_at timestamptz,
   -- Invoice Xendit kedaluwarsa (bawaan 24 jam) dan external_id-nya tidak boleh
   -- dipakai ulang, jadi percobaan berikutnya diberi sufiks -R<n>.
-  add column if not exists gateway_attempt int not null default 0,
-  -- Catatan dari MESIN (mis. "pembayaran online kurang: diterima X dari Y").
-  -- Sengaja bukan kolom `note`: itu milik operator, dan catatan tangannya tidak
-  -- boleh tertimpa setiap kali sebuah callback datang.
-  add column if not exists gateway_note text;
+  add column if not exists gateway_attempt int not null default 0;
 
 -- Kunci idempotensi. Webhook boleh datang berkali-kali untuk invoice yang sama;
 -- keduanya UNIQUE supaya satu invoice Xendit tidak bisa menempel ke dua tagihan.
