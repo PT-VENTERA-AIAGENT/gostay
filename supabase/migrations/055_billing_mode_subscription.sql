@@ -19,11 +19,11 @@
 -- menerima pembayaran Xendit live, Ventera saja yang tidak mengambil potongan.
 --
 -- URUTAN PENERAPAN PENTING: file ini mengganti trigger audit 032 dari BEFORE
--- menjadi AFTER (lihat alasannya di bawah). Kalau 032 dijalankan ULANG setelah
--- 055, trigger BEFORE-nya terpasang lagi di atas fungsi versi 055 yang
--- `return null` — dan trigger BEFORE yang mengembalikan null MEMBATALKAN
--- barisnya, sehingga setiap tulisan ke hotel_payment_config gagal diam-diam.
--- Kalau 032 harus dijalankan ulang, jalankan 055 lagi sesudahnya.
+-- menjadi AFTER (lihat alasannya di bawah). Menjalankan ULANG 032 setelah 055
+-- tidak membuat tulisan gagal — 032 mengganti fungsi DAN triggernya sekaligus,
+-- jadi keduanya kembali konsisten ke versi BEFORE. Yang hilang: kolom audit
+-- *_billing/*_amount berhenti terisi, dan bug baris audit ganda pada upsert
+-- kembali. Kalau 032 harus dijalankan ulang, jalankan 055 lagi sesudahnya.
 
 -- ─── Kolom model tagihan ──────────────────────────────────────────────────────
 alter table hotel_payment_config
@@ -115,8 +115,9 @@ $$;
 -- pemanggilnya adalah trigger credit_hotel_balance() yang sudah berjalan sebagai
 -- pemilik. Memberikannya ke `anon` seperti hotel_payment_mode() di 032 akan
 -- membuat siapa pun tanpa login bisa membaca syarat komersial hotel mana pun
--- lewat /rest/v1/rpc — 032 boleh begitu karena dipakai jalur checkout publik,
--- dua fungsi ini tidak.
+-- lewat /rest/v1/rpc. (hotel_payment_mode() di 032 memang pernah diberikan ke
+-- anon, tapi 034:139 sudah mencabutnya — tidak ada lagi RPC pembayaran yang
+-- terbuka untuk anon, dan dua fungsi ini tidak boleh jadi yang pertama.)
 -- `from public` saja tidak cukup: kalau versi migration ini pernah dijalankan
 -- dengan grant ke anon/authenticated, hak itu eksplisit dan tidak ikut tercabut.
 revoke all on function hotel_billing_mode(uuid) from public, anon, authenticated;

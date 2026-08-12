@@ -69,11 +69,13 @@ test("detail hotel menawarkan dua model tagihan, dan tarif komisinya dari konfig
     billing_mode: "subscription",
     subscription_amount: 500000,
     subscription_day: 10,
-    // Lingkungan pembayaran ikut dikirim apa adanya: mengubah model tagihan
-    // tidak boleh menjatuhkan hotel dari live ke test lewat default kolom.
-    mode: "test",
-    is_active: true,
   });
+  // Payload-nya sempit: mengubah model tagihan tidak boleh ikut menulis
+  // lingkungan pembayaran, supaya saklar Live/Off dari tab lain tidak tertimpa
+  // snapshot basi halaman ini.
+  expect(Object.keys(written).sort()).toEqual(
+    ["billing_mode", "subscription_amount", "subscription_day", "subscription_since", "tenant_id", "updated_by"],
+  );
   // Tanggal mulai distempel saat hotel BARU masuk langganan.
   expect(written.subscription_since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 });

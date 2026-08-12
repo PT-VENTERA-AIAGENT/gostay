@@ -65,6 +65,11 @@ export function periodLabel(period: string, locale = "id-ID"): string {
  * menghapus hotel yang menunggak dari layar penagihan berikut utangnya. Karena
  * itu tagihan diambil di query terpisah dan hotel tanpa langganan aktif tetap
  * ditarik masuk selama masih ada yang belum lunas.
+ *
+ * Batasnya `monthsBack`: tagihan yang lebih tua dari itu tidak ikut terbaca,
+ * jadi hotel yang HANYA menunggak di luar jendela itu tidak muncul sama sekali.
+ * 12 bulan dipilih supaya layar tetap terbaca; kalau suatu saat ada tunggakan
+ * yang lebih tua dari setahun, ia perlu dicari lewat query, bukan lewat layar ini.
  */
 export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHotel[]> {
   const from = new Date();
