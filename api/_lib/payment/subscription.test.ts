@@ -280,7 +280,8 @@ describe("handleWebhook — cabang langganan", () => {
 
     const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
     expect(patch.status).toBeUndefined();                   // tidak dilunasi
-    expect(String(patch.gateway_note)).toContain("300000"); // selisih terlihat operator
+    expect(String(patch.gateway_note)).toContain("Rp300.000"); // selisih terlihat operator
+    expect(String(patch.gateway_note)).toContain("Rp500.000");
     expect(patch.note).toBeUndefined();                     // catatan operator utuh
   });
 
@@ -319,6 +320,33 @@ describe("handleWebhook — cabang langganan", () => {
     const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
     expect(String(patch.gateway_note)).toContain("inv-PERTAMA");
     expect(String(patch.gateway_note)).toContain("inv-KEDUA");
+  });
+
+  it("sudah ditandai lunas operator lalu pembayaran online tetap masuk", async () => {
+    // Tagihan lunas lewat transfer (gateway_ref kosong), lalu tautan online-nya
+    // tetap dibayar. Ini kasus bayar-dua-kali yang paling mudah terjadi, dan
+    // paling mudah lolos senyap kalau syaratnya menuntut ref lama harus ada.
+    const calls = stubFetch([
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
+      { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [{ ...INVOICE, status: "paid", paid_method: "transfer", gateway_ref: null }] },
+    ]);
+    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
+    expect(String(JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body)).gateway_note))
+      .toContain("Pembayaran ganda");
+  });
+
+  it("pelunasan penuh membersihkan peringatan kurang bayar sebelumnya", async () => {
+    // Kalau tidak, tagihan yang akhirnya lunas tetap memajang "kurang bayar"
+    // selamanya, di konsol Ventera maupun di halaman Saldo hotel.
+    const calls = stubFetch([
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1", gateway_note: "Pembayaran online kurang: …" }] },
+    ]);
+    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "recorded" });
+    expect(JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body)).gateway_note).toBeNull();
   });
 
   it("pengulangan callback untuk invoice yang SAMA tetap senyap", async () => {

@@ -49,6 +49,11 @@ const INVOICE_TTL_SECONDS = 20 * 60 * 60;
 // Xendit dan pakai itu sebagai syarat — jangan menebaknya dengan margin.
 const REUSE_WINDOW_MS = INVOICE_TTL_SECONDS * 1000;
 
+/** Rupiah untuk teks yang dibaca operator dan hotel, bukan angka mentah. */
+function rp(n: number): string {
+  return "Rp" + Math.round(n).toLocaleString("id-ID");
+}
+
 function slugSegment(hotelSlug: string): string {
   return (hotelSlug ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
@@ -342,13 +347,17 @@ export async function markInvoicePaidFromCallback(
   paidAmount: number,
 ): Promise<"recorded" | "duplicate" | "underpaid" | "waived" | "stale" | "double_paid"> {
   if (invoice.status === "paid") {
-    // Pengulangan callback untuk invoice YANG SAMA itu wajar dan senyap. Tapi
-    // invoice BERBEDA yang membayar bulan yang sudah lunas berarti hotel
-    // membayar dua kali — uang keduanya masuk ke Ventera, dan tanpa cabang ini
-    // tidak ada satu baris jejak pun.
-    if (invoice.gateway_ref && invoice.gateway_ref !== gatewayRef) {
+    // Pengulangan callback untuk invoice YANG SAMA itu wajar dan senyap.
+    //
+    // Selain itu berarti bulan ini dibayar dua kali. Perhatikan `gateway_ref`
+    // yang KOSONG juga masuk ke sini: itu tagihan yang sudah ditandai lunas
+    // operator (transfer manual) lalu pembayaran online-nya tetap datang —
+    // justru kasus yang paling mudah terjadi, dan paling mudah lolos senyap
+    // kalau syaratnya menuntut ref lama harus ada.
+    if (invoice.gateway_ref !== gatewayRef) {
+      const lewat = invoice.gateway_ref ?? `cara lain (${invoice.status})`;
       await patchInvoice(invoice.id, {
-        gateway_note: `Pembayaran ganda: bulan ini sudah lunas lewat ${invoice.gateway_ref}, lalu ${gatewayRef} membayar ${paidAmount} lagi.`,
+        gateway_note: `Pembayaran ganda: bulan ini sudah lunas lewat ${lewat}, lalu ${rp(paidAmount)} masuk lagi (${gatewayRef}).`,
         updated_by: "xendit_callback",
       });
       return "double_paid";
@@ -361,7 +370,7 @@ export async function markInvoicePaidFromCallback(
   // tapi wajib meninggalkan jejak di barisnya, bukan hanya di log server.
   if (invoice.status === "waived") {
     await patchInvoice(invoice.id, {
-      gateway_note: `Tagihan sudah dibebaskan, tapi pembayaran online ${paidAmount} tetap masuk (${gatewayRef}).`,
+      gateway_note: `Tagihan sudah dibebaskan, tapi pembayaran online ${rp(paidAmount)} tetap masuk (${gatewayRef}).`,
       updated_by: "xendit_callback",
     });
     return "waived";
@@ -373,7 +382,7 @@ export async function markInvoicePaidFromCallback(
     // catatan tangannya ("transfer 5 Agustus via BCA") tidak boleh ditimpa
     // mesin setiap kali callback datang.
     await patchInvoice(invoice.id, {
-      gateway_note: `Pembayaran online kurang: diterima ${paidAmount} dari ${invoice.amount} (${gatewayRef}).`,
+      gateway_note: `Pembayaran online kurang: diterima ${rp(paidAmount)} dari ${rp(invoice.amount)} (${gatewayRef}).`,
       updated_by: "xendit_callback",
     });
     return "underpaid";
@@ -384,6 +393,11 @@ export async function markInvoicePaidFromCallback(
     paid_method: "xendit",
     gateway_ref: gatewayRef,
     gateway_env: mode,
+    // Dibersihkan: peringatan "kurang bayar" dari percobaan sebelumnya tidak
+    // boleh menempel pada tagihan yang akhirnya lunas penuh. gateway_note
+    // selalu berarti "keanehan yang BERLAKU SEKARANG", bukan riwayat — itu
+    // sebabnya ia ditimpa, bukan ditambahkan.
+    gateway_note: null,
     updated_by: "xendit_callback",
   }, "&status=eq.unpaid");   // atomik: dua callback beriringan tidak saling menimpa
 
