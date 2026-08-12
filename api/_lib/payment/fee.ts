@@ -2,9 +2,9 @@
 // reservation income is divided between the hotel and Ventera.
 //
 // This mirrors, exactly, the SQL in migration 031's credit_hotel_balance()
-// trigger. The trigger is what actually moves money in the balance; this TS
-// copy exists so the UI can preview a split and so the maths is unit-tested.
-// If you change one, change the other:
+// trigger (as amended by 055). The trigger is what actually moves money in the
+// balance; this TS copy exists so the UI can preview a split and so the maths
+// is unit-tested. If you change one, change the other:
 //
 //   gross = amount
 //   fee   = round(gross * feeBps / 10000, 2)   -- Ventera's cut (700 bps = 7%)
@@ -12,6 +12,20 @@
 //
 // net is DERIVED from fee (never rounded on its own), so gross === fee + net
 // always holds — no stray cent can appear or vanish in the split.
+//
+// Which feeBps applies is a per-hotel decision — see feeBpsFor() below.
+
+/**
+ * How Ventera charges one hotel.
+ *
+ * - `commission`   — a cut of every reservation payment (the default, 7%).
+ * - `subscription` — no cut at all; the hotel pays a flat monthly fee to
+ *   Ventera out-of-band (bank transfer), recorded in hotel_subscription_invoices.
+ */
+export type BillingMode = "commission" | "subscription";
+
+/** The platform fee, in bps, that actually applies to a hotel on this model. */
+export const DEFAULT_FEE_BPS = 700;
 
 export interface FeeSplit {
   /** The full payment, as received from the guest. */
@@ -35,7 +49,26 @@ export function round2(n: number): number {
  * @param amount  gross payment amount (rupiah)
  * @param feeBps  platform fee in basis points; defaults to 700 (7%)
  */
-export function feeSplit(amount: number, feeBps = 700): FeeSplit {
+/**
+ * The effective fee rate for a hotel — the TS mirror of `hotel_fee_bps()` in
+ * migration 055.
+ *
+ * A subscription hotel is charged 0 here BY DESIGN: it has already paid Ventera
+ * separately, so cutting its reservation income too would be charging twice.
+ * Anything that isn't explicitly 'subscription' falls through to the commission
+ * rate — an unrecognised value must never mean "free".
+ *
+ * @param billingMode  the hotel's model (null/undefined → commission)
+ * @param globalFeeBps the platform rate from payment_config; defaults to 700 (7%)
+ */
+export function feeBpsFor(
+  billingMode: BillingMode | string | null | undefined,
+  globalFeeBps: number = DEFAULT_FEE_BPS,
+): number {
+  return billingMode === "subscription" ? 0 : globalFeeBps;
+}
+
+export function feeSplit(amount: number, feeBps = DEFAULT_FEE_BPS): FeeSplit {
   if (!Number.isFinite(amount) || amount < 0) {
     throw new Error(`invalid amount: ${amount}`);
   }

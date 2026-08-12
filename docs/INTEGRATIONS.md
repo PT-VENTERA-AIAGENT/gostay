@@ -113,6 +113,14 @@ invoice". Salah — layanan itu hanya router callback. Sejak commit `3172def`:
 - **Mode per hotel**: `hotel_payment_config` (live/test/off), default global di
   `payment_config`. `is_active=false` MEMAKSA `test` — sebuah hotel tidak bisa
   bertransaksi live karena kelalaian.
+- **Model tagihan per hotel** (migration 055, kolom di tabel yang sama):
+  `billing_mode` = `commission` (bawaan, potongan 7%) atau `subscription`
+  (0% potongan; hotel bayar tarif tetap bulanan ke Ventera lewat transfer, di
+  LUAR aplikasi). Tegak lurus dengan live/test: hotel langganan tetap boleh
+  menerima pembayaran Xendit live. Diatur super admin di
+  `/platform/hotels/:id`; penagihannya di `/platform/subscriptions`. Menulis
+  kolom ini kewenangan platform saja — hotel yang bisa menulisnya bisa
+  menihilkan fee-nya sendiri.
 - **Lunas → reservasi terkonfirmasi**: trigger `recompute_booking_payment`
   (migration 019, diperluas 044) menaikkan `bookings.status` dari `pending` ke
   `confirmed` begitu `payment_status` jadi `paid`. Hanya MAJU — reservasi yang
@@ -139,12 +147,20 @@ Terbukti jalan end-to-end di sandbox 30 Jul 2026: invoice → bayar → callback
 
 ## 3. Saldo hotel & tarik saldo
 
-Setiap baris `payments` memicu trigger DB (migration 031): kredit
-`hotel_balance` **net setelah fee platform 7%** (`payment_config.platform_fee_bps
-= 700`, migration 036), tercatat di `balance_ledger`. Tarik saldo = insert
-`payouts` (trigger menahan dana atomik; saldo kurang = ditolak DB). Proses
-setujui/tolak = kewenangan platform. UI hotel: `/saldo`; konsol:
-`/platform/balances`.
+Setiap baris `payments` memicu trigger DB (migration 031, diperbarui 055):
+kredit `hotel_balance` **net setelah fee platform** — tarifnya dari
+`hotel_fee_bps(tenant)`, yaitu `payment_config.platform_fee_bps = 700` (7%,
+migration 036) untuk hotel `commission` dan **0 untuk hotel `subscription`**,
+tercatat di `balance_ledger` beserta `fee_bps` yang berlaku saat itu. Karena
+tarifnya tercatat per baris, refund membalik jumlah yang DULU diambil, bukan
+menghitung ulang dengan tarif hari ini. Tarik saldo = insert `payouts` (trigger
+menahan dana atomik; saldo kurang = ditolak DB). Proses setujui/tolak =
+kewenangan platform. UI hotel: `/saldo`; konsol: `/platform/balances`.
+
+Tagihan langganan bulanan (`hotel_subscription_invoices`, 055) BUKAN bagian dari
+saldo: uangnya tidak pernah lewat GoStay. Satu baris per hotel per bulan
+(periode dinormalkan ke tanggal 1, UNIQUE per hotel), diterbitkan dan ditandai
+lunas oleh operator di `/platform/subscriptions` setelah transfer diterima.
 
 ## 4. SSO & identitas
 

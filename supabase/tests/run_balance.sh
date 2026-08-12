@@ -15,7 +15,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIG="$DIR/../migrations"
 TMP="$(mktemp -d)"
 # Guards against a suite that aborts early and reports a vacuous success.
-EXPECTED=26
+EXPECTED=42
 trap 'pg_ctl -D "$TMP/pgdata" stop -m immediate >/dev/null 2>&1; rm -rf "$TMP"' EXIT
 
 echo "==> initdb ($TMP)"
@@ -29,12 +29,16 @@ done
 export PGOPTIONS='--client-min-messages=warning'
 run_su() { psql -h 127.0.0.1 -p "$PORT" -U postgres -q -v ON_ERROR_STOP=1 -f "$1"; }
 
-echo "==> roles + prereqs + migrations 030, 031, 036"
+echo "==> roles + prereqs + migrations 030, 031, 032, 036, 055"
 run_su "$DIR/setup.sql"          # roles (authenticated/anon/service_role) + auth stub
 run_su "$DIR/balance_prereq.sql" # enum/helpers + FK-target stand-ins
 run_su "$MIG/030_payment_gateway.sql" || { echo "migration 030 FAILED"; exit 1; }
 run_su "$MIG/031_hotel_balance.sql"   || { echo "migration 031 FAILED"; exit 1; }
+run_su "$MIG/032_hotel_payment_mode.sql" || { echo "migration 032 FAILED"; exit 1; }
 run_su "$MIG/036_platform_fee_7pct.sql" || { echo "migration 036 FAILED"; exit 1; }
+# 055 mengganti credit_hotel_balance() dengan versi yang memakai tarif per hotel
+# (0% untuk hotel langganan), jadi yang diuji di bawah adalah versi terbaru.
+run_su "$MIG/055_billing_mode_subscription.sql" || { echo "migration 055 FAILED"; exit 1; }
 run_su "$DIR/helpers.sql"        # tests.eq / tests.blocked / tests.allowed
 
 echo "==> balance/payout flow"

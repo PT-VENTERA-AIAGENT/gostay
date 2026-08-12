@@ -76,6 +76,14 @@ yang sudah migrasi LID "sukses" (dapat messageId) tapi tidak pernah tiba.
   menentukan stamp live/test).
 - **Saldo hotel**: fee platform **7%** (700 bps, `payment_config`), kredit
   net-of-fee via trigger DB (migration 031/036), tarik saldo = tabel `payouts`.
+- **Dua model tagihan** (migration 055, `hotel_payment_config.billing_mode`):
+  `commission` (bawaan, potongan 7%) atau `subscription` (0% potongan; hotel
+  bayar tarif tetap bulanan ke Ventera lewat transfer, DI LUAR aplikasi —
+  dicatat di `hotel_subscription_invoices`). Tarif efektif satu hotel =
+  `hotel_fee_bps(tenant)`, dipakai `credit_hotel_balance()`; cerminan TS-nya
+  `feeBpsFor()` di `api/_lib/payment/fee.ts` — ubah satu, ubah keduanya.
+  Model tagihan TEGAK LURUS dengan live/test, dan hanya super admin yang boleh
+  menulisnya (`/platform/hotels/:id`, penagihan di `/platform/subscriptions`).
 
 ## Peran & RLS
 

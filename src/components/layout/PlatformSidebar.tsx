@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, BedDouble, CalendarCheck, CalendarRange, ConciergeBell, MessageSquare, Wallet, Target, Megaphone, ArrowLeft, AlertTriangle, Bot } from "lucide-react";
+import { LayoutDashboard, Building2, BedDouble, CalendarCheck, CalendarRange, ConciergeBell, MessageSquare, Wallet, CalendarClock, Target, Megaphone, ArrowLeft, AlertTriangle, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -14,6 +14,7 @@ const items = [
   { icon: CalendarRange, label: "Kalender Hunian", path: "/platform/calendar" },
   { icon: MessageSquare, label: "Pesan", path: "/platform/messages" },
   { icon: Wallet, label: "Saldo Hotel", path: "/platform/balances" },
+  { icon: CalendarClock, label: "Langganan Bulanan", path: "/platform/subscriptions" },
   { icon: ConciergeBell, label: "Permintaan Tamu", path: "/platform/requests" },
   { icon: AlertTriangle, label: "Kendala WhatsApp", path: "/platform/incidents" },
   { icon: Bot, label: "Log AI", path: "/platform/ai-logs" },

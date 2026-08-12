@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  listHotelPayments, setHotelMode, setHotelPaymentsActive, setHotelPayment,
+  listHotelPayments, setHotelMode, setHotelPaymentsActive, setHotelPayment, setHotelBilling,
+  type BillingMode,
 } from "@/services/adminPaymentService";
+import { subscriptionKeys } from "./useSubscriptions";
 
 export const adminPaymentKeys = {
   all: ["admin-payments"] as const,
@@ -44,6 +46,27 @@ export function useSetHotelPayment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: adminPaymentKeys.list() });
       qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
+/** Pilih model tagihan hotel: potongan 7% atau langganan bulanan (offline). */
+export function useSetHotelBilling() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: {
+      tenantId: string;
+      mode: BillingMode;
+      amount?: number;
+      day?: number;
+      since?: string;
+      by: string;
+    }) => setHotelBilling(v.tenantId, { mode: v.mode, amount: v.amount, day: v.day, since: v.since }, v.by),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: adminPaymentKeys.list() });
+      qc.invalidateQueries({ queryKey: ["platform"] });
+      // Pindah model mengubah siapa yang muncul di daftar langganan.
+      qc.invalidateQueries({ queryKey: subscriptionKeys.all });
     },
   });
 }

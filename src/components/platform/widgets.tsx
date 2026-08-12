@@ -81,6 +81,36 @@ export function ModeBadge({ mode, active }: { mode: "live" | "test"; active: boo
   );
 }
 
+/**
+ * Model tagihan hotel: potongan per transaksi (bawaan) vs langganan bulanan.
+ *
+ * Kedua angkanya datang dari data — tarif komisi dari payment_config, tarif
+ * langganan dari hotel_payment_config — jadi kalau Ventera mengubah tarifnya,
+ * lencana ini ikut berubah tanpa menyentuh kode.
+ */
+export function BillingBadge({
+  mode,
+  amount,
+  feePct,
+}: {
+  mode: "commission" | "subscription";
+  amount?: number;
+  feePct?: number;
+}) {
+  if (mode !== "subscription") {
+    return (
+      <Badge variant="outline" className="text-muted-foreground">
+        Komisi{feePct !== undefined ? ` ${feePct}%` : ""}
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-primary/15 text-primary hover:bg-primary/20">
+      Langganan{amount ? ` ${formatIDR(amount)}/bln` : ""}
+    </Badge>
+  );
+}
+
 // Booking / request / payment statuses → a badge tone. Unknown values fall back
 // to a neutral outline rather than throwing.
 const STATUS_TONE: Record<string, string> = {

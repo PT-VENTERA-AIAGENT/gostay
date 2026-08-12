@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 // Run: npx playwright test --config playwright.local.config.ts
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "**/{template-picker,wa-console}.spec.ts",
+  testMatch: "**/{template-picker,wa-console,billing-mode}.spec.ts",
   outputDir: "./e2e/__artifacts__/local-results",
   timeout: 60_000,
   reporter: [["list"]],

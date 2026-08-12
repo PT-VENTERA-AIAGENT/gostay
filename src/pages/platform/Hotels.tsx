@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, Loader2, ShieldCheck, FlaskConical, Radio, MessageCircle, Ban, ChevronRight } from "lucide-react";
+import { Building2, Loader2, ShieldCheck, FlaskConical, Radio, MessageCircle, Ban, ChevronRight, CalendarClock } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { tr } from "@/lib/i18n";
 import { usePlatformHotels, useSetHotelPayment } from "@/hooks/usePlatform";
+import { usePaymentConfig } from "@/hooks/useSaldo";
 import type { HotelOverview } from "@/services/platformService";
-import { PageHeader, Table, Th, Td, EmptyState, SearchBox } from "@/components/platform/widgets";
+import { PageHeader, Table, Th, Td, EmptyState, SearchBox, BillingBadge } from "@/components/platform/widgets";
 
 type PayState = "off" | "test" | "live";
 
@@ -18,8 +19,12 @@ export default function PlatformHotels() {
   const by = user?.email ?? user?.id ?? "admin";
 
   const { data: hotels = [], isLoading } = usePlatformHotels();
+  const { data: config } = usePaymentConfig();
   const setPayment = useSetHotelPayment();
   const [q, setQ] = useState("");
+
+  // Tarif komisi tidak pernah ditulis di kode — ia datang dari payment_config.
+  const feePct = (config?.feeBps ?? 700) / 100;
 
   const visible = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -27,6 +32,7 @@ export default function PlatformHotels() {
   }, [hotels, q]);
 
   const liveCount = hotels.filter((h) => h.mode === "live" && h.payments_active).length;
+  const subCount = hotels.filter((h) => h.billing_mode === "subscription").length;
 
   const stateOf = (h: HotelOverview): PayState => (!h.payments_active ? "off" : h.mode === "live" ? "live" : "test");
 
@@ -56,6 +62,9 @@ export default function PlatformHotels() {
           <span className="px-3 py-1.5 rounded-lg bg-success/10 text-success font-medium flex items-center gap-1.5">
             <Radio className="w-4 h-4" /> {liveCount} Live
           </span>
+          <Link to="/platform/subscriptions" className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-medium flex items-center gap-1.5 hover:bg-primary/15">
+            <CalendarClock className="w-4 h-4" /> {subCount} {tr("Langganan")}
+          </Link>
         </div>
 
         <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex gap-2.5 text-sm text-foreground">
@@ -75,6 +84,7 @@ export default function PlatformHotels() {
                 <Th>{tr("Pemilik akun")}</Th>
                 <Th>WhatsApp</Th>
                 <Th className="text-center">{tr("Pembayaran")}</Th>
+                <Th className="text-center">Ventera</Th>
                 <Th></Th>
               </tr>
             </thead>
@@ -135,6 +145,13 @@ export default function PlatformHotels() {
                           </button>
                         </div>
                       </div>
+                    </Td>
+                    <Td className="text-center">
+                      {/* Model tagihan diubah di halaman detail: ia butuh tarif
+                          dan tanggal jatuh tempo, bukan satu klik. */}
+                      <Link to={`/platform/hotels/${h.tenant_id}`}>
+                        <BillingBadge mode={h.billing_mode} amount={h.subscription_amount} feePct={feePct} />
+                      </Link>
                     </Td>
                     <Td>
                       <Link to={`/platform/hotels/${h.tenant_id}`} className="text-muted-foreground hover:text-primary">

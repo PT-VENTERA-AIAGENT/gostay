@@ -1,6 +1,6 @@
 -- GoStay HMS — balance/payout ("tarik saldo") trigger regression.
--- Run as the superuser AFTER balance_prereq.sql + migrations 030 + 031 + 036 +
--- the tests.* helpers (see run_balance.sh).
+-- Run as the superuser AFTER balance_prereq.sql + migrations 030 + 031 + 032 +
+-- 036 + 055 + the tests.* helpers (see run_balance.sh).
 --
 -- Verifies the money never drifts across the whole lifecycle:
 --   income → credited NET of the 7% platform fee
@@ -9,6 +9,8 @@
 --   refund → credit reversed by the exact amount taken
 --   guard  → a payment whose net is already withdrawn cannot be deleted
 --   gw ref → a replayed gateway settlement cannot double-credit
+--   sewa   → a subscription hotel (055) is credited WHOLE, and switching models
+--            changes only what happens next, never what already happened
 --
 -- Amounts are whole rupiah so every fee (×0.07) is exact — a rounding drift
 -- would surface as a mismatch, not hide in it.
@@ -107,3 +109,86 @@ select tests.blocked('second payment with the same gateway_ref',
       values ('11111111-1111-4111-8111-1111111111f2', 200000, 'xendit', 'inv-DUP')$$);
 select tests.eqn('idempotency hotel credited exactly once (186,000 net)',
   (select available from hotel_balance where tenant_id=:'T2'), 186000);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Model tagihan langganan (migration 055)
+-- ─────────────────────────────────────────────────────────────────────────────
+\set T3 '11111111-1111-4111-8111-111111111133'
+\set P3 '33333333-3333-4333-8333-333333333303'
+\set P4 '33333333-3333-4333-8333-333333333304'
+
+\echo ''
+\echo '=== hotel langganan: pendapatan masuk UTUH (0% potongan) ==='
+insert into tenants (id, name) values (:'T3', 'Hotel Langganan');
+insert into hotel_payment_config (tenant_id, billing_mode, subscription_amount, updated_by)
+  values (:'T3', 'subscription', 500000, 'test');
+insert into payments (id, tenant_id, amount) values (:'P3', :'T3', 1000000);
+select tests.eqn('langganan: available = bruto penuh', (select available    from hotel_balance where tenant_id=:'T3'), 1000000);
+select tests.eqn('langganan: lifetime_fee tetap 0',    (select lifetime_fee from hotel_balance where tenant_id=:'T3'), 0);
+select tests.eq ('langganan: fee_bps ledger = 0',
+  (select fee_bps from balance_ledger where payment_id=:'P3' and entry_type='reservation_income'), 0);
+select tests.eq ('langganan: ledger menerangkan sebabnya',
+  (select count(*) from balance_ledger where payment_id=:'P3' and description like '%langganan%'), 1);
+
+\echo ''
+\echo '=== pindah kembali ke komisi: hanya pembayaran BERIKUTNYA yang dipotong ==='
+update hotel_payment_config set billing_mode='commission', updated_by='test' where tenant_id=:'T3';
+insert into payments (id, tenant_id, amount) values (:'P4', :'T3', 1000000);
+select tests.eqn('setelah pindah: available 1.000.000 + 930.000', (select available    from hotel_balance where tenant_id=:'T3'), 1930000);
+select tests.eqn('setelah pindah: lifetime_fee = 70.000',         (select lifetime_fee from hotel_balance where tenant_id=:'T3'), 70000);
+select tests.eq ('perpindahan model tercatat di audit',
+  (select count(*) from hotel_payment_mode_audit
+     where tenant_id=:'T3' and old_billing='subscription' and new_billing='commission'), 1);
+
+-- Konsol menulis lewat upsert. Pada `on conflict do update`, trigger BEFORE
+-- INSERT tetap jalan untuk baris usulan sebelum bentrokannya diketahui — dulu
+-- itu membuat tiap sentuhan menulis baris audit hantu "hotel baru disetel".
+-- Setelah pindah ke trigger AFTER, satu perubahan = tepat satu baris audit.
+insert into hotel_payment_config (tenant_id, billing_mode, subscription_amount, updated_by)
+  values (:'T3', 'subscription', 750000, 'upsert-test')
+  on conflict (tenant_id) do update
+    set billing_mode = excluded.billing_mode,
+        subscription_amount = excluded.subscription_amount,
+        updated_by = excluded.updated_by;
+select tests.eq ('upsert pada baris yang sudah ada = satu baris audit, tanpa baris hantu',
+  (select count(*) from hotel_payment_mode_audit where tenant_id=:'T3' and changed_by='upsert-test'), 1);
+select tests.eq ('baris audit itu mencatat model SEBELUMNYA, bukan kosong',
+  (select count(*) from hotel_payment_mode_audit
+     where tenant_id=:'T3' and changed_by='upsert-test' and old_billing='commission'), 1);
+-- Kembalikan ke komisi supaya pemeriksaan refund di bawah tetap bicara soal
+-- tarif tercatat, bukan tarif yang kebetulan berubah di sini.
+update hotel_payment_config set billing_mode='commission', updated_by='test' where tenant_id=:'T3';
+
+\echo ''
+\echo '=== refund memakai tarif yang TERCATAT, bukan tarif yang berlaku sekarang ==='
+-- P3 dibayar saat hotel masih langganan (fee 0). Meski hotelnya kini komisi,
+-- pembalikannya harus mengembalikan 1.000.000 penuh — bukan 930.000.
+delete from payments where id=:'P3';
+select tests.eqn('setelah refund pembayaran era langganan: available', (select available    from hotel_balance where tenant_id=:'T3'), 930000);
+select tests.eqn('setelah refund: lifetime_fee tidak berubah',         (select lifetime_fee from hotel_balance where tenant_id=:'T3'), 70000);
+
+\echo ''
+\echo '=== tagihan langganan bulanan (dibayar offline) ==='
+-- Periode dinormalkan ke tanggal 1 supaya dua tagihan di bulan yang sama mustahil.
+insert into hotel_subscription_invoices (tenant_id, period, amount, updated_by)
+  values (:'T3', date '2026-08-17', 500000, 'test');
+select tests.eq('periode tagihan dinormalkan ke tanggal 1',
+  (select count(*) from hotel_subscription_invoices where tenant_id=:'T3' and period = date '2026-08-01'), 1);
+select tests.eq('tagihan baru berstatus unpaid tanpa paid_at',
+  (select count(*) from hotel_subscription_invoices
+     where tenant_id=:'T3' and status='unpaid' and paid_at is null), 1);
+select tests.blocked('tagihan kedua untuk bulan yang sama',
+  $$insert into hotel_subscription_invoices (tenant_id, period, amount)
+      values ('11111111-1111-4111-8111-111111111133', date '2026-08-01', 500000)$$);
+
+update hotel_subscription_invoices set status='paid', paid_method='transfer', updated_by='test'
+  where tenant_id=:'T3' and period = date '2026-08-01';
+select tests.eq('ditandai lunas → paid_at terisi',
+  (select count(*) from hotel_subscription_invoices
+     where tenant_id=:'T3' and status='paid' and paid_at is not null), 1);
+
+update hotel_subscription_invoices set status='unpaid', updated_by='test'
+  where tenant_id=:'T3' and period = date '2026-08-01';
+select tests.eq('dibatalkan lunas → paid_at ikut dibersihkan',
+  (select count(*) from hotel_subscription_invoices
+     where tenant_id=:'T3' and status='unpaid' and paid_at is null), 1);

@@ -45,6 +45,7 @@ import PlatformIncidents from "./pages/platform/Incidents";
 import PlatformAiLogs from "./pages/platform/AiLogs";
 import PlatformMessages from "./pages/platform/Messages";
 import PlatformBalances from "./pages/platform/Balances";
+import PlatformSubscriptions from "./pages/platform/Subscriptions";
 import PlatformCalendar from "./pages/platform/Calendar";
 import LeadDetail from "./pages/admin/LeadDetail";
 import CampaignsPage from "./pages/admin/Campaigns";
@@ -254,6 +255,7 @@ const App = () => (
               <Route path="/platform/calendar" element={<PlatformCalendar />} />
               <Route path="/platform/messages" element={<PlatformMessages />} />
               <Route path="/platform/balances" element={<PlatformBalances />} />
+              <Route path="/platform/subscriptions" element={<PlatformSubscriptions />} />
               <Route path="/platform/requests" element={<PlatformGuestRequests />} />
               <Route path="/platform/incidents" element={<PlatformIncidents />} />
               <Route path="/platform/ai-logs" element={<PlatformAiLogs />} />

@@ -26,6 +26,15 @@ create or replace function get_my_tenant() returns uuid
     select nullif(current_setting('request.jwt.claims', true)::json ->> 'tenant', '')::uuid
   $$;
 
+-- Predikat cakupan platform (asli di 035/041). 055 memasang RLS tagihan
+-- langganan di atasnya, jadi keduanya harus ada sebelum migration itu jalan.
+-- Isinya sengaja dangkal: yang diuji di sini aritmetika uangnya, bukan RLS-nya
+-- (itu urusan attacks.sql).
+create or replace function public.platform_admin_scope() returns boolean
+  language sql stable as $$ select true $$;
+create or replace function public.is_hotel_member() returns boolean
+  language sql stable as $$ select get_my_role() in ('staff'::user_role, 'admin'::user_role) $$;
+
 -- Payouts carry a set_tenant_id() BEFORE-insert trigger (defined in 011). Here we
 -- only need tenant_id populated for the money math, so keep any value already
 -- supplied and fall back to the JWT tenant otherwise.
