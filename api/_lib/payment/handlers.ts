@@ -148,6 +148,13 @@ export async function handleWebhook(
   const externalId = String(body.external_id ?? "");
   const gatewayRef = String(body.invoice_id ?? body.id ?? "");
   const amount = Number(body.amount ?? body.paid_amount ?? 0);
+  // Yang BENAR-BENAR diterima. Pada payload invoice Xendit, `amount` adalah
+  // nominal tagihannya dan `paid_amount` yang dibayar — jadi urutannya harus
+  // terbalik dari baris di atas. Membaca `amount` di sini membuat setiap
+  // pemeriksaan kurang bayar membandingkan tagihan dengan dirinya sendiri, dan
+  // tidak akan pernah menyala. Tetap aman kalau router callback hanya mengirim
+  // salah satunya.
+  const paidAmount = Number(body.paid_amount ?? body.amount ?? 0);
   if (!externalId || !gatewayRef || !(amount > 0)) {
     return { ok: false, status: 400, error: "malformed_webhook" };
   }
@@ -165,17 +172,18 @@ export async function handleWebhook(
   if (isSubscriptionExternalId(externalId)) {
     const invoice = await findInvoiceForCallback(gatewayRef, externalId);
     if (!invoice) return { ok: false, status: 404, error: "subscription_invoice_not_found" };
-    const outcome = await markInvoicePaidFromCallback(invoice, gatewayRef, modeForEnv(env), amount);
-    if (outcome === "underpaid") {
-      // Dijawab 200 supaya gateway berhenti mengulang — pengulangan tidak akan
-      // mengubah apa pun. Tagihannya sengaja TETAP belum lunas, dan selisihnya
-      // sudah dicatat di baris tagihan itu supaya operator melihatnya.
-      console.error(
-        `[payment/webhook] langganan kurang bayar: invoice ${invoice.id}, diterima ${amount} dari ${invoice.amount}`,
-      );
-      return { ok: true, outcome: "ignored", status: 200 };
+    const outcome = await markInvoicePaidFromCallback(invoice, gatewayRef, modeForEnv(env), paidAmount);
+    if (outcome === "recorded" || outcome === "duplicate") {
+      return { ok: true, outcome, status: 200 };
     }
-    return { ok: true, outcome, status: 200 };
+    // Sisanya: uang sudah masuk ke Ventera tapi tagihannya SENGAJA tidak
+    // dilunasi. Dijawab 200 karena mengulang tidak akan mengubah apa pun, dan
+    // dicatat keras — ini justru keadaan yang butuh mata manusia.
+    console.error(
+      `[payment/webhook] langganan tidak dilunasi (${outcome}): invoice ${invoice.id}, ` +
+      `diterima ${paidAmount} dari ${invoice.amount}, status ${invoice.status}, ref ${gatewayRef}`,
+    );
+    return { ok: true, outcome: "ignored", status: 200 };
   }
 
   const reference = referenceFromExternalId(externalId);

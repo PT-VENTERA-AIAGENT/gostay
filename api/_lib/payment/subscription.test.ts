@@ -87,7 +87,7 @@ describe("handleSubscriptionCheckout", () => {
   // PATCH didaftarkan LEBIH DULU: route GET di bawahnya tidak memeriksa method,
   // jadi kalau urutannya terbalik ia yang selalu menang dan route PATCH mati.
   const routes = (invoice: unknown, profile: unknown = [{ tenant_id: "t-1", role: "staff", is_active: true }]) => [
-    { match: (u: string, i?: RequestInit) => u.includes("/hotel_subscription_invoices?id=eq.") && i?.method === "PATCH", reply: () => ({}) },
+    { match: (u: string, i?: RequestInit) => u.includes("/hotel_subscription_invoices?id=eq.") && i?.method === "PATCH", reply: () => [{ id: 7 }] },
     { match: (u: string) => u.includes("/profiles?"), reply: () => profile },
     { match: (u: string) => u.includes("/hotel_subscription_invoices?id=eq."), reply: () => [invoice] },
     { match: (u: string) => u.includes("/payment_config?"), reply: () => [{ subscription_mode: "test" }] },
@@ -205,7 +205,7 @@ describe("handleWebhook — cabang langganan", () => {
   it("menandai tagihan lunas tanpa membuat baris payments", async () => {
     const calls = stubFetch([
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => ({}) },
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
     ]);
     const res = await handleWebhook("tok-sandbox", body);
     expect(res).toMatchObject({ ok: true, outcome: "recorded", status: 200 });
@@ -231,7 +231,7 @@ describe("handleWebhook — cabang langganan", () => {
     stubFetch([
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
       { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [INVOICE] },
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => ({}) },
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
     ]);
     await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "recorded" });
   });
@@ -242,7 +242,7 @@ describe("handleWebhook — cabang langganan", () => {
     // invoice pertama. Tanpa upaya pencocokan per-bulan ini, uangnya masuk ke
     // Ventera sementara tagihannya tetap tercatat belum lunas.
     const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => ({}) },
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
       { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [] },
       { match: (u: string) => u.includes("gateway_external_id=like."), reply: () => [{ ...INVOICE, gateway_external_id: "GOSTAY-SUB-KOPI-RINTIK-202608-R1" }] },
@@ -251,18 +251,68 @@ describe("handleWebhook — cabang langganan", () => {
     expect(calls.some((c) => c.url.includes("like.GOSTAY-SUB-KOPI-RINTIK-202608"))).toBe(true);
   });
 
-  it("kurang bayar TIDAK dianggap lunas, dan selisihnya dicatat di tagihan", async () => {
+  it("kurang bayar pada BENTUK PAYLOAD XENDIT tidak dianggap lunas", async () => {
+    // Bentuk aslinya: `amount` = nominal tagihan, `paid_amount` = yang dibayar.
+    // Membaca `amount` membuat guard ini membandingkan tagihan dengan dirinya
+    // sendiri dan tidak pernah menyala — tes yang mengirim `amount: 300000`
+    // saja akan lolos tanpa membuktikan apa pun.
     const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => ({}) },
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
     ]);
-    // 200 supaya gateway berhenti mengulang; tagihannya sengaja tetap unpaid.
-    await expect(handleWebhook("tok-sandbox", { ...body, amount: 300000 }))
+    await expect(handleWebhook("tok-sandbox", { ...body, amount: 500000, paid_amount: 300000 }))
       .resolves.toMatchObject({ ok: true, outcome: "ignored" });
 
     const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
-    expect(patch.status).toBeUndefined();          // tidak dilunasi
-    expect(String(patch.note)).toContain("300000");  // selisihnya terlihat operator
+    expect(patch.status).toBeUndefined();                   // tidak dilunasi
+    expect(String(patch.gateway_note)).toContain("300000"); // selisih terlihat operator
+    expect(patch.note).toBeUndefined();                     // catatan operator utuh
+  });
+
+  it("bayar penuh pada bentuk Xendit tetap melunasi", async () => {
+    stubFetch([
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
+    ]);
+    await expect(handleWebhook("tok-sandbox", { ...body, amount: 500000, paid_amount: 500000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "recorded" });
+  });
+
+  it("tagihan yang keburu dibebaskan tidak dilunasi diam-diam", async () => {
+    const calls = stubFetch([
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, status: "waived", gateway_ref: "inv-xnd-1" }] },
+    ]);
+    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
+    expect(calls.filter((c) => c.init?.method === "PATCH")).toHaveLength(0);
+  });
+
+  it("PATCH yang tidak kena baris apa pun tidak dilaporkan sebagai lunas", async () => {
+    // PostgREST menjawab 204 baik untuk 1 baris maupun 0. Tanpa
+    // return=representation, pelunasan yang filternya meleset terbaca sukses.
+    let dibaca = 0;
+    const calls = stubFetch([
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [] },  // 0 baris berubah
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
+      { match: (u: string) => u.includes("?id=eq."), reply: () => { dibaca++; return [{ ...INVOICE, status: "waived" }]; } },
+    ]);
+    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
+    expect(dibaca).toBe(1);  // dibaca ulang untuk memisahkan kembar dari basi
+    expect(calls.some((c) => c.url.includes("status=eq.unpaid"))).toBe(true);
+  });
+
+  it("menolak external_id ber-wildcard yang bisa melunasi tagihan hotel lain", async () => {
+    // encodeURIComponent tidak meng-escape `*`. Callback berbekal token dengan
+    // external_id ber-wildcard tidak boleh mencocokkan tagihan hotel mana pun.
+    const calls = stubFetch([
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
+      { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [] },
+      { match: (u: string) => u.includes("like."), reply: () => [INVOICE] },
+    ]);
+    await expect(handleWebhook("tok-sandbox", { ...body, external_id: "GOSTAY-SUB-*-202608" }))
+      .resolves.toMatchObject({ ok: false, status: 404 });
+    expect(calls.some((c) => c.url.includes("like."))).toBe(false);
   });
 
   it("tagihan yang tidak dikenali dijawab 404, bukan dicatat sebagai booking", async () => {

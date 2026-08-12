@@ -34,7 +34,11 @@ const SUB_MARKER = "SUB-";
  * mati pada detik kita boleh menerbitkan penggantinya.
  */
 const INVOICE_TTL_SECONDS = 20 * 60 * 60;
-const REUSE_WINDOW_MS = INVOICE_TTL_SECONDS * 1000;
+// Margin setengah jam: `gateway_issued_at` dicatat dengan jam KITA setelah
+// Xendit membuat invoicenya, dan dua jam itu tidak identik. Tanpa margin, di
+// ujung jangka ada saat tautannya sudah ditutup Xendit sementara kita masih
+// menganggapnya hidup — hotel menekan Bayar dan mendapat halaman kedaluwarsa.
+const REUSE_WINDOW_MS = (INVOICE_TTL_SECONDS - 30 * 60) * 1000;
 
 function slugSegment(hotelSlug: string): string {
   return (hotelSlug ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -70,11 +74,16 @@ export function subscriptionExternalId(hotelSlug: string | null, period: string,
  * pernah tercatat, dan saldo hotel itu tidak pernah dikredit — diam-diam, dan
  * hanya untuk hotel itu. Karena itu dua syarat lagi: tidak boleh mengandung
  * penanda booking, dan ekornya harus berbentuk periode YYYYMM (+ -R<n>).
+ *
+ * Penanda booking-nya dicocokkan dengan BENTUK referensinya (`-BK-<8 digit>-`),
+ * bukan sekadar "-BK-". Kalau hanya potongan itu, hotel dengan segmen slug `bk`
+ * (mis. `sub-bk-inn` → `GOSTAY-SUB-BK-INN-202608`) justru terlempar ke arah
+ * sebaliknya: tagihan langganannya dibaca sebagai reservasi dan dijawab 404.
  */
 export function isSubscriptionExternalId(externalId: string | undefined): boolean {
   const id = externalId ?? "";
   return id.startsWith(PREFIX + SUB_MARKER)
-    && !id.includes("-BK-")
+    && !/-BK-\d{8}-/.test(id)
     && /-\d{6}(-R\d+)?$/.test(id);
 }
 
@@ -179,8 +188,14 @@ export async function findInvoiceForCallback(
   // `GOSTAY-SUB-<HOTEL>-<YYYYMM>` unik per hotel per bulan, jadi mencocokkan
   // awalannya tidak bisa nyasar ke tagihan bulan atau hotel lain.
   const base = baseExternalId(externalId);
+  // Wildcard DINETRALKAN. encodeURIComponent tidak meng-escape `*`, `%`, atau
+  // `_`, dan string ini datang dari badan callback: sebuah panggilan berbekal
+  // token internal dengan external_id "GOSTAY-SUB-*-202608" akan mencocokkan
+  // tagihan bulan itu milik hotel MANA PUN dan melunasinya. Hanya bentuk yang
+  // kita terbitkan sendiri yang boleh lewat.
+  if (!/^[A-Z0-9-]+$/.test(base)) return null;
   const byBase = await serviceGet(
-    `hotel_subscription_invoices?gateway_external_id=like.${encodeURIComponent(base)}*&select=${INVOICE_COLUMNS}&limit=1`,
+    `hotel_subscription_invoices?gateway_external_id=like.${encodeURIComponent(base)}*&select=${INVOICE_COLUMNS}&order=id.desc&limit=1`,
   );
   if (byBase.ok) {
     const rows = (await byBase.json()) as any[];
@@ -189,18 +204,30 @@ export async function findInvoiceForCallback(
   return null;
 }
 
+/**
+ * PATCH satu tagihan; mengembalikan BERAPA BARIS yang benar-benar berubah.
+ *
+ * `return=representation` bukan kemewahan: dengan `return=minimal` PostgREST
+ * menjawab 204 baik ketika satu baris terupdate maupun nol, jadi pelunasan yang
+ * filternya tidak kena apa-apa (tagihan sudah dibebaskan, atau callback lain
+ * mendahului) akan terbaca sebagai sukses — uang masuk, baris tidak berubah,
+ * dan tidak ada satu pun jejak.
+ */
 async function patchInvoice(
   id: number,
   patch: Record<string, unknown>,
   extraFilter = "",
-): Promise<void> {
+): Promise<number> {
   // serviceUpdate menerima path+filter sebagai SATU argumen (lihat wa/client.ts),
   // bukan tabel dan filter terpisah.
   const res = await serviceUpdate(
     `hotel_subscription_invoices?id=eq.${encodeURIComponent(String(id))}${extraFilter}`,
     patch,
+    "return=representation",
   );
   if (!res.ok) throw new Error(`subscription_invoice_update_failed_${res.status}`);
+  const rows = (await res.json().catch(() => [])) as unknown[];
+  return Array.isArray(rows) ? rows.length : 0;
 }
 
 export type SubscriptionCheckoutResult =
@@ -304,24 +331,39 @@ export async function markInvoicePaidFromCallback(
   gatewayRef: string,
   mode: PaymentMode,
   paidAmount: number,
-): Promise<"recorded" | "duplicate" | "underpaid"> {
+): Promise<"recorded" | "duplicate" | "underpaid" | "waived" | "stale"> {
   if (invoice.status === "paid") return "duplicate";
+  // Operator membebaskan tagihan setelah tautannya terbit, lalu hotel tetap
+  // membayar. Uangnya sudah masuk; yang salah bukan pembayarannya, jadi jangan
+  // diam-diam melunasi sesuatu yang sudah dinyatakan tidak perlu dibayar.
+  if (invoice.status === "waived") return "waived";
 
   // Toleransi setengah rupiah: pembulatan boleh, kurang bayar tidak.
   if (paidAmount + 0.5 < invoice.amount) {
+    // Ditulis ke gateway_note, BUKAN note: kolom itu milik operator, dan
+    // catatan tangannya ("transfer 5 Agustus via BCA") tidak boleh ditimpa
+    // mesin setiap kali callback datang.
     await patchInvoice(invoice.id, {
-      note: `Pembayaran online kurang: diterima ${paidAmount} dari ${invoice.amount} (${gatewayRef}).`,
+      gateway_note: `Pembayaran online kurang: diterima ${paidAmount} dari ${invoice.amount} (${gatewayRef}).`,
       updated_by: "xendit_callback",
     });
     return "underpaid";
   }
 
-  await patchInvoice(invoice.id, {
+  const changed = await patchInvoice(invoice.id, {
     status: "paid",
     paid_method: "xendit",
     gateway_ref: gatewayRef,
     gateway_env: mode,
     updated_by: "xendit_callback",
   }, "&status=eq.unpaid");   // atomik: dua callback beriringan tidak saling menimpa
+
+  if (changed === 0) {
+    // Filternya tidak kena: statusnya berubah antara pembacaan dan penulisan.
+    // Dibaca ulang supaya "callback kembar" tidak tertukar dengan "tagihan
+    // keburu dibebaskan" — yang pertama wajar, yang kedua perlu dilihat orang.
+    const fresh = await getSubscriptionInvoice(invoice.id);
+    return fresh?.status === "paid" ? "duplicate" : "stale";
+  }
   return "recorded";
 }
