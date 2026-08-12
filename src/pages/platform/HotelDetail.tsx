@@ -89,6 +89,11 @@ export default function PlatformHotelDetail() {
         since: mode === "subscription" && billing.billing_mode !== "subscription"
           ? new Date().toISOString().slice(0, 10)
           : undefined,
+        // Bawa serta lingkungan pembayaran yang sedang berlaku: hotel yang
+        // belum punya baris konfigurasi akan mendapat baris baru, dan tanpa ini
+        // kolom mode-nya jatuh ke default 'test'.
+        keepMode: hotel.mode,
+        keepActive: hotel.payments_active,
         by,
       });
       toast({

@@ -107,10 +107,23 @@ export async function setHotelPayment(
  *
  * `since` is passed by the caller rather than stamped here, so that editing the
  * fee of a hotel that already subscribes doesn't silently move its start date.
+ *
+ * `keepMode`/`keepActive` carry the hotel's CURRENT payment environment into the
+ * upsert. Without them, a hotel that has no config row yet gets one inserted
+ * with the column default `mode='test'` — so changing the billing model would
+ * quietly change the payment environment too. Harmless while the global default
+ * is 'test', and a live hotel silently switched off the moment it isn't.
  */
 export async function setHotelBilling(
   tenantId: string,
-  input: { mode: BillingMode; amount?: number; day?: number; since?: string },
+  input: {
+    mode: BillingMode;
+    amount?: number;
+    day?: number;
+    since?: string;
+    keepMode?: "live" | "test";
+    keepActive?: boolean;
+  },
   by: string,
 ): Promise<void> {
   const patch: Record<string, unknown> = {
@@ -118,6 +131,8 @@ export async function setHotelBilling(
     billing_mode: input.mode,
     updated_by: by,
   };
+  if (input.keepMode !== undefined) patch.mode = input.keepMode;
+  if (input.keepActive !== undefined) patch.is_active = input.keepActive;
   if (input.amount !== undefined) patch.subscription_amount = Math.max(0, Math.round(input.amount));
   if (input.day !== undefined) patch.subscription_day = Math.min(28, Math.max(1, Math.round(input.day)));
   if (input.since !== undefined) patch.subscription_since = input.since;

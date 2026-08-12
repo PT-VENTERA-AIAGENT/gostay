@@ -32,6 +32,7 @@ export interface SubscriptionHotel {
   tenant_id: string;
   name: string;
   slug: string;
+  /** 'commission' = sudah tidak berlangganan, tapi masih punya tagihan terbuka. */
   billing_mode: BillingMode;
   subscription_amount: number;
   subscription_day: number;
@@ -56,11 +57,14 @@ export function periodLabel(period: string, locale = "id-ID"): string {
 }
 
 /**
- * Semua hotel berlangganan beserta riwayat tagihannya.
+ * Semua hotel berlangganan beserta riwayat tagihannya, DITAMBAH hotel yang
+ * sudah pindah kembali ke komisi tapi masih meninggalkan tagihan belum lunas.
  *
- * Dua query lalu digabung di sini (bukan satu embed) supaya tagihan hotel yang
- * SUDAH pindah kembali ke komisi tetap terbaca — utang bulan lalu tidak hilang
- * hanya karena modelnya berganti hari ini.
+ * Bagian kedua itu bukan kelengkapan yang manis-manis saja: kalau daftar ini
+ * dikunci ke `billing_mode = 'subscription'`, satu klik "Potongan 7%" akan
+ * menghapus hotel yang menunggak dari layar penagihan berikut utangnya. Karena
+ * itu tagihan diambil di query terpisah dan hotel tanpa langganan aktif tetap
+ * ditarik masuk selama masih ada yang belum lunas.
  */
 export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHotel[]> {
   const from = new Date();
@@ -73,7 +77,9 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
       .select("tenant_id,billing_mode,subscription_amount,subscription_day,subscription_since,tenants(name,slug)")
       .eq("billing_mode", "subscription"),
     db.from("hotel_subscription_invoices")
-      .select("id,tenant_id,period,amount,status,paid_at,paid_method,note,updated_by")
+      // Nama hotel ikut ditarik di sini supaya baris tagihan tetap bisa
+      // ditampilkan meski hotelnya tidak ada lagi di daftar langganan aktif.
+      .select("id,tenant_id,period,amount,status,paid_at,paid_method,note,updated_by,tenants(name,slug)")
       .gte("period", since)
       .order("period", { ascending: false }),
   ]);
@@ -82,8 +88,11 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
 
   const invoices = (invRes.data ?? []) as any[];
   const byTenant = new Map<string, SubscriptionInvoice[]>();
+  const namaTenant = new Map<string, { name: string; slug: string }>();
   for (const raw of invoices) {
-    const inv: SubscriptionInvoice = { ...raw, amount: Number(raw.amount) };
+    const { tenants, ...rest } = raw;
+    const inv: SubscriptionInvoice = { ...rest, amount: Number(rest.amount) };
+    if (tenants) namaTenant.set(inv.tenant_id, { name: tenants.name ?? "—", slug: tenants.slug ?? "" });
     const list = byTenant.get(inv.tenant_id);
     if (list) list.push(inv);
     else byTenant.set(inv.tenant_id, [inv]);
@@ -106,6 +115,31 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
       overdue_amount: late.reduce((s, i) => s + i.amount, 0),
     };
   });
+  // Hotel yang sudah tidak berlangganan tapi masih punya tagihan terbuka.
+  // Mereka tidak muncul di cfgRes (difilter ke 'subscription'), dan justru
+  // merekalah yang paling perlu ditagih.
+  const sudahAda = new Set(rows.map((r) => r.tenant_id));
+  for (const [tenantId, list] of byTenant) {
+    if (sudahAda.has(tenantId)) continue;
+    const belumLunas = list.filter((i) => i.status === "unpaid");
+    if (belumLunas.length === 0) continue;
+    const late = belumLunas.filter((i) => i.period < now);
+    const t = namaTenant.get(tenantId);
+    rows.push({
+      tenant_id: tenantId,
+      name: t?.name ?? "—",
+      slug: t?.slug ?? "",
+      billing_mode: "commission",          // penanda "mantan langganan"
+      subscription_amount: 0,
+      subscription_day: 1,
+      subscription_since: null,
+      invoices: list,
+      current: list.find((i) => i.period === now) ?? null,
+      overdue_count: late.length,
+      overdue_amount: late.reduce((s, i) => s + i.amount, 0),
+    });
+  }
+
   return rows.sort((a, b) => b.overdue_count - a.overdue_count || a.name.localeCompare(b.name));
 }
 

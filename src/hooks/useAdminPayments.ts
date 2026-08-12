@@ -60,8 +60,14 @@ export function useSetHotelBilling() {
       amount?: number;
       day?: number;
       since?: string;
+      keepMode?: "live" | "test";
+      keepActive?: boolean;
       by: string;
-    }) => setHotelBilling(v.tenantId, { mode: v.mode, amount: v.amount, day: v.day, since: v.since }, v.by),
+    }) => setHotelBilling(
+      v.tenantId,
+      { mode: v.mode, amount: v.amount, day: v.day, since: v.since, keepMode: v.keepMode, keepActive: v.keepActive },
+      v.by,
+    ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: adminPaymentKeys.list() });
       qc.invalidateQueries({ queryKey: ["platform"] });

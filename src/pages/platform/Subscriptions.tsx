@@ -27,12 +27,16 @@ export default function PlatformSubscriptions() {
   const setStatus = useSetInvoiceStatus();
 
   const thisPeriod = periodOf();
+  // `aktif` = masih berlangganan. Sisanya adalah hotel yang sudah pindah ke
+  // komisi tapi meninggalkan tagihan terbuka: tetap ditagih, tidak diterbitkan
+  // tagihan baru, dan tidak dihitung sebagai pelanggan.
+  const aktif = useMemo(() => hotels.filter((h) => h.billing_mode === "subscription"), [hotels]);
   const totals = useMemo(() => ({
-    monthly: hotels.reduce((s, h) => s + h.subscription_amount, 0),
-    unbilled: hotels.filter((h) => !h.current && h.subscription_amount > 0),
-    paid: hotels.filter((h) => h.current?.status === "paid").length,
+    monthly: aktif.reduce((s, h) => s + h.subscription_amount, 0),
+    unbilled: aktif.filter((h) => !h.current && h.subscription_amount > 0),
+    paid: aktif.filter((h) => h.current?.status === "paid").length,
     overdue: hotels.reduce((s, h) => s + h.overdue_amount, 0),
-  }), [hotels]);
+  }), [hotels, aktif]);
 
   async function issueAll() {
     if (totals.unbilled.length === 0) return;
@@ -75,9 +79,9 @@ export default function PlatformSubscriptions() {
 
       <div className="p-4 md:p-6 space-y-5">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <StatCard label={tr("Hotel berlangganan")} value={hotels.length} />
+          <StatCard label={tr("Hotel berlangganan")} value={aktif.length} />
           <StatCard label={tr("Nilai per bulan")} value={formatIDR(totals.monthly)} />
-          <StatCard label={`${tr("Lunas")} ${periodLabel(thisPeriod)}`} value={`${totals.paid}/${hotels.length}`} />
+          <StatCard label={`${tr("Lunas")} ${periodLabel(thisPeriod)}`} value={`${totals.paid}/${aktif.length}`} />
           <StatCard label={tr("Tunggakan bulan lalu")} value={formatIDR(totals.overdue)} />
         </div>
 
@@ -100,16 +104,26 @@ export default function PlatformSubscriptions() {
             <tbody>
               {hotels.map((h) => {
                 const inv = h.current;
+                const mantan = h.billing_mode !== "subscription";
                 return (
                   <tr key={h.tenant_id} className="hover:bg-muted/30">
                     <Td>
                       <Link to={`/platform/hotels/${h.tenant_id}`} className="font-medium text-foreground hover:text-primary">
                         {h.name}
                       </Link>
-                      <div><code className="text-xs text-muted-foreground">/{h.slug}</code></div>
+                      <div>
+                        <code className="text-xs text-muted-foreground">/{h.slug}</code>
+                        {mantan && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            ({tr("sudah kembali ke komisi")})
+                          </span>
+                        )}
+                      </div>
                     </Td>
-                    <Td className="text-right tabular-nums">{formatIDR(h.subscription_amount)}</Td>
-                    <Td className="text-center text-muted-foreground">{tr("tgl")} {h.subscription_day}</Td>
+                    <Td className="text-right tabular-nums">
+                      {mantan ? <span className="text-muted-foreground">—</span> : formatIDR(h.subscription_amount)}
+                    </Td>
+                    <Td className="text-center text-muted-foreground">{mantan ? "—" : `${tr("tgl")} ${h.subscription_day}`}</Td>
                     <Td>
                       {!inv ? (
                         <span className="text-xs text-muted-foreground">{tr("belum diterbitkan")}</span>

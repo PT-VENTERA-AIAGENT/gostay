@@ -112,7 +112,8 @@ export const EN: Record<string, string> = {
     "No hotel is on the monthly subscription yet. Change the billing model on a hotel's detail page.",
   "belum diterbitkan": "not issued yet",
   "tgl": "day",
-  "bulan": "months",
+  "bulan": "month(s)",
+  "sudah kembali ke komisi": "back on commission",
   "Hotel ini berlangganan bulanan — pendapatan reservasi masuk penuh ke saldo, tanpa potongan":
     "This hotel is on a monthly subscription — reservation income is credited in full, with no cut",
   "Hotel ini membayar": "This hotel pays",

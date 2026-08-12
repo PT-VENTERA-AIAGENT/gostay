@@ -17,6 +17,13 @@
 --
 -- Model tagihan TEGAK LURUS dengan mode live/test: hotel langganan tetap boleh
 -- menerima pembayaran Xendit live, Ventera saja yang tidak mengambil potongan.
+--
+-- URUTAN PENERAPAN PENTING: file ini mengganti trigger audit 032 dari BEFORE
+-- menjadi AFTER (lihat alasannya di bawah). Kalau 032 dijalankan ULANG setelah
+-- 055, trigger BEFORE-nya terpasang lagi di atas fungsi versi 055 yang
+-- `return null` — dan trigger BEFORE yang mengembalikan null MEMBATALKAN
+-- barisnya, sehingga setiap tulisan ke hotel_payment_config gagal diam-diam.
+-- Kalau 032 harus dijalankan ulang, jalankan 055 lagi sesudahnya.
 
 -- ─── Kolom model tagihan ──────────────────────────────────────────────────────
 alter table hotel_payment_config
@@ -104,8 +111,16 @@ language sql stable security definer set search_path = public, pg_temp as $$
     (select billing_mode from hotel_payment_config where tenant_id = p_tenant),
     'commission');
 $$;
-revoke all on function hotel_billing_mode(uuid) from public;
-grant execute on function hotel_billing_mode(uuid) to anon, authenticated, service_role;
+-- Hanya service_role. Keduanya SECURITY DEFINER (menembus RLS) dan satu-satunya
+-- pemanggilnya adalah trigger credit_hotel_balance() yang sudah berjalan sebagai
+-- pemilik. Memberikannya ke `anon` seperti hotel_payment_mode() di 032 akan
+-- membuat siapa pun tanpa login bisa membaca syarat komersial hotel mana pun
+-- lewat /rest/v1/rpc — 032 boleh begitu karena dipakai jalur checkout publik,
+-- dua fungsi ini tidak.
+-- `from public` saja tidak cukup: kalau versi migration ini pernah dijalankan
+-- dengan grant ke anon/authenticated, hak itu eksplisit dan tidak ikut tercabut.
+revoke all on function hotel_billing_mode(uuid) from public, anon, authenticated;
+grant execute on function hotel_billing_mode(uuid) to service_role;
 
 -- Tarif yang benar-benar dipotong dari pendapatan satu hotel, dalam bps.
 -- Hotel langganan = 0. Selain itu tarif global payment_config (700 = 7%).
@@ -118,8 +133,8 @@ language sql stable security definer set search_path = public, pg_temp as $$
     else coalesce((select platform_fee_bps from payment_config where id = true), 700)
   end;
 $$;
-revoke all on function hotel_fee_bps(uuid) from public;
-grant execute on function hotel_fee_bps(uuid) to anon, authenticated, service_role;
+revoke all on function hotel_fee_bps(uuid) from public, anon, authenticated;
+grant execute on function hotel_fee_bps(uuid) to service_role;
 
 -- ─── Trigger uang: pakai tarif per hotel, bukan tarif global ──────────────────
 -- Satu-satunya perubahan terhadap 031: `bps` sekarang datang dari

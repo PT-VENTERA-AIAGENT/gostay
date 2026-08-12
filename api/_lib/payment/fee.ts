@@ -14,6 +14,14 @@
 // always holds — no stray cent can appear or vanish in the split.
 //
 // Which feeBps applies is a per-hotel decision — see feeBpsFor() below.
+//
+// JANGAN TAMBAHKAN IMPORT KE FILE INI. Ia satu-satunya modul di api/_lib yang
+// juga ditarik peramban (src/services/saldoService.ts) supaya aturan fee tidak
+// disalin ke sisi klien. api/ punya package.json sendiri dan tidak pernah
+// mengimpor dari src/, jadi arahnya tidak bisa dibalik tanpa mengubah cara
+// Vercel membundel function. Selama file ini tetap aritmetika murni tanpa
+// dependensi, tidak ada kode server yang ikut ke bundle browser — begitu ada
+// satu import (apalagi yang menyentuh process.env), jaminan itu hilang.
 
 /**
  * How Ventera charges one hotel.

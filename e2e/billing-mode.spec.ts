@@ -46,7 +46,6 @@ test("detail hotel menawarkan dua model tagihan, dan tarif komisinya dari konfig
 
   await page.goto(`/platform/hotels/${TENANT}`);
 
-  const card = page.locator("div", { hasText: "Model Tagihan" }).last();
   await expect(page.getByText("Model Tagihan")).toBeVisible({ timeout: 20_000 });
 
   // Tarif komisi datang dari payment_config (700 bps) — kalau Ventera
@@ -60,8 +59,8 @@ test("detail hotel menawarkan dua model tagihan, dan tarif komisinya dari konfig
   });
 
   // Pindah ke langganan Rp500.000/bulan, jatuh tempo tanggal 10.
-  await page.getByPlaceholder("500000").fill("500000");
-  await page.locator('input[value="1"]').first().fill("10");
+  await page.getByLabel("Tarif per bulan (Rp)").fill("500000");
+  await page.getByLabel("Jatuh tempo tiap tanggal").fill("10");
   await page.getByRole("button", { name: "Pakai langganan" }).click();
 
   await expect.poll(() => written, { timeout: 15_000 }).not.toBeNull();
@@ -70,6 +69,10 @@ test("detail hotel menawarkan dua model tagihan, dan tarif komisinya dari konfig
     billing_mode: "subscription",
     subscription_amount: 500000,
     subscription_day: 10,
+    // Lingkungan pembayaran ikut dikirim apa adanya: mengubah model tagihan
+    // tidak boleh menjatuhkan hotel dari live ke test lewat default kolom.
+    mode: "test",
+    is_active: true,
   });
   // Tanggal mulai distempel saat hotel BARU masuk langganan.
   expect(written.subscription_since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
