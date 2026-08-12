@@ -15,7 +15,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIG="$DIR/../migrations"
 TMP="$(mktemp -d)"
 # Guards against a suite that aborts early and reports a vacuous success.
-EXPECTED=46
+EXPECTED=63
 trap 'pg_ctl -D "$TMP/pgdata" stop -m immediate >/dev/null 2>&1; rm -rf "$TMP"' EXIT
 
 echo "==> initdb ($TMP)"
@@ -29,7 +29,7 @@ done
 export PGOPTIONS='--client-min-messages=warning'
 run_su() { psql -h 127.0.0.1 -p "$PORT" -U postgres -q -v ON_ERROR_STOP=1 -f "$1"; }
 
-echo "==> roles + prereqs + migrations 030, 031, 032, 036, 055, 056"
+echo "==> roles + prereqs + migrations 030, 031, 032, 036, 055–058"
 run_su "$DIR/setup.sql"          # roles (authenticated/anon/service_role) + auth stub
 run_su "$DIR/balance_prereq.sql" # enum/helpers + FK-target stand-ins
 run_su "$MIG/030_payment_gateway.sql" || { echo "migration 030 FAILED"; exit 1; }
@@ -42,6 +42,10 @@ run_su "$MIG/055_billing_mode_subscription.sql" || { echo "migration 055 FAILED"
 # 056 menambah jejak invoice Xendit pada tagihan langganan; diuji di sini karena
 # pelunasannya TIDAK BOLEH menggerakkan saldo hotel.
 run_su "$MIG/056_subscription_online_payment.sql" || { echo "migration 056 FAILED"; exit 1; }
+run_su "$MIG/057_subscription_gateway_note.sql" || { echo "migration 057 FAILED"; exit 1; }
+# 058: buku pembayaran + gerbang tunggakan. Diuji di sini karena status tagihan
+# kini DITURUNKAN dari buku itu, dan saldo hotel tetap tidak boleh tersentuh.
+run_su "$MIG/058_subscription_payment_log_and_gate.sql" || { echo "migration 058 FAILED"; exit 1; }
 run_su "$DIR/helpers.sql"        # tests.eq / tests.blocked / tests.allowed
 
 echo "==> balance/payout flow"

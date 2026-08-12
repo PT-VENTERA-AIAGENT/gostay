@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { tr } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useSubscriptions, useIssueInvoices, useSetInvoiceStatus } from "@/hooks/useSubscriptions";
+import { useSubscriptions, useIssueInvoices, useRecordPayment } from "@/hooks/useSubscriptions";
 import { usePaymentConfig } from "@/hooks/useSaldo";
 import { periodOf, periodLabel } from "@/services/subscriptionService";
 import { PageHeader, StatCard, Table, Th, Td, EmptyState, formatIDR } from "@/components/platform/widgets";
@@ -26,7 +26,7 @@ export default function PlatformSubscriptions() {
   const { data: hotels = [], isLoading } = useSubscriptions();
   const { data: config } = usePaymentConfig();
   const issue = useIssueInvoices();
-  const setStatus = useSetInvoiceStatus();
+  const record = useRecordPayment();
 
   const thisPeriod = periodOf();
   // `aktif` = masih berlangganan. Sisanya adalah hotel yang sudah pindah ke
@@ -41,19 +41,22 @@ export default function PlatformSubscriptions() {
   }), [hotels, aktif]);
 
   async function issueAll() {
-    if (totals.unbilled.length === 0) return;
     try {
-      const n = await issue.mutateAsync({ hotels: totals.unbilled, period: thisPeriod, by });
-      toast({ title: `${n} ${tr("tagihan diterbitkan untuk")} ${periodLabel(thisPeriod)}` });
+      const n = await issue.mutateAsync({});
+      toast({
+        title: n > 0
+          ? `${n} ${tr("tagihan diterbitkan")}`
+          : tr("Semua bulan sudah tertagih"),
+      });
     } catch (e) {
       toast({ title: tr("Gagal menerbitkan tagihan"), description: (e as Error).message, variant: "destructive" });
     }
   }
 
-  async function markPaid(id: number) {
+  async function markPaid(inv: NonNullable<(typeof hotels)[number]["current"]>) {
     try {
-      await setStatus.mutateAsync({ id, status: "paid", by });
-      toast({ title: tr("Ditandai lunas") });
+      await record.mutateAsync({ invoice: inv, by });
+      toast({ title: tr("Pembayaran dicatat") });
     } catch (e) {
       toast({ title: tr("Gagal mengubah status"), description: (e as Error).message, variant: "destructive" });
     }
@@ -68,13 +71,13 @@ export default function PlatformSubscriptions() {
         action={
           <button
             onClick={issueAll}
-            disabled={issue.isPending || totals.unbilled.length === 0}
+            disabled={issue.isPending}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {issue.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             {totals.unbilled.length > 0
               ? `${tr("Terbitkan")} ${totals.unbilled.length} ${tr("tagihan")}`
-              : tr("Tagihan bulan ini lengkap")}
+              : tr("Terbitkan tagihan yang terlewat")}
           </button>
         }
       />
@@ -171,8 +174,8 @@ export default function PlatformSubscriptions() {
                     <Td className="text-right">
                       {inv && inv.status === "unpaid" && (
                         <button
-                          onClick={() => markPaid(inv.id)}
-                          disabled={setStatus.isPending}
+                          onClick={() => markPaid(inv)}
+                          disabled={record.isPending}
                           className="inline-flex items-center gap-1 text-xs font-medium text-success hover:underline disabled:opacity-50"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" /> {tr("Tandai lunas")}

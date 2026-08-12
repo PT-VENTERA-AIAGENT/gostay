@@ -102,14 +102,20 @@ test("halaman langganan menampilkan tunggakan dan bisa menandai lunas", async ({
   });
 
   let marked: any = null;
+  // Sejak 058 pelunasan manual adalah PEMBAYARAN yang dicatat, bukan status
+  // yang ditambal — status tagihannya dihitung ulang trigger dari buku itu.
+  await page.route("**/rest/v1/subscription_payments*", async (route) => {
+    marked = JSON.parse(route.request().postData() ?? "null");
+    await route.fulfill({ status: 201, contentType: "application/json", body: "[]" });
+  });
   await page.route("**/rest/v1/hotel_subscription_invoices*", async (route) => {
     const method = route.request().method();
     if (method === "GET") {
       return route.fulfill({
         status: 200, contentType: "application/json",
         body: JSON.stringify([
-          { id: 1, tenant_id: "t-1", period: bulanIni, amount: 500000, status: "unpaid", paid_at: null, paid_method: null, note: null, updated_by: null },
-          { id: 2, tenant_id: "t-1", period: periodeLalu, amount: 500000, status: "unpaid", paid_at: null, paid_method: null, note: null, updated_by: null },
+          { id: 1, tenant_id: "t-1", period: bulanIni, amount: 500000, paid_total: 0, status: "unpaid", paid_at: null, paid_method: null, note: null, gateway_note: null, updated_by: null },
+          { id: 2, tenant_id: "t-1", period: periodeLalu, amount: 500000, paid_total: 0, status: "unpaid", paid_at: null, paid_method: null, note: null, gateway_note: null, updated_by: null },
         ]),
       });
     }
@@ -132,7 +138,8 @@ test("halaman langganan menampilkan tunggakan dan bisa menandai lunas", async ({
 
   await page.getByRole("button", { name: "Tandai lunas" }).first().click();
   await expect.poll(() => marked, { timeout: 15_000 }).not.toBeNull();
-  expect(marked).toMatchObject({ status: "paid", paid_method: "transfer" });
+  // Yang dicatat: uangnya, untuk tagihan yang benar, sebesar sisa yang belum tertutup.
+  expect(marked).toMatchObject({ invoice_id: 1, tenant_id: "t-1", amount: 500000, method: "transfer" });
 });
 
 test("halaman Saldo hotel langganan tidak lagi bercerita soal potongan 7%", async ({ page }, testInfo) => {
@@ -185,6 +192,52 @@ test("halaman Saldo hotel langganan tidak lagi bercerita soal potongan 7%", asyn
   await testInfo.attach("saldo-hotel-langganan", {
     body: await page.screenshot({ fullPage: false }), contentType: "image/png",
   });
+});
+
+test("hotel yang menunggak lebih dari seminggu kehilangan akses, kecuali ke Saldo", async ({ page }, testInfo) => {
+  // Gerbang tunggakan (058). Dua hal yang diuji sekaligus: aplikasinya benar
+  // tertutup, DAN jalan untuk membayarnya tetap terbuka — gerbang yang
+  // mengunci jalan keluarnya sendiri berhenti jadi penagihan.
+  await signIn(page, staff);
+
+  const json = (body: unknown) => ({
+    status: 200, contentType: "application/json", body: JSON.stringify(body),
+  });
+  await page.route("**/rest/v1/rpc/my_subscription_gate", (route) =>
+    route.fulfill(json([{
+      gated: true, period: "2026-07-01", due_date: "2026-07-01",
+      days_late: 42, amount_due: 500000,
+    }])));
+  await page.route("**/rest/v1/hotel_payment_config*", (route) =>
+    route.fulfill(json({
+      billing_mode: "subscription", subscription_amount: 500000,
+      subscription_day: 1, subscription_since: "2026-06-01",
+    })));
+  await page.route("**/rest/v1/payment_config*", (route) =>
+    route.fulfill(json({ mode: "test", platform_fee_bps: 700, subscription_mode: "live" })));
+  await page.route("**/rest/v1/hotel_balance*", (route) => route.fulfill(json(null)));
+  await page.route("**/rest/v1/balance_ledger*", (route) => route.fulfill(json([])));
+  await page.route("**/rest/v1/payouts*", (route) => route.fulfill(json([])));
+  await page.route("**/rest/v1/hotel_subscription_invoices*", (route) =>
+    route.fulfill(json([
+      { id: 51, period: "2026-07-01", amount: 500000, status: "unpaid", paid_at: null, paid_method: null, gateway_note: null },
+    ])));
+
+  await page.goto("/dashboard");
+  await expect(page.getByRole("heading", { name: "Langganan tertunggak" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Rp500.000")).toBeVisible();
+  await expect(page.getByText(/42 hari terlambat/)).toBeVisible();
+  // Isi dasbornya benar tidak ikut tampil.
+  await expect(page.getByText("Booking Baru")).toHaveCount(0);
+
+  await testInfo.attach("gerbang-tunggakan", {
+    body: await page.screenshot({ fullPage: false }), contentType: "image/png",
+  });
+
+  // Jalan membayarnya tetap terbuka.
+  await page.getByRole("link", { name: /Bayar sekarang/ }).click();
+  await expect(page).toHaveURL(/\/saldo/);
+  await expect(page.getByRole("button", { name: "Bayar sekarang" })).toBeVisible();
 });
 
 test("hotel bisa membayar tagihan langganannya sendiri lewat Xendit", async ({ page }, testInfo) => {

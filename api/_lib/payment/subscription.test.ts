@@ -71,7 +71,8 @@ function stubFetch(routes: Route[], onCall?: (url: string, init?: RequestInit) =
 const INVOICE = {
   id: 7, tenant_id: "t-1", period: "2026-08-01", amount: 500000, status: "unpaid",
   gateway_ref: null, gateway_external_id: null, gateway_url: null,
-  gateway_env: null, gateway_issued_at: null, gateway_attempt: 0,
+  gateway_env: null, gateway_issued_at: null, gateway_attempt: 0, paid_total: 0,
+  gateway_amount: null, gateway_note: null,
 };
 
 describe("handleSubscriptionCheckout", () => {
@@ -122,6 +123,43 @@ describe("handleSubscriptionCheckout", () => {
     expect(calls.filter((c) => c.url.includes("/payments"))).toHaveLength(0);
   });
 
+  it("menagih SISA, bukan nominal penuh, saat sebagian sudah dibayar", async () => {
+    // Layar gerbang menyebut sisa; tautan yang menagih penuh akan menagih hotel
+    // dua kali untuk bagian yang sudah ia transfer.
+    const calls = stubFetch(routes({ ...INVOICE, paid_total: 200000 }));
+    const res = await handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" });
+    expect(res).toMatchObject({ ok: true, amount: 300000 });
+    const body = JSON.parse(String(calls.find((c) => c.url.includes("xendit.local"))!.init?.body));
+    expect(body.amount).toBe(300000);
+  });
+
+  it("tautan tidak beranak: klik kedua pada sisa yang sama memakai tautan yang ada", async () => {
+    // Kalau pemakaian ulang dimatikan begitu ada pembayaran sebagian, tiap klik
+    // menerbitkan invoice baru yang semuanya tetap bisa dibayar.
+    const calls = stubFetch(routes({
+      ...INVOICE, paid_total: 200000, gateway_ref: "inv-lama",
+      gateway_url: "https://pay.xendit/lama", gateway_env: "test",
+      gateway_amount: 300000, gateway_issued_at: new Date().toISOString(), gateway_attempt: 1,
+    }));
+    await expect(handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" }))
+      .resolves.toMatchObject({ reused: true, amount: 300000 });
+    expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(0);
+  });
+
+  it("tidak memakai ulang tautan yang nominalnya sudah basi", async () => {
+    // Tautan terbit untuk Rp500.000, lalu transfer Rp200.000 masuk. Memakai
+    // ulang tautan itu berarti menyodorkan angka yang sudah pasti salah.
+    const calls = stubFetch(routes({
+      ...INVOICE, paid_total: 200000, gateway_ref: "inv-lama",
+      gateway_url: "https://pay.xendit/lama", gateway_env: "test",
+      gateway_issued_at: new Date().toISOString(), gateway_attempt: 1,
+      gateway_amount: 500000,   // terbit sebelum transfer Rp200.000 masuk
+    }));
+    await expect(handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" }))
+      .resolves.toMatchObject({ reused: false, amount: 300000 });
+    expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(1);
+  });
+
   it("menolak tagihan milik hotel lain seperti tagihan yang tidak ada", async () => {
     stubFetch(routes({ ...INVOICE, tenant_id: "hotel-lain" }));
     // Jawaban yang berbeda akan mengubah endpoint ini jadi alat mengintip
@@ -147,6 +185,7 @@ describe("handleSubscriptionCheckout", () => {
     const segar = {
       ...INVOICE, gateway_ref: "inv-lama", gateway_url: "https://pay.xendit/lama",
       gateway_env: "test", gateway_issued_at: new Date().toISOString(), gateway_attempt: 1,
+      gateway_amount: 500000,   // masih sama dengan sisa → boleh dipakai ulang
     };
     const calls = stubFetch(routes(segar));
     const res = await handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" });
@@ -160,7 +199,7 @@ describe("handleSubscriptionCheckout", () => {
     // Invoice yang diterbitkan tepat di bawah TTL harus masih dipakai ulang.
     const hampirHabis = {
       ...INVOICE, gateway_ref: "inv-lama", gateway_url: "https://pay.xendit/lama",
-      gateway_env: "test", gateway_attempt: 1,
+      gateway_env: "test", gateway_attempt: 1, gateway_amount: 500000,
       gateway_issued_at: new Date(Date.now() - (20 * 60 * 60 - 60) * 1000).toISOString(),
     };
     const calls = stubFetch(routes(hampirHabis));
@@ -191,7 +230,7 @@ describe("handleSubscriptionCheckout", () => {
   it("menerbitkan ulang dengan sufiks -R saat tautan lama sudah kedaluwarsa", async () => {
     const basi = {
       ...INVOICE, gateway_ref: "inv-lama", gateway_url: "https://pay.xendit/lama",
-      gateway_env: "test", gateway_attempt: 0,
+      gateway_env: "test", gateway_attempt: 0, gateway_amount: 500000,
       gateway_external_id: "GOSTAY-SUB-KOPI-RINTIK-202608",
       gateway_issued_at: new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(),
     };
@@ -202,6 +241,7 @@ describe("handleSubscriptionCheckout", () => {
     expect(JSON.parse(String(xendit.init?.body)).external_id).toBe("GOSTAY-SUB-KOPI-RINTIK-202608-R1");
   });
 });
+
 
 describe("handleWebhook — cabang langganan", () => {
   const OLD = { ...process.env };
@@ -214,50 +254,123 @@ describe("handleWebhook — cabang langganan", () => {
 
   const body = {
     external_id: "GOSTAY-SUB-KOPI-RINTIK-202608",
-    invoice_id: "inv-xnd-1", status: "PAID", amount: 500000,
+    invoice_id: "inv-xnd-1", status: "PAID", amount: 500000, paid_amount: 500000,
   };
 
-  it("menandai tagihan lunas tanpa membuat baris payments", async () => {
-    const calls = stubFetch([
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
-    ]);
-    const res = await handleWebhook("tok-sandbox", body);
-    expect(res).toMatchObject({ ok: true, outcome: "recorded", status: 200 });
+  /** Rute bersama: pencarian tagihan + penulisan buku pembayaran + patch catatan. */
+  const wh = (invoice: unknown, opts: { insertStatus?: number } = {}) => [
+    { match: (u: string, i?: RequestInit) => u.includes("/subscription_payments") && i?.method === "POST",
+      reply: () => [{ id: 1 }], status: opts.insertStatus ?? 201 },
+    { match: (u: string, i?: RequestInit) => u.includes("/hotel_subscription_invoices") && i?.method === "PATCH",
+      reply: () => [{ id: 7 }] },
+    { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => (invoice ? [invoice] : []) },
+    { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [] },
+    { match: (u: string) => u.includes("gateway_external_id=like."), reply: () => [] },
+  ];
 
-    const patch = calls.find((c) => c.init?.method === "PATCH")!;
-    expect(patch.url).toContain("hotel_subscription_invoices");
-    expect(JSON.parse(String(patch.init?.body))).toMatchObject({ status: "paid", paid_method: "xendit" });
+  const posted = (calls: Array<{ url: string; init?: RequestInit }>) =>
+    JSON.parse(String(calls.find((c) => c.url.includes("/subscription_payments"))!.init?.body));
+  const patched = (calls: Array<{ url: string; init?: RequestInit }>) => {
+    const c = calls.find((x) => x.init?.method === "PATCH");
+    return c ? JSON.parse(String(c.init?.body)) : null;
+  };
 
-    // Inti dari semuanya.
-    expect(calls.filter((c) => c.url.includes("/payments"))).toHaveLength(0);
+  it("mencatat uangnya di buku pembayaran, bukan menambal status", async () => {
+    const calls = stubFetch(wh({ ...INVOICE, gateway_ref: "inv-xnd-1" }));
+    await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "recorded" });
+
+    expect(posted(calls)).toMatchObject({
+      tenant_id: "t-1", invoice_id: 7, amount: 500000, method: "xendit",
+      gateway_ref: "inv-xnd-1", gateway_env: "test",
+    });
+    // Statusnya diturunkan trigger dari buku itu — bukan ditulis dari sini.
+    expect(patched(calls)?.status).toBeUndefined();
+  });
+
+  it("TIDAK PERNAH menyentuh tabel payments milik saldo hotel", async () => {
+    const calls = stubFetch(wh({ ...INVOICE, gateway_ref: "inv-xnd-1" }));
+    await handleWebhook("tok-sandbox", body);
+    // `/rest/v1/payments` — bukan `subscription_payments`, yang justru wajib.
+    expect(calls.filter((c) => c.url.includes("/rest/v1/payments"))).toHaveLength(0);
     expect(calls.filter((c) => c.url.includes("/bookings"))).toHaveLength(0);
   });
 
-  it("callback berulang untuk tagihan yang sudah lunas tidak menulis apa pun", async () => {
-    const calls = stubFetch([
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, status: "paid", gateway_ref: "inv-xnd-1" }] },
-    ]);
+  it("callback yang diulang ditolak database dan dijawab duplicate", async () => {
+    // UNIQUE gateway_ref: uang yang sama tidak bisa masuk buku dua kali.
+    const calls = stubFetch(wh({ ...INVOICE, gateway_ref: "inv-xnd-1" }, { insertStatus: 409 }));
     await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "duplicate" });
     expect(calls.filter((c) => c.init?.method === "PATCH")).toHaveLength(0);
   });
 
+  it("kurang bayar tetap dicatat uangnya, tapi tidak melunasi", async () => {
+    // Bentuk payload Xendit yang asli: `amount` nominal tagihan, `paid_amount`
+    // yang dibayar. Membaca `amount` membuat guard ini tak pernah menyala.
+    const calls = stubFetch(wh({ ...INVOICE, gateway_ref: "inv-xnd-1" }));
+    await expect(handleWebhook("tok-sandbox", { ...body, amount: 500000, paid_amount: 300000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
+
+    expect(posted(calls).amount).toBe(300000);   // uangnya tetap masuk buku
+    const p = patched(calls);
+    expect(p.status).toBeUndefined();
+    expect(String(p.gateway_note)).toContain("Rp300.000");
+    expect(String(p.gateway_note)).toContain("kurang Rp200.000");
+    expect(p.note).toBeUndefined();              // catatan operator utuh
+  });
+
+  it("pembayaran kedua yang JUSTRU melunasi tidak dicap kurang bayar", async () => {
+    // Operator sudah mencatat transfer Rp200.000; tautan online Rp300.000
+    // dibayar. Membandingkan pembayaran ini sendirian dengan nominal tagihan
+    // akan menempelkan peringatan palsu pada tagihan yang justru sudah beres.
+    const calls = stubFetch(wh({ ...INVOICE, gateway_ref: "inv-xnd-1", paid_total: 200000 }));
+    await expect(handleWebhook("tok-sandbox", { ...body, amount: 500000, paid_amount: 300000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "recorded" });
+    expect(posted(calls).amount).toBe(300000);
+  });
+
+  it("tagihan yang keburu dibebaskan: uang tercatat, statusnya tidak diubah", async () => {
+    const calls = stubFetch(wh({ ...INVOICE, status: "waived", gateway_ref: "inv-xnd-1" }));
+    await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "ignored" });
+    expect(posted(calls).amount).toBe(500000);
+    expect(String(patched(calls).gateway_note)).toContain("dibebaskan");
+  });
+
+  it("pembayaran KEDUA atas bulan yang sudah lunas meninggalkan jejak", async () => {
+    const calls = stubFetch(wh({ ...INVOICE, status: "paid", gateway_ref: "inv-PERTAMA" }));
+    await expect(handleWebhook("tok-sandbox", { ...body, invoice_id: "inv-KEDUA" }))
+      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
+    const note = String(patched(calls).gateway_note);
+    expect(note).toContain("inv-PERTAMA");
+    expect(note).toContain("inv-KEDUA");
+  });
+
+  it("lunas lewat transfer lalu pembayaran online tetap masuk", async () => {
+    // Kasus bayar-dua-kali yang paling mudah terjadi: operator sudah menandai
+    // lunas (tanpa gateway_ref), tautan online-nya tetap dibayar.
+    const calls = stubFetch(wh({ ...INVOICE, status: "paid", paid_method: "transfer", gateway_ref: null }));
+    await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "ignored" });
+    expect(String(patched(calls).gateway_note)).toContain("Pembayaran ganda");
+  });
+
+  it("pelunasan penuh membersihkan peringatan kurang bayar sebelumnya", async () => {
+    const calls = stubFetch(wh({ ...INVOICE, gateway_ref: "inv-xnd-1", gateway_note: "Pembayaran online kurang: …" }));
+    await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "recorded" });
+    expect(patched(calls).gateway_note).toBeNull();
+  });
+
   it("mengenali tagihan lewat external_id saat id Xendit belum tersimpan", async () => {
     stubFetch([
+      { match: (u: string, i?: RequestInit) => u.includes("/subscription_payments") && i?.method === "POST", reply: () => [{ id: 1 }], status: 201 },
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
       { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [INVOICE] },
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
     ]);
     await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "recorded" });
   });
 
   it("menemukan tagihan lewat bulannya saat invoice lama jadi yatim", async () => {
     // Dua tab menekan Bayar hampir bersamaan: baris tagihan hanya menyimpan
-    // external_id yang terakhir (-R1), sementara yang dibayar hotel adalah
-    // invoice pertama. Tanpa upaya pencocokan per-bulan ini, uangnya masuk ke
-    // Ventera sementara tagihannya tetap tercatat belum lunas.
+    // external_id yang terakhir, sementara yang dibayar adalah invoice pertama.
     const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
+      { match: (u: string, i?: RequestInit) => u.includes("/subscription_payments") && i?.method === "POST", reply: () => [{ id: 1 }], status: 201 },
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
       { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [] },
       { match: (u: string) => u.includes("gateway_external_id=like."), reply: () => [{ ...INVOICE, gateway_external_id: "GOSTAY-SUB-KOPI-RINTIK-202608-R1" }] },
@@ -266,116 +379,7 @@ describe("handleWebhook — cabang langganan", () => {
     expect(calls.some((c) => c.url.includes("like.GOSTAY-SUB-KOPI-RINTIK-202608"))).toBe(true);
   });
 
-  it("kurang bayar pada BENTUK PAYLOAD XENDIT tidak dianggap lunas", async () => {
-    // Bentuk aslinya: `amount` = nominal tagihan, `paid_amount` = yang dibayar.
-    // Membaca `amount` membuat guard ini membandingkan tagihan dengan dirinya
-    // sendiri dan tidak pernah menyala — tes yang mengirim `amount: 300000`
-    // saja akan lolos tanpa membuktikan apa pun.
-    const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
-    ]);
-    await expect(handleWebhook("tok-sandbox", { ...body, amount: 500000, paid_amount: 300000 }))
-      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
-
-    const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
-    expect(patch.status).toBeUndefined();                   // tidak dilunasi
-    expect(String(patch.gateway_note)).toContain("Rp300.000"); // selisih terlihat operator
-    expect(String(patch.gateway_note)).toContain("Rp500.000");
-    expect(patch.note).toBeUndefined();                     // catatan operator utuh
-  });
-
-  it("bayar penuh pada bentuk Xendit tetap melunasi", async () => {
-    stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
-    ]);
-    await expect(handleWebhook("tok-sandbox", { ...body, amount: 500000, paid_amount: 500000 }))
-      .resolves.toMatchObject({ ok: true, outcome: "recorded" });
-  });
-
-  it("tagihan yang keburu dibebaskan tidak dilunasi, tapi meninggalkan jejak", async () => {
-    const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, status: "waived", gateway_ref: "inv-xnd-1" }] },
-    ]);
-    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
-      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
-    const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
-    expect(patch.status).toBeUndefined();                       // tetap dibebaskan
-    expect(String(patch.gateway_note)).toContain("dibebaskan"); // tapi terlihat
-  });
-
-  it("pembayaran KEDUA atas bulan yang sudah lunas tidak lewat tanpa jejak", async () => {
-    // Dua invoice untuk bulan yang sama, dua-duanya dibayar. Kalau ini hanya
-    // dijawab "duplicate" seperti pengulangan callback biasa, hotel membayar
-    // dua kali dan tidak ada satu baris pun yang mencatatnya.
-    const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
-      { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [{ ...INVOICE, status: "paid", gateway_ref: "inv-PERTAMA" }] },
-    ]);
-    await expect(handleWebhook("tok-sandbox", { ...body, invoice_id: "inv-KEDUA", paid_amount: 500000 }))
-      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
-    const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
-    expect(String(patch.gateway_note)).toContain("inv-PERTAMA");
-    expect(String(patch.gateway_note)).toContain("inv-KEDUA");
-  });
-
-  it("sudah ditandai lunas operator lalu pembayaran online tetap masuk", async () => {
-    // Tagihan lunas lewat transfer (gateway_ref kosong), lalu tautan online-nya
-    // tetap dibayar. Ini kasus bayar-dua-kali yang paling mudah terjadi, dan
-    // paling mudah lolos senyap kalau syaratnya menuntut ref lama harus ada.
-    const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
-      { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [{ ...INVOICE, status: "paid", paid_method: "transfer", gateway_ref: null }] },
-    ]);
-    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
-      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
-    expect(String(JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body)).gateway_note))
-      .toContain("Pembayaran ganda");
-  });
-
-  it("pelunasan penuh membersihkan peringatan kurang bayar sebelumnya", async () => {
-    // Kalau tidak, tagihan yang akhirnya lunas tetap memajang "kurang bayar"
-    // selamanya, di konsol Ventera maupun di halaman Saldo hotel.
-    const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [{ id: 7 }] },
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1", gateway_note: "Pembayaran online kurang: …" }] },
-    ]);
-    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
-      .resolves.toMatchObject({ ok: true, outcome: "recorded" });
-    expect(JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body)).gateway_note).toBeNull();
-  });
-
-  it("pengulangan callback untuk invoice yang SAMA tetap senyap", async () => {
-    const calls = stubFetch([
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, status: "paid", gateway_ref: "inv-xnd-1" }] },
-    ]);
-    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
-      .resolves.toMatchObject({ ok: true, outcome: "duplicate" });
-    expect(calls.filter((c) => c.init?.method === "PATCH")).toHaveLength(0);
-  });
-
-  it("PATCH yang tidak kena baris apa pun tidak dilaporkan sebagai lunas", async () => {
-    // PostgREST menjawab 204 baik untuk 1 baris maupun 0. Tanpa
-    // return=representation, pelunasan yang filternya meleset terbaca sukses.
-    let dibaca = 0;
-    const calls = stubFetch([
-      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => [] },  // 0 baris berubah
-      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
-      { match: (u: string) => u.includes("?id=eq."), reply: () => { dibaca++; return [{ ...INVOICE, status: "waived" }]; } },
-    ]);
-    await expect(handleWebhook("tok-sandbox", { ...body, paid_amount: 500000 }))
-      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
-    expect(dibaca).toBe(1);  // dibaca ulang untuk memisahkan kembar dari basi
-    expect(calls.some((c) => c.url.includes("status=eq.unpaid"))).toBe(true);
-  });
-
   it("menolak external_id ber-wildcard yang bisa melunasi tagihan hotel lain", async () => {
-    // encodeURIComponent tidak meng-escape `*`. Callback berbekal token dengan
-    // external_id ber-wildcard tidak boleh mencocokkan tagihan hotel mana pun.
     const calls = stubFetch([
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
       { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [] },

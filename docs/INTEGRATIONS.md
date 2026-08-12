@@ -178,6 +178,35 @@ ditagihkan kepadanya, lalu memotong 7% dari pendapatan Ventera sendiri. Tautan
 Xendit dipakai ulang selama < 20 jam supaya menekan tombol dua kali tidak
 menerbitkan tagihan kembar; idempotensi callback dijaga UNIQUE `gateway_ref`.
 
+### Buku pembayaran & gerbang tunggakan (058)
+
+Sejak 058, "lunas" bukan lagi kolom yang ditulis tangan. Setiap rupiah yang
+diterima Ventera masuk ke `subscription_payments` (append-only: nominal, cara
+bayar, `gateway_ref` UNIQUE, siapa mencatat), dan trigger menghitung ulang
+`hotel_subscription_invoices.paid_total` + `status` dari jumlahnya. Pola yang
+sama dengan `balance_ledger` di 031. Akibatnya bayar sebagian, bayar dua kali,
+dan pembatalan punya tempat — sebelumnya semuanya hanya jadi kalimat catatan.
+**Jangan menulis `status='paid'` langsung**; catat pembayarannya.
+
+Gerbang: hotel yang belum membayar **7 hari** setelah jatuh tempo kehilangan
+akses aplikasi stafnya sampai membayar.
+
+- Jatuh tempo = `period + subscription_day - 1`, tidak pernah mundur ke belakang
+  `subscription_since` (hotel yang bergabung tanggal 20 tidak langsung menunggak).
+- Tanggal tagih **tidak bergeser** karena telat: periode berikutnya tetap jatuh
+  pada tanggal yang sama, jadi membayar telat tidak membeli tenggat baru.
+- `subscription_gate(tenant)` / `my_subscription_gate()` menghitung dari periode
+  yang DIHARAPKAN, bukan dari tagihan yang kebetulan sudah terbit — kalau tidak,
+  hotel yang tagihannya lupa diterbitkan justru bebas dari gerbang.
+- `ensure_subscription_invoices()` menambal semua bulan yang terlewat (idempoten,
+  platform-only). Tombol "Terbitkan tagihan" memanggilnya.
+- **Yang TIDAK digerbang**: halaman `/saldo` (di situ tombol bayarnya — gerbang
+  yang mengunci jalan keluarnya sendiri berhenti jadi penagihan), serta portal
+  tamu dan bot WhatsApp (keduanya melayani tamu, bukan hotel).
+- Gerbangnya di lapisan UI (`SubscriptionGate` di `StaffLayout`); ia menahan
+  orang, bukan permintaan HTTP. Menahan permintaan berarti mengunci lewat RLS,
+  dan itu keputusan terpisah karena salah sedikit mengunci hotel dari datanya.
+
 Lingkungannya `payment_config.subscription_mode` ('live'|'test', bawaan test) —
 **terpisah** dari `payment_config.mode`: hotel yang masih test tetap berutang
 uang sungguhan, dan menumpang `mode` akan ikut memindahkan setiap hotel tanpa

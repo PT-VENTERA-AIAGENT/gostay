@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { tr } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useHotelInvoices, useIssueInvoices, useSetInvoiceStatus } from "@/hooks/useSubscriptions";
+import { useHotelInvoices, useIssueInvoices, useRecordPayment, useUndoPayments } from "@/hooks/useSubscriptions";
 import { periodOf, periodLabel } from "@/services/subscriptionService";
 import { Table, Th, Td, EmptyState, formatIDR } from "./widgets";
 
@@ -36,7 +36,8 @@ export default function SubscriptionInvoices({
 
   const { data: invoices = [], isLoading } = useHotelInvoices(tenantId);
   const issue = useIssueInvoices();
-  const setStatus = useSetInvoiceStatus();
+  const record = useRecordPayment();
+  const undo = useUndoPayments();
 
   const thisPeriod = periodOf();
   const hasCurrent = invoices.some((i) => i.period === thisPeriod);
@@ -47,25 +48,22 @@ export default function SubscriptionInvoices({
       return;
     }
     try {
-      const n = await issue.mutateAsync({
-        hotels: [{ tenant_id: tenantId, subscription_amount: amount }],
-        period: thisPeriod,
-        by,
-      });
+      const n = await issue.mutateAsync({ tenantId });
       toast({
         title: n > 0
-          ? `${tr("Tagihan diterbitkan")} — ${periodLabel(thisPeriod)}`
-          : tr("Tagihan bulan ini sudah ada"),
+          ? `${n} ${tr("tagihan diterbitkan")}`
+          : tr("Semua bulan sudah tertagih"),
       });
     } catch (e) {
       toast({ title: tr("Gagal menerbitkan tagihan"), description: (e as Error).message, variant: "destructive" });
     }
   }
 
-  async function mark(id: number, paid: boolean) {
+  async function mark(inv: (typeof invoices)[number], lunas: boolean) {
     try {
-      await setStatus.mutateAsync({ id, status: paid ? "paid" : "unpaid", by });
-      toast({ title: paid ? tr("Ditandai lunas") : tr("Status dikembalikan ke belum bayar") });
+      if (lunas) await record.mutateAsync({ invoice: inv, by });
+      else await undo.mutateAsync({ invoiceId: inv.id });
+      toast({ title: lunas ? tr("Pembayaran dicatat") : tr("Pencatatan pembayaran dibatalkan") });
     } catch (e) {
       toast({ title: tr("Gagal mengubah status"), description: (e as Error).message, variant: "destructive" });
     }
@@ -77,11 +75,11 @@ export default function SubscriptionInvoices({
         <h2 className="text-sm font-semibold text-foreground">{tr("Tagihan Langganan")}</h2>
         <button
           onClick={issueCurrent}
-          disabled={issue.isPending || hasCurrent}
+          disabled={issue.isPending}
           className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
         >
           {issue.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          {hasCurrent ? tr("Tagihan bulan ini sudah ada") : `${tr("Terbitkan tagihan")} ${periodLabel(thisPeriod)}`}
+          {hasCurrent ? tr("Terbitkan tagihan yang terlewat") : `${tr("Terbitkan tagihan")} ${periodLabel(thisPeriod)}`}
         </button>
       </div>
 
@@ -115,7 +113,14 @@ export default function SubscriptionInvoices({
                     </p>
                   )}
                 </Td>
-                <Td className="text-right tabular-nums">{formatIDR(inv.amount)}</Td>
+                <Td className="text-right tabular-nums">
+                  {formatIDR(inv.amount)}
+                  {inv.paid_total > 0 && inv.paid_total < inv.amount && (
+                    <p className="text-xs font-normal text-warning">
+                      {tr("sudah masuk")} {formatIDR(inv.paid_total)}
+                    </p>
+                  )}
+                </Td>
                 <Td>
                   <span className={cn("inline-block rounded-full px-2 py-0.5 text-xs font-medium", STATUS_TONE[inv.status])}>
                     {tr(STATUS_LABEL[inv.status] ?? inv.status)}
@@ -129,16 +134,16 @@ export default function SubscriptionInvoices({
                 <Td className="text-right">
                   {inv.status === "paid" ? (
                     <button
-                      onClick={() => mark(inv.id, false)}
-                      disabled={setStatus.isPending}
+                      onClick={() => mark(inv, false)}
+                      disabled={undo.isPending}
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
                     >
                       <RotateCcw className="w-3.5 h-3.5" /> {tr("Batalkan")}
                     </button>
                   ) : (
                     <button
-                      onClick={() => mark(inv.id, true)}
-                      disabled={setStatus.isPending}
+                      onClick={() => mark(inv, true)}
+                      disabled={record.isPending}
                       className="inline-flex items-center gap-1 text-xs font-medium text-success hover:underline disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" /> {tr("Tandai lunas")}

@@ -11,7 +11,7 @@
 // memilih tujuan dari awalan `GOSTAY-`, jadi external_id langganan tetap
 // memakai awalan itu dan membedakan dirinya dengan penanda `SUB-` sesudahnya.
 
-import { serviceGet, serviceUpdate } from "../wa/client";
+import { serviceGet, serviceUpdate, serviceInsert } from "../wa/client";
 import { createInvoiceViaGateway, isGatewayConfigured } from "./gateway";
 import { envForMode, type PaymentMode } from "./xendit";
 
@@ -118,13 +118,24 @@ export interface SubscriptionInvoiceRow {
   gateway_env: "live" | "test" | null;
   gateway_issued_at: string | null;
   gateway_attempt: number;
+  /** Yang sudah masuk sebelum pembayaran ini (058). */
+  paid_total: number;
+  gateway_note: string | null;
+  /** Nominal di tautan terakhir — penentu boleh-tidaknya dipakai ulang. */
+  gateway_amount: number | null;
 }
 
 const INVOICE_COLUMNS =
-  "id,tenant_id,period,amount,status,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt";
+  "id,tenant_id,period,amount,status,paid_total,gateway_note,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt,gateway_amount";
 
 function toRow(raw: any): SubscriptionInvoiceRow {
-  return { ...raw, amount: Number(raw.amount), gateway_attempt: Number(raw.gateway_attempt ?? 0) };
+  return {
+    ...raw,
+    amount: Number(raw.amount),
+    paid_total: Number(raw.paid_total ?? 0),
+    gateway_amount: raw.gateway_amount == null ? null : Number(raw.gateway_amount),
+    gateway_attempt: Number(raw.gateway_attempt ?? 0),
+  };
 }
 
 /** Lingkungan penagihan Ventera sendiri — terpisah dari mode pembayaran hotel. */
@@ -272,7 +283,15 @@ export async function handleSubscriptionCheckout(
   }
   if (invoice.status === "paid") return { ok: false, status: 409, error: "already_paid" };
   if (invoice.status === "waived") return { ok: false, status: 409, error: "invoice_waived" };
-  if (!(invoice.amount > 0)) return { ok: false, status: 400, error: "nothing_to_pay" };
+  // Yang ditagih adalah SISA. Hotel yang sudah mentransfer sebagian melihat
+  // sisa itu di layar gerbang; menerbitkan tautan sebesar nominal penuh akan
+  // menagihnya dua kali untuk bagian yang sudah ia bayar.
+  // Dibulatkan ke sen, dan ambangnya disamakan dengan
+  // recompute_subscription_invoice() di 058 (toleransi 0,5). Tanpa itu sisa
+  // Rp0,30 pada baris yang belum sempat dihitung ulang lolos ke Xendit,
+  // ditolak gateway, dan hotel mendapat 502 alih-alih kalimat yang terbaca.
+  const sisa = Math.round((invoice.amount - invoice.paid_total) * 100) / 100;
+  if (!(sisa > 0.5)) return { ok: false, status: 400, error: "nothing_to_pay" };
 
   const mode = await getSubscriptionMode();
   // Diperiksa lebih dulu supaya kunci Xendit yang belum diisi menjadi jawaban
@@ -286,10 +305,17 @@ export async function handleSubscriptionCheckout(
   // dibayar — dua-duanya masuk untuk satu bulan yang sama.
   const issuedAt = invoice.gateway_issued_at ? Date.parse(invoice.gateway_issued_at) : 0;
   const masihHidup = Date.now() - issuedAt < REUSE_WINDOW_MS;
-  if (invoice.gateway_url && invoice.gateway_ref && invoice.gateway_env === mode && masihHidup) {
+  // Dipakai ulang selama masih hidup DAN nominalnya masih sama dengan sisa hari
+  // ini. Syarat kedua itu yang menahan tautan beranak: kalau pembayaran
+  // sebagian mematikan pemakaian ulang begitu saja, setiap klik Bayar
+  // menerbitkan invoice baru yang semuanya tetap bisa dibayar — hotel yang
+  // mengklik tiga kali punya tiga tautan hidup, dan kelebihan bayarnya jadi
+  // kerja tangan untuk dikembalikan.
+  if (invoice.gateway_url && invoice.gateway_ref && invoice.gateway_env === mode
+      && masihHidup && invoice.gateway_amount === sisa) {
     return {
       ok: true, invoiceUrl: invoice.gateway_url, invoiceId: invoice.gateway_ref,
-      amount: invoice.amount, mode, reused: true,
+      amount: sisa, mode, reused: true,
     };
   }
 
@@ -301,7 +327,7 @@ export async function handleSubscriptionCheckout(
   const created = await createInvoiceViaGateway(
     {
       externalId,
-      amount: invoice.amount,
+      amount: sisa,
       description: hotel.name
         ? `Langganan GoStay ${bulan} — ${hotel.name}`
         : `Langganan GoStay ${bulan}`,
@@ -317,96 +343,82 @@ export async function handleSubscriptionCheckout(
     gateway_external_id: externalId,
     gateway_url: created.invoiceUrl,
     gateway_env: mode,
+    gateway_amount: sisa,
     gateway_issued_at: new Date().toISOString(),
     gateway_attempt: attempt,
   });
 
   return {
     ok: true, invoiceUrl: created.invoiceUrl, invoiceId: created.id,
-    amount: invoice.amount, mode, reused: false,
+    amount: sisa, mode, reused: false,
   };
 }
 
 /**
- * Tandai satu tagihan langganan lunas karena callback Xendit.
+ * Catat pembayaran langganan yang datang dari callback Xendit.
  *
- * Idempoten: callback yang datang dua kali untuk invoice yang sudah lunas
- * dijawab "duplicate" tanpa menulis apa pun. `paid_at` sengaja tidak dikirim —
- * trigger 055 yang mengisinya, supaya waktu lunas selalu waktu server.
+ * Urutannya disengaja: uangnya SELALU dicatat lebih dulu ke buku pembayaran
+ * (058), baru keanehannya dijelaskan. Sebelum buku itu ada, uang yang tidak
+ * pas — kurang bayar, bayar dua kali, bayar atas tagihan yang sudah dibebaskan
+ * — hanya bisa jadi kalimat di kolom catatan, dan angkanya hilang. Sekarang
+ * setiap rupiah yang benar-benar diterima punya barisnya sendiri, dan status
+ * tagihan cuma ringkasan yang dihitung ulang trigger dari jumlah isinya.
  *
- * Nominalnya DIPERIKSA. Callback yang membawa uang kurang dari tagihan tidak
- * boleh menandainya lunas hanya karena statusnya "PAID" — kalau dibiarkan,
- * selisihnya tidak pernah muncul di layar mana pun. Yang kurang bayar dicatat
- * di kolom `note` supaya operator melihatnya di tempat ia memang melihat
- * tagihan, bukan hanya di log server yang tak pernah dibuka.
+ * Idempoten lewat UNIQUE gateway_ref: callback yang diulang ditolak database,
+ * dan itu jawaban yang benar, bukan kegagalan.
  */
 export async function markInvoicePaidFromCallback(
   invoice: SubscriptionInvoiceRow,
   gatewayRef: string,
   mode: PaymentMode,
   paidAmount: number,
-): Promise<"recorded" | "duplicate" | "underpaid" | "waived" | "stale" | "double_paid"> {
-  if (invoice.status === "paid") {
-    // Pengulangan callback untuk invoice YANG SAMA itu wajar dan senyap.
-    //
-    // Selain itu berarti bulan ini dibayar dua kali. Perhatikan `gateway_ref`
-    // yang KOSONG juga masuk ke sini: itu tagihan yang sudah ditandai lunas
-    // operator (transfer manual) lalu pembayaran online-nya tetap datang —
-    // justru kasus yang paling mudah terjadi, dan paling mudah lolos senyap
-    // kalau syaratnya menuntut ref lama harus ada.
-    if (invoice.gateway_ref !== gatewayRef) {
-      const lewat = invoice.gateway_ref ?? `cara lain (${invoice.status})`;
-      await patchInvoice(invoice.id, {
-        gateway_note: `Pembayaran ganda: bulan ini sudah lunas lewat ${lewat}, lalu ${rp(paidAmount)} masuk lagi (${gatewayRef}).`,
-        updated_by: "xendit_callback",
-      });
-      return "double_paid";
-    }
-    return "duplicate";
-  }
-  // Operator membebaskan tagihan setelah tautannya terbit, lalu hotel tetap
-  // membayar. Uangnya sudah masuk; yang salah bukan pembayarannya, jadi jangan
-  // diam-diam melunasi sesuatu yang sudah dinyatakan tidak perlu dibayar —
-  // tapi wajib meninggalkan jejak di barisnya, bukan hanya di log server.
+): Promise<"recorded" | "duplicate" | "underpaid" | "waived" | "double_paid"> {
+  const res = await serviceInsert("subscription_payments", {
+    tenant_id: invoice.tenant_id,
+    invoice_id: invoice.id,
+    amount: paidAmount,
+    method: "xendit",
+    gateway_ref: gatewayRef,
+    gateway_env: mode,
+    recorded_by: "xendit_callback",
+  });
+  if (res.status === 409) return "duplicate";   // callback yang sama, diulang
+  if (!res.ok) throw new Error(`subscription_payment_insert_failed_${res.status}`);
+
+  // Keanehan yang perlu dilihat orang. Ditulis ke gateway_note, BUKAN note:
+  // kolom itu milik operator, dan catatan tangannya ("transfer 5 Agustus via
+  // BCA") tidak boleh ditimpa mesin setiap kali callback datang.
   if (invoice.status === "waived") {
     await patchInvoice(invoice.id, {
       gateway_note: `Tagihan sudah dibebaskan, tapi pembayaran online ${rp(paidAmount)} tetap masuk (${gatewayRef}).`,
-      updated_by: "xendit_callback",
     });
     return "waived";
   }
-
-  // Toleransi setengah rupiah: pembulatan boleh, kurang bayar tidak.
-  if (paidAmount + 0.5 < invoice.amount) {
-    // Ditulis ke gateway_note, BUKAN note: kolom itu milik operator, dan
-    // catatan tangannya ("transfer 5 Agustus via BCA") tidak boleh ditimpa
-    // mesin setiap kali callback datang.
+  if (invoice.status === "paid") {
+    // Bulan ini sudah lunas sebelum uang ini datang — entah lewat invoice lain
+    // atau transfer yang ditandai operator. Uangnya tetap tercatat di buku,
+    // jadi paid_total akan melebihi tagihan dan selisihnya terlihat.
+    const lewat = invoice.gateway_ref ?? "cara lain";
     await patchInvoice(invoice.id, {
-      gateway_note: `Pembayaran online kurang: diterima ${rp(paidAmount)} dari ${rp(invoice.amount)} (${gatewayRef}).`,
-      updated_by: "xendit_callback",
+      gateway_note: `Pembayaran ganda: bulan ini sudah lunas lewat ${lewat}, lalu ${rp(paidAmount)} masuk lagi (${gatewayRef}).`,
+    });
+    return "double_paid";
+  }
+  // Yang dibandingkan adalah SELURUH yang sudah masuk, bukan pembayaran ini
+  // sendirian. Operator mencatat transfer Rp200.000 lalu tautan online
+  // Rp300.000 dibayar: trigger 058 menjumlahkannya jadi lunas, dan menyebut
+  // pembayaran kedua "kurang bayar" hanya karena ia lebih kecil dari tagihan
+  // akan menempelkan peringatan palsu pada tagihan yang justru sudah beres.
+  // Toleransi setengah rupiah: pembulatan boleh, kurang bayar tidak.
+  const kurang = invoice.amount - (invoice.paid_total + paidAmount);
+  if (kurang > 0.5) {
+    await patchInvoice(invoice.id, {
+      gateway_note: `Pembayaran online kurang: diterima ${rp(paidAmount)}, total masuk ${rp(invoice.paid_total + paidAmount)} dari ${rp(invoice.amount)} — kurang ${rp(kurang)} (${gatewayRef}).`,
     });
     return "underpaid";
   }
 
-  const changed = await patchInvoice(invoice.id, {
-    status: "paid",
-    paid_method: "xendit",
-    gateway_ref: gatewayRef,
-    gateway_env: mode,
-    // Dibersihkan: peringatan "kurang bayar" dari percobaan sebelumnya tidak
-    // boleh menempel pada tagihan yang akhirnya lunas penuh. gateway_note
-    // selalu berarti "keanehan yang BERLAKU SEKARANG", bukan riwayat — itu
-    // sebabnya ia ditimpa, bukan ditambahkan.
-    gateway_note: null,
-    updated_by: "xendit_callback",
-  }, "&status=eq.unpaid");   // atomik: dua callback beriringan tidak saling menimpa
-
-  if (changed === 0) {
-    // Filternya tidak kena: statusnya berubah antara pembacaan dan penulisan.
-    // Dibaca ulang supaya "callback kembar" tidak tertukar dengan "tagihan
-    // keburu dibebaskan" — yang pertama wajar, yang kedua perlu dilihat orang.
-    const fresh = await getSubscriptionInvoice(invoice.id);
-    return fresh?.status === "paid" ? "duplicate" : "stale";
-  }
+  // Lunas penuh: peringatan dari percobaan sebelumnya tidak boleh menempel.
+  if (invoice.gateway_note) await patchInvoice(invoice.id, { gateway_note: null });
   return "recorded";
 }

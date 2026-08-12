@@ -3,6 +3,8 @@ import AppSidebar from "./AppSidebar";
 import TopBar from "./TopBar";
 import MobileBottomNav from "@/components/shared/MobileBottomNav";
 import RealtimeSync from "@/components/shared/RealtimeSync";
+import SubscriptionGate from "@/components/shared/SubscriptionGate";
+import SubscriptionDueBanner from "@/components/shared/SubscriptionDueBanner";
 
 export default function StaffLayout() {
   return (
@@ -16,7 +18,12 @@ export default function StaffLayout() {
             made stagger animations occasionally not fire, leaving content stuck
             at opacity 0 (the "blank until refresh" bug). */}
         <main className="flex-1 overflow-auto pb-16 md:pb-0">
-          <Outlet />
+          {/* Peringatan lebih dulu, gerbang belakangan: hotel harus sempat
+              melihat tenggatnya mendekat sebelum aksesnya berhenti. */}
+          <SubscriptionDueBanner />
+          <SubscriptionGate>
+            <Outlet />
+          </SubscriptionGate>
         </main>
       </div>
       <MobileBottomNav />
