@@ -155,6 +155,7 @@ export const EN: Record<string, string> = {
   "Semua bulan sudah tertagih": "Every month is already invoiced",
   "Terbitkan tagihan yang terlewat": "Issue missed invoices",
   "sudah masuk": "received",
+  "jatuh tempo": "due",
 
   "Kontrol Pembayaran Hotel": "Hotel Payment Control",
   "Kontrol Pembayaran": "Payment Control",

@@ -240,6 +240,60 @@ test("hotel yang menunggak lebih dari seminggu kehilangan akses, kecuali ke Sald
   await expect(page.getByRole("button", { name: "Bayar sekarang" })).toBeVisible();
 });
 
+test("hotel tergerbang TANPA tagihan terbit tetap punya cara membayar", async ({ page }) => {
+  // Lubang yang ketahuan saat uji nyata: gerbang menghitung dari periode yang
+  // DIHARAPKAN, sementara daftar bayarnya hanya menampilkan baris tagihan yang
+  // ada. Hotel yang operatornya belum menerbitkan tagihan jadi terkunci tanpa
+  // apa pun untuk dibayar — gerbang yang mengunci jalan keluarnya sendiri.
+  await signIn(page, staff);
+
+  const json = (body: unknown) => ({
+    status: 200, contentType: "application/json", body: JSON.stringify(body),
+  });
+  await page.route("**/rest/v1/rpc/my_subscription_gate", (route) =>
+    route.fulfill(json([{
+      gated: true, period: "2026-08-01", due_date: "2026-08-05",
+      days_late: 7, amount_due: 500000, grace_days: 7,
+    }])));
+  await page.route("**/rest/v1/hotel_payment_config*", (route) =>
+    route.fulfill(json({
+      billing_mode: "subscription", subscription_amount: 500000,
+      subscription_day: 1, subscription_since: "2026-08-01",
+    })));
+  await page.route("**/rest/v1/payment_config*", (route) =>
+    route.fulfill(json({ mode: "test", platform_fee_bps: 700, subscription_mode: "live" })));
+  await page.route("**/rest/v1/hotel_balance*", (route) => route.fulfill(json(null)));
+  await page.route("**/rest/v1/balance_ledger*", (route) => route.fulfill(json([])));
+  await page.route("**/rest/v1/payouts*", (route) => route.fulfill(json([])));
+  // Nol tagihan — justru itu intinya.
+  await page.route("**/rest/v1/hotel_subscription_invoices*", (route) => route.fulfill(json([])));
+
+  let sent: any = null;
+  await page.route("**/api/payment/subscription-checkout", async (route) => {
+    sent = JSON.parse(route.request().postData() ?? "null");
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ ok: true, invoiceUrl: "https://checkout.xendit.co/web/inv-gate", amount: 500000, mode: "live" }),
+    });
+  });
+  await page.route("https://checkout.xendit.co/**", (route) =>
+    route.fulfill({ status: 200, contentType: "text/html", body: "<h1>Xendit palsu</h1>" }));
+
+  await page.goto("/saldo");
+  // Tombolnya, bukan teks bulannya: "Agustus 2026" juga muncul di baris jatuh
+  // tempo, dan locator yang cocok ke dua elemen melanggar strict mode.
+  const bayar = page.getByRole("button", { name: "Bayar sekarang" });
+  await expect(bayar).toBeVisible({ timeout: 20_000 });
+  await bayar.click();
+
+  await expect.poll(() => sent, { timeout: 15_000 }).not.toBeNull();
+  // Yang dikirim periodenya; servernya yang menerbitkan tagihannya — dan hanya
+  // untuk bulan yang menurut DB memang sudah terutang.
+  expect(sent).toMatchObject({ period: "2026-08-01" });
+  expect(sent.invoiceId).toBeUndefined();
+  await expect(page).toHaveURL(/checkout\.xendit\.co/);
+});
+
 test("hotel bisa membayar tagihan langganannya sendiri lewat Xendit", async ({ page }, testInfo) => {
   // Sisi hotel dari migration 056. Yang diperiksa: tombolnya mengirim id
   // tagihan saja (bukan nominal — itu ditentukan server), dan peramban benar

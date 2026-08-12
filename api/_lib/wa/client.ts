@@ -61,6 +61,25 @@ export async function serviceGet(pathAndQuery: string): Promise<Response> {
 }
 
 /**
+ * A service-role RPC call against `/rest/v1/rpc/<fn>`.
+ *
+ * For DB functions the server needs but clients must not reach — the ones
+ * granted to `service_role` only. Returns the parsed body (a table-returning
+ * function gives an array; a scalar one gives the value).
+ */
+export async function serviceRpc(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
+  const { url, serviceKey } = serviceConfig();
+  if (!url || !serviceKey) throw new Error("wa_service_not_configured");
+  const res = await fetch(`${url}/rest/v1/rpc/${encodeURIComponent(fn)}`, {
+    method: "POST",
+    headers: serviceHeaders(serviceKey),
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) throw new Error(`rpc_${fn}_failed_${res.status}`);
+  return res.json().catch(() => null);
+}
+
+/**
  * A service-role INSERT into `/rest/v1/<table>`.
  *
  * Defaults to `Prefer: return=minimal` — callers that need the inserted row

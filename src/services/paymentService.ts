@@ -81,7 +81,9 @@ export async function createCheckoutInvoice(bookingReference: string): Promise<s
  * diterbitkan (`reused`), supaya menekan tombolnya dua kali tidak menumpuk
  * tagihan kembar di Xendit — dua-duanya bisa dibayar untuk satu bulan yang sama.
  */
-export async function createSubscriptionInvoice(invoiceId: number): Promise<string> {
+export async function createSubscriptionInvoice(
+  target: { invoiceId: number } | { period: string },
+): Promise<string> {
   const token = getSession()?.supabase_token;
   if (!token) throw new UserFacingError(tr("Silakan masuk lebih dulu untuk membayar."));
 
@@ -89,7 +91,7 @@ export async function createSubscriptionInvoice(invoiceId: number): Promise<stri
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      invoiceId,
+      ...target,
       successRedirectUrl: `${window.location.origin}/saldo`,
     }),
   });
@@ -100,6 +102,7 @@ export async function createSubscriptionInvoice(invoiceId: number): Promise<stri
       unauthorized: "Sesi Anda sudah berakhir. Silakan masuk kembali.",
       not_hotel_member: "Hanya staf hotel yang bisa membayar langganan.",
       invoice_not_found: "Tagihan ini tidak ditemukan.",
+      missing_invoice_id: "Tidak ada tagihan yang bisa dibayar saat ini.",
       already_paid: "Tagihan ini sudah lunas.",
       invoice_waived: "Tagihan ini sudah dibebaskan Ventera.",
       service_not_configured: "Pembayaran online belum aktif.",

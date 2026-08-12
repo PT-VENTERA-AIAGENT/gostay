@@ -160,6 +160,42 @@ describe("handleSubscriptionCheckout", () => {
     expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(1);
   });
 
+  it("hotel tergerbang bisa membayar bulan yang tagihannya belum diterbitkan", async () => {
+    // Lubang yang ditemukan saat uji nyata: gerbang menghitung dari periode
+    // yang DIHARAPKAN, sementara tombol bayarnya menuntut baris tagihan ada.
+    // Hotel jadi terkunci tanpa apa pun untuk dibayar.
+    const calls = stubFetch([
+      { match: (u: string, i?: RequestInit) => u.includes("/hotel_subscription_invoices") && i?.method === "POST",
+        reply: () => [{ id: 99 }], status: 201 },
+      { match: (u: string) => u.includes("/rpc/subscription_gate"),
+        reply: () => [{ gated: true, period: "2026-08-01", due_date: "2026-08-05", days_late: 7, amount_due: 500000, grace_days: 7 }] },
+      { match: (u: string) => u.includes("/profiles?"), reply: () => [{ tenant_id: "t-1", role: "staff", is_active: true }] },
+      { match: (u: string) => u.includes("/hotel_payment_config?"), reply: () => [{ subscription_amount: 500000, billing_mode: "subscription" }] },
+      { match: (u: string) => u.includes("/hotel_subscription_invoices?id=eq."), reply: () => [{ ...INVOICE, id: 99 }] },
+      { match: (u: string) => u.includes("/payment_config?"), reply: () => [{ subscription_mode: "test" }] },
+      { match: (u: string) => u.includes("/tenants?"), reply: () => [{ slug: "kopi-rintik", name: "Kopi Rintik" }] },
+      { match: (u: string) => u.includes("xendit.local"), reply: () => ({ id: "inv-baru", invoice_url: "https://pay.xendit/baru", status: "PENDING", amount: 500000 }) },
+      { match: (u: string, i?: RequestInit) => u.includes("/hotel_subscription_invoices?id=eq.") && i?.method === "PATCH", reply: () => [{ id: 99 }] },
+    ]);
+    const res = await handleSubscriptionCheckout({ period: "2026-08-01", profileId: "p-1" });
+    expect(res).toMatchObject({ ok: true, invoiceUrl: "https://pay.xendit/baru" });
+    const dibuat = JSON.parse(String(calls.find((c) => c.init?.method === "POST" && c.url.includes("/hotel_subscription_invoices"))!.init?.body));
+    expect(dibuat).toMatchObject({ tenant_id: "t-1", period: "2026-08-01", amount: 500000 });
+  });
+
+  it("menolak menerbitkan tagihan untuk bulan yang belum terutang", async () => {
+    // Periodenya tidak dipercaya apa adanya: kalau iya, hotel bisa menyuruh
+    // server membuat tagihan untuk bulan mana pun, termasuk yang belum tiba.
+    const calls = stubFetch([
+      { match: (u: string) => u.includes("/rpc/subscription_gate"),
+        reply: () => [{ gated: false, period: "2026-08-01", due_date: "2026-08-05", days_late: 0, amount_due: 500000, grace_days: 7 }] },
+      { match: (u: string) => u.includes("/profiles?"), reply: () => [{ tenant_id: "t-1", role: "staff", is_active: true }] },
+    ]);
+    await expect(handleSubscriptionCheckout({ period: "2026-12-01", profileId: "p-1" }))
+      .resolves.toMatchObject({ ok: false, status: 400, error: "missing_invoice_id" });
+    expect(calls.filter((c) => c.init?.method === "POST" && c.url.includes("/hotel_subscription_invoices"))).toHaveLength(0);
+  });
+
   it("menolak tagihan milik hotel lain seperti tagihan yang tidak ada", async () => {
     stubFetch(routes({ ...INVOICE, tenant_id: "hotel-lain" }));
     // Jawaban yang berbeda akan mengubah endpoint ini jadi alat mengintip

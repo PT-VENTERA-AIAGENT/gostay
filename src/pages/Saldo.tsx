@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useT } from "@/lib/i18n";
 import { humanMessage } from "@/lib/errors";
+import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
 import { createSubscriptionInvoice } from "@/services/paymentService";
 import {
   useBalance, useLedger, usePayouts, useHotelBilling, useMySubscriptionInvoices,
@@ -15,6 +16,9 @@ function formatIDR(n: number): string {
 }
 function formatDate(s: string): string {
   return new Date(s).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function formatDay(s: string): string {
+  return new Date(s).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
 /** "2026-08-01" → "Agustus 2026". Periode tagihan langganan selalu tanggal 1. */
 function monthLabel(period: string): string {
@@ -44,6 +48,7 @@ export default function Saldo() {
   const isSubscription = billing?.billingMode === "subscription";
   const feePct = (billing?.feeBps ?? 700) / 100;
   const { data: invoices = [] } = useMySubscriptionInvoices(isSubscription);
+  const { data: gate } = useSubscriptionGate();
   const unpaid = invoices.filter((i) => i.status === "unpaid");
 
   // Membayar langganan membuka halaman Xendit di tab yang sama: kepulangannya
@@ -51,11 +56,11 @@ export default function Saldo() {
   // bukan dari peramban ini, yang bisa saja ditutup di tengah jalan.
   const [paying, setPaying] = useState<number | null>(null);
   const [payError, setPayError] = useState("");
-  async function pay(invoiceId: number) {
+  async function pay(target: { invoiceId: number } | { period: string }, tanda: number) {
     setPayError("");
-    setPaying(invoiceId);
+    setPaying(tanda);
     try {
-      window.location.href = await createSubscriptionInvoice(invoiceId);
+      window.location.href = await createSubscriptionInvoice(target);
     } catch (e) {
       setPayError(humanMessage(e, t("Tautan pembayaran belum bisa dibuka. Coba lagi sebentar.")));
       setPaying(null);
@@ -125,6 +130,34 @@ export default function Saldo() {
               </p>
             </div>
 
+            {/* Bulan yang menurut DB sudah terutang tapi tagihannya belum
+                pernah diterbitkan operator. Tanpa baris ini, hotel yang sudah
+                tergerbang tidak punya apa pun untuk dibayar — gerbang yang
+                mengunci jalan keluarnya sendiri. Servernya yang menerbitkan
+                tagihannya saat tombol ini ditekan. */}
+            {gate && !invoices.some((i) => i.period === gate.period) && (
+              <div className="rounded-lg border border-border bg-card">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground capitalize">{monthLabel(gate.period)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatIDR(gate.amount_due)} · {t("jatuh tempo")} {formatDay(gate.due_date)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => pay({ period: gate.period }, -1)}
+                    disabled={paying !== null}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                  >
+                    {paying === -1
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <CreditCard className="w-3.5 h-3.5" />}
+                    {t("Bayar sekarang")}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {invoices.length > 0 && (
               <div className="divide-y divide-border/60 rounded-lg border border-border bg-card">
                 {invoices.map((inv) => (
@@ -148,7 +181,7 @@ export default function Saldo() {
                       <span className="text-xs font-medium px-2 py-1 rounded-full bg-muted text-muted-foreground">{t("Dibebaskan")}</span>
                     ) : (
                       <button
-                        onClick={() => pay(inv.id)}
+                        onClick={() => pay({ invoiceId: inv.id }, inv.id)}
                         disabled={paying !== null}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                       >

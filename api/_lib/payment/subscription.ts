@@ -11,7 +11,7 @@
 // memilih tujuan dari awalan `GOSTAY-`, jadi external_id langganan tetap
 // memakai awalan itu dan membedakan dirinya dengan penanda `SUB-` sesudahnya.
 
-import { serviceGet, serviceUpdate, serviceInsert } from "../wa/client";
+import { serviceGet, serviceUpdate, serviceInsert, serviceRpc } from "../wa/client";
 import { createInvoiceViaGateway, isGatewayConfigured } from "./gateway";
 import { envForMode, type PaymentMode } from "./xendit";
 
@@ -255,6 +255,54 @@ async function patchInvoice(
   return Array.isArray(rows) ? rows.length : 0;
 }
 
+/**
+ * Terbitkan tagihan satu periode untuk hotel ini kalau belum ada, lalu
+ * kembalikan id-nya. Mengembalikan null kalau periodenya tidak sah untuk hotel
+ * itu.
+ *
+ * Periodenya TIDAK dipercaya apa adanya: yang menentukan boleh-tidaknya adalah
+ * `subscription_gate()` — hanya bulan yang benar-benar terutang menurut DB yang
+ * bisa diterbitkan dari sini. Tanpa itu hotel bisa menyuruh server membuat
+ * tagihan untuk bulan mana pun, termasuk yang belum tiba.
+ */
+async function ensureOwnInvoice(tenantId: string, period: string): Promise<number | null> {
+  const gateRes = (await serviceRpc("subscription_gate", { p_tenant: tenantId })) as any[];
+  const owed = Array.isArray(gateRes) ? gateRes[0] : null;
+  if (!owed || String(owed.period).slice(0, 10) !== period.slice(0, 10)) return null;
+
+  const cfg = await serviceGet(
+    `hotel_payment_config?tenant_id=eq.${encodeURIComponent(tenantId)}&select=subscription_amount,billing_mode&limit=1`,
+  );
+  if (!cfg.ok) throw new Error(`hotel_payment_config_read_failed_${cfg.status}`);
+  const row = ((await cfg.json()) as any[])[0];
+  const amount = Number(row?.subscription_amount ?? 0);
+  if (row?.billing_mode !== "subscription" || !(amount > 0)) return null;
+
+  // Upsert: dua tab yang menekan Bayar bersamaan tidak boleh membuat dua
+  // tagihan untuk bulan yang sama (UNIQUE tenant_id+period menahannya, tapi
+  // yang kalah harus tetap mendapat barisnya, bukan galat).
+  const ins = await serviceInsert(
+    "hotel_subscription_invoices",
+    { tenant_id: tenantId, period, amount, updated_by: "hotel_checkout" },
+    "return=representation,resolution=ignore-duplicates",
+  );
+  if (ins.ok) {
+    const rows = (await ins.json().catch(() => [])) as any[];
+    if (rows[0]?.id) return Number(rows[0].id);
+  } else if (ins.status !== 409) {
+    throw new Error(`subscription_invoice_insert_failed_${ins.status}`);
+  }
+
+  // Sudah ada (atau upsert tidak mengembalikan baris) — baca kembali.
+  const found = await serviceGet(
+    `hotel_subscription_invoices?tenant_id=eq.${encodeURIComponent(tenantId)}` +
+    `&period=eq.${encodeURIComponent(period)}&select=id&limit=1`,
+  );
+  if (!found.ok) throw new Error(`subscription_invoice_read_failed_${found.status}`);
+  const got = ((await found.json()) as any[])[0];
+  return got?.id ? Number(got.id) : null;
+}
+
 export type SubscriptionCheckoutResult =
   | { ok: true; invoiceUrl: string; invoiceId: string; amount: number; mode: PaymentMode; reused: boolean }
   | { ok: false; status: number; error: string };
@@ -269,13 +317,26 @@ export type SubscriptionCheckoutResult =
  * harus milik hotel si pemanggil.
  */
 export async function handleSubscriptionCheckout(
-  input: { invoiceId: number; profileId: string; successRedirectUrl?: string },
+  input: { invoiceId?: number; period?: string; profileId: string; successRedirectUrl?: string },
   fetchImpl: typeof fetch = fetch,
 ): Promise<SubscriptionCheckoutResult> {
   const tenantId = await profileTenantId(input.profileId);
   if (!tenantId) return { ok: false, status: 403, error: "not_hotel_member" };
 
-  const invoice = await getSubscriptionInvoice(input.invoiceId);
+  // Membayar bulan yang tagihannya BELUM diterbitkan.
+  //
+  // Gerbang tunggakan menghitung dari periode yang diharapkan, bukan dari baris
+  // tagihan yang ada — supaya hotel yang tagihannya lupa diterbitkan tetap
+  // tertagih. Tapi kalau tombol bayarnya menuntut baris itu ada, hotel yang
+  // sama jadi terkunci TANPA cara membayar: gerbang yang mengunci jalan
+  // keluarnya sendiri. Jadi barisnya diterbitkan di sini, dengan service key,
+  // atas periode yang memang sudah jatuh tempo baginya.
+  const invoiceId = input.invoiceId ?? (input.period
+    ? await ensureOwnInvoice(tenantId, input.period)
+    : null);
+  if (invoiceId === null) return { ok: false, status: 400, error: "missing_invoice_id" };
+
+  const invoice = await getSubscriptionInvoice(invoiceId);
   // Tagihan yang tidak ada dan tagihan milik hotel lain dijawab sama, supaya
   // endpoint ini tidak bisa dipakai menghitung tagihan hotel sebelah.
   if (!invoice || invoice.tenant_id !== tenantId) {
