@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  listSubscriptions, listHotelInvoices, issueInvoices, setInvoiceStatus,
-  type InvoiceStatus,
+  listSubscriptions, listHotelInvoices, issueInvoices,
+  recordManualPayment, undoManualPayments, setInvoiceWaived,
+  type SubscriptionInvoice,
 } from "@/services/subscriptionService";
 
 export const subscriptionKeys = {
@@ -23,23 +24,39 @@ export function useHotelInvoices(tenantId: string | undefined) {
   });
 }
 
+/** Terbitkan semua tagihan yang belum ada — satu hotel, atau semuanya. */
 export function useIssueInvoices() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: {
-      hotels: Array<{ tenant_id: string; subscription_amount: number }>;
-      period: string;
-      by: string;
-    }) => issueInvoices(v.hotels, v.period, v.by),
+    mutationFn: (v: { tenantId?: string }) => issueInvoices(v.tenantId),
     onSuccess: () => qc.invalidateQueries({ queryKey: subscriptionKeys.all }),
   });
 }
 
-export function useSetInvoiceStatus() {
+/** Catat transfer yang sudah diterima Ventera. */
+export function useRecordPayment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: number; status: InvoiceStatus; by: string; method?: string }) =>
-      setInvoiceStatus(v.id, v.status, v.by, { method: v.method }),
+    mutationFn: (v: { invoice: SubscriptionInvoice; by: string; method?: "transfer" | "cash" }) =>
+      recordManualPayment(v.invoice, v.by, { method: v.method }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: subscriptionKeys.all }),
+  });
+}
+
+/** Batalkan pencatatan transfer (hanya yang dicatat tangan). */
+export function useUndoPayments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { invoiceId: number }) => undoManualPayments(v.invoiceId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: subscriptionKeys.all }),
+  });
+}
+
+export function useSetInvoiceWaived() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; waived: boolean; by: string }) =>
+      setInvoiceWaived(v.id, v.waived, v.by),
     onSuccess: () => qc.invalidateQueries({ queryKey: subscriptionKeys.all }),
   });
 }

@@ -223,3 +223,96 @@ insert into hotel_subscription_invoices (tenant_id, period, amount, updated_by)
 select tests.blocked('id invoice Xendit yang sama dipakai dua tagihan',
   $$update hotel_subscription_invoices set gateway_ref='inv-xnd-1'
       where tenant_id='11111111-1111-4111-8111-111111111133' and period = date '2026-09-01'$$);
+
+\echo ''
+\echo '=== buku pembayaran: status tagihan diturunkan dari jumlah yang masuk ==='
+-- Tagihan September (Rp500.000) dibayar dua kali sebagian: 200rb transfer,
+-- lalu 300rb online. Tidak satu pun boleh melunasinya sendirian.
+select id as inv_sep from hotel_subscription_invoices
+  where tenant_id=:'T3' and period = date '2026-09-01' \gset
+
+insert into subscription_payments (tenant_id, invoice_id, amount, method, recorded_by)
+  values (:'T3', :inv_sep, 200000, 'transfer', 'operator');
+select tests.eq ('bayar sebagian belum melunasi',
+  (select count(*) from hotel_subscription_invoices where id=:inv_sep and status='unpaid'), 1);
+select tests.eqn('paid_total mengikuti buku', (select paid_total from hotel_subscription_invoices where id=:inv_sep), 200000);
+
+insert into subscription_payments (tenant_id, invoice_id, amount, method, gateway_ref, gateway_env, recorded_by)
+  values (:'T3', :inv_sep, 300000, 'xendit', 'inv-xnd-sep', 'test', 'xendit_callback');
+select tests.eq ('sisanya menutup tagihan → lunas',
+  (select count(*) from hotel_subscription_invoices where id=:inv_sep and status='paid'), 1);
+select tests.eqn('paid_total = 500.000', (select paid_total from hotel_subscription_invoices where id=:inv_sep), 500000);
+select tests.eq ('paid_at diambil dari pembayaran PERTAMA, bukan yang terakhir',
+  (select count(*) from hotel_subscription_invoices i
+     where i.id=:inv_sep
+       and i.paid_at = (select min(paid_at) from subscription_payments where invoice_id=:inv_sep)), 1);
+
+-- Pembayaran yang dibatalkan menurunkan statusnya kembali — tidak ada "lunas"
+-- yang menggantung tanpa uang di belakangnya.
+delete from subscription_payments where invoice_id=:inv_sep and method='xendit';
+select tests.eq ('pembayaran dihapus → tagihan kembali belum lunas',
+  (select count(*) from hotel_subscription_invoices where id=:inv_sep and status='unpaid' and paid_at is null), 1);
+
+select tests.blocked('callback yang sama mencatat uang dua kali',
+  $$insert into subscription_payments (tenant_id, invoice_id, amount, method, gateway_ref)
+      select tenant_id, id, 500000, 'xendit', 'inv-xnd-dup'
+        from hotel_subscription_invoices where period = date '2026-09-01'
+      union all
+      select tenant_id, id, 500000, 'xendit', 'inv-xnd-dup'
+        from hotel_subscription_invoices where period = date '2026-09-01'$$);
+
+select tests.eqn('saldo hotel TETAP tidak tersentuh oleh buku langganan',
+  (select available from hotel_balance where tenant_id=:'T3'), 930000);
+
+\echo ''
+\echo '=== gerbang tunggakan: jatuh tempo + 7 hari ==='
+-- Hotel uji sendiri, supaya tanggalnya bisa diatur tanpa mengganggu yang lain.
+\set T4 '11111111-1111-4111-8111-111111111144'
+insert into tenants (id, name) values (:'T4', 'Hotel Nunggak');
+-- Berlangganan sejak 3 bulan lalu, jatuh tempo tanggal 1, belum bayar sama sekali.
+insert into hotel_payment_config (tenant_id, billing_mode, subscription_amount, subscription_day, subscription_since, updated_by)
+  values (:'T4', 'subscription', 500000, 1, (date_trunc('month', current_date) - interval '3 months')::date, 'test');
+
+select tests.eq('menunggak berbulan-bulan → tergerbang',
+  (select count(*) from subscription_gate(:'T4') where gated), 1);
+select tests.eq('yang ditagih adalah bulan TERTUA, bukan yang terbaru',
+  (select count(*) from subscription_gate(:'T4')
+     where period = (date_trunc('month', current_date) - interval '3 months')::date), 1);
+
+-- Hotel yang baru bergabung hari ini tidak boleh langsung tergerbang, meski
+-- tanggal jatuh temponya (tgl 1) sudah lewat bulan ini.
+\set T5 '11111111-1111-4111-8111-111111111155'
+insert into tenants (id, name) values (:'T5', 'Hotel Baru');
+insert into hotel_payment_config (tenant_id, billing_mode, subscription_amount, subscription_day, subscription_since, updated_by)
+  values (:'T5', 'subscription', 500000, 1, current_date, 'test');
+select tests.eq('hotel yang baru berlangganan hari ini tidak tergerbang',
+  (select count(*) from subscription_gate(:'T5') where gated), 0);
+
+-- Batas persisnya: tepat 7 hari lewat = tergerbang, 6 hari = belum.
+\set T6 '11111111-1111-4111-8111-111111111166'
+insert into tenants (id, name) values (:'T6', 'Hotel Batas');
+insert into hotel_payment_config (tenant_id, billing_mode, subscription_amount, subscription_day, subscription_since, updated_by)
+  values (:'T6', 'subscription', 500000, 1, (current_date - interval '6 days')::date, 'test');
+select tests.eq('6 hari lewat jatuh tempo: belum tergerbang',
+  (select count(*) from subscription_gate(:'T6') where gated), 0);
+update hotel_payment_config set subscription_since = (current_date - interval '7 days')::date where tenant_id=:'T6';
+select tests.eq('tepat 7 hari lewat jatuh tempo: tergerbang',
+  (select count(*) from subscription_gate(:'T6') where gated), 1);
+
+-- Membayar membuka gerbangnya, dan TIDAK menggeser tanggal tagih berikutnya.
+insert into hotel_subscription_invoices (tenant_id, period, amount, updated_by)
+  values (:'T6', date_trunc('month', current_date - interval '7 days')::date, 500000, 'test');
+insert into subscription_payments (tenant_id, invoice_id, amount, method, recorded_by)
+  select tenant_id, id, 500000, 'transfer', 'operator' from hotel_subscription_invoices
+   where tenant_id=:'T6' order by period limit 1;
+select tests.eq('setelah dibayar: gerbang terbuka',
+  (select count(*) from subscription_gate(:'T6') where gated), 0);
+
+\echo ''
+\echo '=== penerbitan tagihan menambal semua bulan yang terlewat ==='
+select tests.eq('tiga bulan tertunggak diterbitkan sekaligus',
+  (select ensure_subscription_invoices(:'T4')), 4);   -- 3 bulan lalu s/d bulan ini
+select tests.eq('dijalankan lagi tidak membuat tagihan kembar',
+  (select ensure_subscription_invoices(:'T4')), 0);
+select tests.eq('tagihan yang sudah lunas tidak diterbitkan ulang',
+  (select count(*) from hotel_subscription_invoices where tenant_id=:'T6'), 1);

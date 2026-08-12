@@ -135,6 +135,28 @@ export const EN: Record<string, string> = {
     "Subscription payments still use the Xendit sandbox — the link a hotel opens does not take real money.",
   "untuk menyalakannya.": "to switch it on.",
 
+  // ── Buku pembayaran & gerbang tunggakan (058) ────────────────────────────
+  "Langganan tertunggak": "Subscription overdue",
+  "Tagihan langganan yang jatuh tempo": "The subscription invoice due",
+  "belum dibayar sampai hari ini": "has not been paid",
+  "hari terlambat": "days late",
+  "Akses aplikasi dibuka kembali segera setelah pembayarannya masuk.":
+    "Access is restored as soon as the payment arrives.",
+  "Yang harus dibayar": "Amount due",
+  "Tanggal tagih bulan berikutnya tidak berubah — membayar sekarang tidak menggeser jatuh tempo Anda.":
+    "Next month's billing date does not change — paying now does not move your due date.",
+  "Langganan bulan ini belum dibayar": "This month's subscription is unpaid",
+  "hari lewat jatuh tempo": "days past due",
+  "Akses ditutup dalam": "Access closes in",
+  "hari lagi": "more days",
+  "Akses akan ditutup hari ini.": "Access closes today.",
+  // "Pembayaran dicatat" sudah ada di bagian pembayaran di bawah.
+  "Pencatatan pembayaran dibatalkan": "Payment record removed",
+  "tagihan diterbitkan": "invoices issued",
+  "Semua bulan sudah tertagih": "Every month is already invoiced",
+  "Terbitkan tagihan yang terlewat": "Issue missed invoices",
+  "masuk": "received",
+
   "Kontrol Pembayaran Hotel": "Hotel Payment Control",
   "Kontrol Pembayaran": "Payment Control",
   "Console Platform": "Platform Console",

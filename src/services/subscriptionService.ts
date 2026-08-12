@@ -24,6 +24,8 @@ export interface SubscriptionInvoice {
   status: InvoiceStatus;
   paid_at: string | null;
   paid_method: string | null;
+  /** Jumlah yang benar-benar sudah masuk (058); status hanyalah ringkasannya. */
+  paid_total: number;
   note: string | null;
   /** Catatan mesin: kurang bayar, bayar ganda, atau bayar atas tagihan yang dibebaskan (057). */
   gateway_note: string | null;
@@ -86,7 +88,7 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
     db.from("hotel_subscription_invoices")
       // Nama hotel ikut ditarik di sini supaya baris tagihan tetap bisa
       // ditampilkan meski hotelnya tidak ada lagi di daftar langganan aktif.
-      .select("id,tenant_id,period,amount,status,paid_at,paid_method,note,gateway_note,updated_by,tenants(name,slug)")
+      .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,updated_by,tenants(name,slug)")
       .gte("period", since)
       .order("period", { ascending: false }),
   ]);
@@ -98,7 +100,7 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
   const namaTenant = new Map<string, { name: string; slug: string }>();
   for (const raw of invoices) {
     const { tenants, ...rest } = raw;
-    const inv: SubscriptionInvoice = { ...rest, amount: Number(rest.amount) };
+    const inv: SubscriptionInvoice = { ...rest, amount: Number(rest.amount), paid_total: Number(rest.paid_total ?? 0) };
     if (tenants) namaTenant.set(inv.tenant_id, { name: tenants.name ?? "—", slug: tenants.slug ?? "" });
     const list = byTenant.get(inv.tenant_id);
     if (list) list.push(inv);
@@ -154,56 +156,91 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
 export async function listHotelInvoices(tenantId: string, limit = 12): Promise<SubscriptionInvoice[]> {
   const { data, error } = await db
     .from("hotel_subscription_invoices")
-    .select("id,tenant_id,period,amount,status,paid_at,paid_method,note,gateway_note,updated_by")
+    .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,updated_by")
     .eq("tenant_id", tenantId)
     .order("period", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return ((data ?? []) as any[]).map((r) => ({ ...r, amount: Number(r.amount) }));
+  return ((data ?? []) as any[]).map((r) => ({ ...r, amount: Number(r.amount), paid_total: Number(r.paid_total ?? 0) }));
 }
 
 /**
- * Terbitkan tagihan satu bulan untuk sekumpulan hotel.
+ * Terbitkan tagihan yang belum ada — SEMUA bulan yang terlewat, bukan hanya
+ * bulan ini.
  *
- * `ignoreDuplicates` membuat tombol "Terbitkan tagihan bulan ini" aman ditekan
- * dua kali: hotel yang tagihannya sudah ada dilewati apa adanya — termasuk yang
- * sudah dilunasi, yang kalau ditimpa akan kembali jadi belum bayar.
- * Mengembalikan jumlah tagihan yang benar-benar baru.
+ * Dikerjakan fungsi DB `ensure_subscription_invoices` (058), bukan di sini:
+ * gerbang tunggakan hanya seadil daftar tagihannya, dan kalau penerbitan
+ * bergantung pada ingatan operator, hotel yang terlewat tidak pernah tertagih
+ * sekaligus tidak pernah tergerbang. Idempoten — yang sudah ada dilewati apa
+ * adanya, termasuk yang sudah lunas. Mengembalikan jumlah yang benar-benar baru.
  */
-export async function issueInvoices(
-  hotels: Array<{ tenant_id: string; subscription_amount: number }>,
-  period: string,
-  by: string,
-): Promise<number> {
-  const rows = hotels
-    .filter((h) => h.subscription_amount > 0)
-    .map((h) => ({ tenant_id: h.tenant_id, period, amount: h.subscription_amount, updated_by: by }));
-  if (rows.length === 0) return 0;
-  const { data, error } = await db
-    .from("hotel_subscription_invoices")
-    .upsert(rows, { onConflict: "tenant_id,period", ignoreDuplicates: true })
-    .select("id");
+export async function issueInvoices(tenantId?: string): Promise<number> {
+  const { data, error } = await (platformDb as any).rpc("ensure_subscription_invoices", {
+    p_tenant: tenantId ?? null,
+  });
   if (error) throw error;
-  return (data ?? []).length;
+  return Number(data ?? 0);
 }
 
 /**
- * Catat pembayaran offline (atau batalkan pencatatannya).
+ * Catat transfer yang sudah diterima Ventera.
  *
- * `paid_at` tidak dikirim dari sini — trigger 055 yang mengisinya saat status
- * jadi 'paid' dan membersihkannya saat kembali 'unpaid', supaya waktu lunas
- * selalu waktu server, bukan jam di komputer operator.
+ * Yang ditulis adalah PEMBAYARAN-nya, bukan status tagihannya: status dihitung
+ * ulang trigger 058 dari jumlah isi buku. Itu yang membuat pembayaran sebagian
+ * ("baru transfer separuh") punya tempat, dan membuat "lunas" tidak pernah ada
+ * tanpa uang di belakangnya.
+ *
+ * Nominalnya = sisa yang belum tertutup, supaya menekan tombol pada tagihan
+ * yang sudah dibayar sebagian tidak mencatat uang dua kali lipat.
  */
-export async function setInvoiceStatus(
-  id: number,
-  status: InvoiceStatus,
+export async function recordManualPayment(
+  invoice: Pick<SubscriptionInvoice, "id" | "tenant_id" | "amount" | "paid_total">,
   by: string,
-  opts: { method?: string; note?: string } = {},
+  opts: { method?: "transfer" | "cash" | "adjustment"; note?: string } = {},
 ): Promise<void> {
-  const patch: Record<string, unknown> = { status, updated_by: by };
-  if (status === "paid") patch.paid_method = opts.method ?? "transfer";
-  else patch.paid_method = null;
-  if (opts.note !== undefined) patch.note = opts.note;
-  const { error } = await db.from("hotel_subscription_invoices").update(patch).eq("id", id);
+  const sisa = Math.max(0, invoice.amount - invoice.paid_total);
+  if (sisa <= 0) return;
+  const { error } = await db.from("subscription_payments").insert({
+    tenant_id: invoice.tenant_id,
+    invoice_id: invoice.id,
+    amount: sisa,
+    method: opts.method ?? "transfer",
+    recorded_by: by,
+    note: opts.note ?? null,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Batalkan pencatatan pembayaran manual sebuah tagihan.
+ *
+ * Hanya yang dicatat tangan. Pembayaran online adalah bukti uang yang benar
+ * BENAR-BENAR masuk ke akun Xendit Ventera; menghapusnya dari sini tidak
+ * mengembalikan uangnya, hanya menghapus jejaknya — jadi ia ditolak dan
+ * operator diberi tahu alasannya.
+ */
+export async function undoManualPayments(invoiceId: number): Promise<void> {
+  const { data, error: readErr } = await db
+    .from("subscription_payments")
+    .select("id,method")
+    .eq("invoice_id", invoiceId);
+  if (readErr) throw readErr;
+  const rows = (data ?? []) as Array<{ id: number; method: string }>;
+  if (rows.some((r) => r.method === "xendit")) {
+    throw new Error(
+      "Tagihan ini punya pembayaran online. Uangnya sudah masuk ke Xendit — hapus jejaknya tidak mengembalikannya.",
+    );
+  }
+  if (rows.length === 0) return;
+  const { error } = await db.from("subscription_payments").delete().eq("invoice_id", invoiceId);
+  if (error) throw error;
+}
+
+/** Bebaskan sebuah tagihan (atau cabut pembebasannya). Keputusan operator. */
+export async function setInvoiceWaived(id: number, waived: boolean, by: string): Promise<void> {
+  const { error } = await db
+    .from("hotel_subscription_invoices")
+    .update({ status: waived ? "waived" : "unpaid", updated_by: by })
+    .eq("id", id);
   if (error) throw error;
 }

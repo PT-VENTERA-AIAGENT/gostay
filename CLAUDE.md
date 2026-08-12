@@ -92,6 +92,18 @@ yang sudah migrasi LID "sukses" (dapat messageId) tapi tidak pernah tiba.
   akan mengkredit saldo hotel sekaligus memotong 7% dari pendapatan Ventera
   sendiri. Lingkungannya `payment_config.subscription_mode` — TERPISAH dari
   `mode` (hanya bisa diubah lewat psql; tabel itu disegel dari tulisan klien).
+- **Buku pembayaran langganan** (058): `subscription_payments` append-only;
+  `hotel_subscription_invoices.status`/`paid_total` DITURUNKAN darinya oleh
+  trigger — jangan pernah menulis `status='paid'` langsung, catat pembayarannya.
+  Pola yang sama dengan `balance_ledger`: uang = kejadian, status = ringkasan.
+- **Gerbang tunggakan** (058): hotel yang belum bayar **7 hari** setelah jatuh
+  tempo kehilangan aplikasi stafnya sampai membayar (`subscription_gate()`,
+  `my_subscription_gate()`). Jatuh tempo = `period + subscription_day - 1`, dan
+  TIDAK bergeser karena telat. `/saldo` sengaja tetap terbuka — di situ tombol
+  bayarnya. Portal tamu dan bot WhatsApp TIDAK digerbang: keduanya melayani
+  tamu, bukan hotel. Gerbangnya di lapisan UI (`SubscriptionGate`), sumber
+  kebenarannya fungsi DB. Tagihan ditambal `ensure_subscription_invoices()`
+  supaya gerbang tidak bergantung pada ingatan operator.
 
 ## Peran & RLS
 
