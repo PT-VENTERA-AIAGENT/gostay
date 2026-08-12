@@ -1,4 +1,5 @@
 import { platformDb } from "@/lib/supabase";
+import { billingOf, type BillingMode, type HotelBillingSettings } from "./adminPaymentService";
 
 // Cross-hotel data for the Ventera platform console.
 //
@@ -25,6 +26,9 @@ export interface HotelOverview {
   is_active: boolean;
   mode: "live" | "test";
   payments_active: boolean;
+  /** Model tagihan Ventera: potongan per transaksi vs langganan bulanan (055). */
+  billing_mode: BillingMode;
+  subscription_amount: number;
   wa_linked: boolean;         // an ACTIVE WhatsApp session exists
   wa_number: string | null;   // the hotel's WhatsApp bot number, if any
   wa_session_id: string | null;
@@ -48,7 +52,11 @@ function isSyntheticEmail(email: string | null | undefined): boolean {
 export async function listHotels(): Promise<HotelOverview[]> {
   const [tenantsRes, ownersRes] = await Promise.all([
     db.from("tenants")
-      .select("id,name,slug,is_active,hotel_payment_config(mode,is_active),wa_hotel_sessions(session_id,bot_number,is_active)")
+      .select(
+        "id,name,slug,is_active," +
+        "hotel_payment_config(mode,is_active,billing_mode,subscription_amount)," +
+        "wa_hotel_sessions(session_id,bot_number,is_active)",
+      )
       .order("name"),
     db.from("profiles")
       .select("tenant_id,full_name,email,phone,role,created_at")
@@ -90,6 +98,8 @@ export async function listHotels(): Promise<HotelOverview[]> {
       is_active: t.is_active,
       mode: cfg?.mode === "live" ? "live" : "test",
       payments_active: cfg?.is_active ?? true,
+      billing_mode: billingOf(cfg).billing_mode,
+      subscription_amount: billingOf(cfg).subscription_amount,
       wa_linked: Boolean(activeWa),                 // linked only when a session is ACTIVE
       wa_number: anyWa?.bot_number ?? null,
       wa_session_id: anyWa?.session_id ?? null,
@@ -548,6 +558,8 @@ export interface HotelDetail {
   is_active: boolean;
   mode: "live" | "test";
   payments_active: boolean;
+  /** Model tagihan + syarat langganannya (055). */
+  billing: HotelBillingSettings;
   wa_linked: boolean;
   wa_number: string | null;
   owner: HotelOwner | null;
@@ -580,7 +592,9 @@ export async function getHotelDetail(tenantId: string): Promise<HotelDetail | nu
     recentBkRes, threadsRes,
   ] = await Promise.all([
     db.from("tenants").select("id,name,slug,is_active").eq("id", tenantId).maybeSingle(),
-    db.from("hotel_payment_config").select("mode,is_active").eq("tenant_id", tenantId).maybeSingle(),
+    db.from("hotel_payment_config")
+      .select("mode,is_active,billing_mode,subscription_amount,subscription_day,subscription_since")
+      .eq("tenant_id", tenantId).maybeSingle(),
     db.from("wa_hotel_sessions").select("bot_number,is_active").eq("tenant_id", tenantId),
     db.from("profiles").select("full_name,email,phone,role,created_at").eq("tenant_id", tenantId)
       .in("role", ["staff", "admin"]).order("created_at", { ascending: true }),
@@ -620,6 +634,7 @@ export async function getHotelDetail(tenantId: string): Promise<HotelDetail | nu
     is_active: t.is_active,
     mode: cfg?.mode === "live" ? "live" : "test",
     payments_active: cfg?.is_active ?? true,
+    billing: billingOf(cfg),
     wa_linked: Boolean(sessions.find((s) => s.is_active)),
     wa_number: activeWa?.bot_number ?? null,
     owner: firstOwner

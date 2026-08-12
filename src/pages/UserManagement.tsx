@@ -109,7 +109,7 @@ export default function UserManagement() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">{t("User Management")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {t("Kelola tim (admin & staff)")} · {isLoading ? "Loading…" : `${team.length} {t("anggota")}`}
+            {t("Kelola tim (admin & staff)")} · {isLoading ? t("Memuat…") : `${team.length} ${t("anggota")}`}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("Tamu ada di CRM Tamu.")}</p>
         </div>
@@ -120,15 +120,15 @@ export default function UserManagement() {
         <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-3.5 py-3">
           <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Users appear here after their first sign-in with Ventera SSO — accounts cannot be created
-            from this page. Everyone starts as <span className="font-medium text-foreground">{t("Customer")}</span>;
-            grant staff or admin access below. Deactivating someone revokes their access immediately.
+            {t("Users appear here after their first sign-in with Ventera SSO — accounts cannot be created from this page. Everyone starts as")}{" "}
+            <span className="font-medium text-foreground">{t("Customer")}</span>
+            {t("; grant staff or admin access below. Deactivating someone revokes their access immediately.")}
           </p>
         </div>
 
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-3">
-            <p className="text-xs text-destructive">Could not load users: {(error as Error).message}</p>
+            <p className="text-xs text-destructive">{t("Could not load users")}: {(error as Error).message}</p>
           </div>
         )}
 

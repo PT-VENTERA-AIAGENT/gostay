@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Wallet, ArrowDownToLine, TrendingUp, Scissors, Banknote, Loader2, Info } from "lucide-react";
+import { Wallet, ArrowDownToLine, TrendingUp, Scissors, Banknote, Loader2, Info, CalendarClock } from "lucide-react";
 import { motion } from "framer-motion";
 import PageTransition, { staggerContainer, staggerItem } from "@/components/shared/PageTransition";
 import { useT } from "@/lib/i18n";
-import { useBalance, useLedger, usePayouts, usePaymentConfig } from "@/hooks/useSaldo";
+import {
+  useBalance, useLedger, usePayouts, useHotelBilling, useMySubscriptionInvoices,
+} from "@/hooks/useSaldo";
 import WithdrawDialog from "@/components/saldo/WithdrawDialog";
 
 function formatIDR(n: number): string {
@@ -11,6 +13,11 @@ function formatIDR(n: number): string {
 }
 function formatDate(s: string): string {
   return new Date(s).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+/** "2026-08-01" → "Agustus 2026". Periode tagihan langganan selalu tanggal 1. */
+function monthLabel(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 }
 
 const payoutStatusStyle: Record<string, string> = {
@@ -28,14 +35,22 @@ export default function Saldo() {
   const { data: balance, isLoading: balLoading } = useBalance();
   const { data: ledger = [] } = useLedger();
   const { data: payouts = [] } = usePayouts();
-  const { data: config } = usePaymentConfig();
+  const { data: billing } = useHotelBilling();
 
-  const feePct = (config?.feeBps ?? 700) / 100;
+  // Dua model tagihan (055). Halaman ini menerangkan yang BERLAKU untuk hotel
+  // ini saja — tarifnya pun datang dari konfigurasi, tidak ditulis di kode.
+  const isSubscription = billing?.billingMode === "subscription";
+  const feePct = (billing?.feeBps ?? 700) / 100;
+  const { data: invoices = [] } = useMySubscriptionInvoices(isSubscription);
+  const unpaid = invoices.filter((i) => i.status === "unpaid");
+
   const available = balance?.available ?? 0;
   const stats = [
     { icon: Wallet, label: t("Saldo tersedia"), value: available, accent: "text-primary", highlight: true },
     { icon: TrendingUp, label: t("Total pendapatan reservasi"), value: balance?.lifetime_gross ?? 0, accent: "text-foreground" },
-    { icon: Scissors, label: `${t("Fee GoStay")} (${feePct}%)`, value: balance?.lifetime_fee ?? 0, accent: "text-destructive" },
+    isSubscription
+      ? { icon: CalendarClock, label: t("Langganan per bulan"), value: billing?.subscriptionAmount ?? 0, accent: "text-foreground" }
+      : { icon: Scissors, label: `${t("Fee GoStay")} (${feePct}%)`, value: balance?.lifetime_fee ?? 0, accent: "text-destructive" },
     { icon: Banknote, label: t("Total ditarik"), value: balance?.lifetime_withdrawn ?? 0, accent: "text-foreground" },
   ];
 
@@ -49,7 +64,9 @@ export default function Saldo() {
               <Wallet className="w-6 h-6 text-primary" /> {t("Saldo")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {t("Pendapatan reservasi masuk ke saldo setelah dipotong fee GoStay")} {feePct}%.
+              {isSubscription
+                ? `${t("Hotel ini berlangganan bulanan — pendapatan reservasi masuk penuh ke saldo, tanpa potongan")}.`
+                : `${t("Pendapatan reservasi masuk ke saldo setelah dipotong fee GoStay")} ${feePct}%.`}
             </p>
           </div>
           <button
@@ -79,14 +96,32 @@ export default function Saldo() {
           ))}
         </motion.div>
 
-        {/* How the cut works */}
-        <div className="bg-muted/40 border border-border rounded-xl p-4 mb-5 flex gap-3 text-sm text-muted-foreground">
-          <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
-          <p>
-            {t("Setiap pembayaran reservasi otomatis dipotong")} <span className="font-semibold text-destructive">{feePct}%</span> {t("untuk pemeliharaan GoStay")}.{" "}
-            {t("Contoh: pembayaran")} <span className="font-medium text-foreground">{formatIDR(1_000_000)}</span> → {t("fee")} <span className="font-medium text-destructive">{formatIDR(1_000_000 * feePct / 100)}</span>, {t("masuk saldo")} <span className="font-medium text-success">{formatIDR(1_000_000 * (1 - feePct / 100))}</span>.
-          </p>
-        </div>
+        {/* Bagaimana GoStay mengambil bagiannya — beda per model tagihan */}
+        {isSubscription ? (
+          <div className="bg-muted/40 border border-border rounded-xl p-4 mb-5 flex gap-3 text-sm text-muted-foreground">
+            <CalendarClock className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+            <div className="space-y-2">
+              <p>
+                {t("Hotel ini membayar")} <span className="font-semibold text-foreground">{formatIDR(billing?.subscriptionAmount ?? 0)}</span> {t("per bulan, jatuh tempo tiap tanggal")} {billing?.subscriptionDay ?? 1}.{" "}
+                {t("Pembayarannya lewat transfer ke Ventera di luar aplikasi, dan tidak memotong saldo di halaman ini.")}
+              </p>
+              {unpaid.length > 0 && (
+                <p className="text-warning">
+                  {unpaid.length} {t("bulan belum dibayar")}:{" "}
+                  {unpaid.map((i) => monthLabel(i.period)).join(", ")} — {formatIDR(unpaid.reduce((s, i) => s + i.amount, 0))}.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-muted/40 border border-border rounded-xl p-4 mb-5 flex gap-3 text-sm text-muted-foreground">
+            <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+            <p>
+              {t("Setiap pembayaran reservasi otomatis dipotong")} <span className="font-semibold text-destructive">{feePct}%</span> {t("untuk pemeliharaan GoStay")}.{" "}
+              {t("Contoh: pembayaran")} <span className="font-medium text-foreground">{formatIDR(1_000_000)}</span> → {t("fee")} <span className="font-medium text-destructive">{formatIDR(1_000_000 * feePct / 100)}</span>, {t("masuk saldo")} <span className="font-medium text-success">{formatIDR(1_000_000 * (1 - feePct / 100))}</span>.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Ledger */}

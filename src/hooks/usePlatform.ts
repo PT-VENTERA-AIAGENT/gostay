@@ -111,4 +111,6 @@ export function usePlatformHotelDetail(tenantId: string | undefined) {
 }
 
 // Payment mutations are shared with the older admin hook.
-export { useSetHotelMode, useSetHotelPaymentsActive, useSetHotelPayment } from "./useAdminPayments";
+export {
+  useSetHotelMode, useSetHotelPaymentsActive, useSetHotelPayment, useSetHotelBilling,
+} from "./useAdminPayments";

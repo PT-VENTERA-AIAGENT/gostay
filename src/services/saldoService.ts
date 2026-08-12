@@ -1,4 +1,7 @@
 import { supabase } from "@/lib/supabase";
+// Aturan "hotel langganan tidak dipotong" hanya ditulis sekali, di modul fee
+// yang juga dicerminkan trigger DB-nya (055) — bukan disalin ulang di sini.
+import { feeBpsFor, type BillingMode } from "../../api/_lib/payment/fee";
 
 // hotel_balance / balance_ledger / payouts / payment_config are new tables that
 // aren't in the generated Database type yet, so we use an untyped client cast —
@@ -47,6 +50,32 @@ export interface PaymentConfig {
   feeBps: number;
 }
 
+/**
+ * Model tagihan hotel ini + tarif yang benar-benar berlaku baginya.
+ *
+ * Hotel hanya BOLEH MEMBACA ini (RLS 032/041): memilih model adalah keputusan
+ * Ventera di konsol platform. Halaman Saldo memakainya untuk menerangkan angka
+ * yang dilihat pemilik hotel — hotel langganan tidak boleh dibacakan cerita
+ * "dipotong 7%" yang tidak pernah terjadi padanya.
+ */
+export interface HotelBilling {
+  billingMode: BillingMode;
+  /** Tarif efektif dalam bps: 0 untuk hotel langganan. */
+  feeBps: number;
+  subscriptionAmount: number;
+  subscriptionDay: number;
+  subscriptionSince: string | null;
+}
+
+export interface SubscriptionInvoice {
+  id: number;
+  period: string;
+  amount: number;
+  status: "unpaid" | "paid" | "waived";
+  paid_at: string | null;
+  paid_method: string | null;
+}
+
 /** The caller's own hotel balance. Null until the hotel has its first income. */
 export async function getBalance(): Promise<HotelBalance | null> {
   const { data, error } = await db.from("hotel_balance").select("*").maybeSingle();
@@ -85,6 +114,40 @@ export async function getPaymentConfig(): Promise<PaymentConfig> {
     mode: data?.mode === "live" ? "live" : "test",
     feeBps: typeof data?.platform_fee_bps === "number" ? data.platform_fee_bps : 700,
   };
+}
+
+/**
+ * Model tagihan hotel yang sedang login. Tanpa baris konfigurasi → komisi
+ * dengan tarif global, persis seperti yang dilakukan hotel_fee_bps() di DB.
+ */
+export async function getHotelBilling(): Promise<HotelBilling> {
+  const [cfgRes, globalCfg] = await Promise.all([
+    db.from("hotel_payment_config")
+      .select("billing_mode,subscription_amount,subscription_day,subscription_since")
+      .maybeSingle(),
+    getPaymentConfig(),
+  ]);
+  if (cfgRes.error) throw cfgRes.error;
+  const row = cfgRes.data as any;
+  const billingMode: BillingMode = row?.billing_mode === "subscription" ? "subscription" : "commission";
+  return {
+    billingMode,
+    feeBps: feeBpsFor(billingMode, globalCfg.feeBps),
+    subscriptionAmount: Number(row?.subscription_amount ?? 0),
+    subscriptionDay: Number(row?.subscription_day ?? 1),
+    subscriptionSince: row?.subscription_since ?? null,
+  };
+}
+
+/** Tagihan langganan hotel ini — hanya baca; yang menandai lunas Ventera. */
+export async function getMySubscriptionInvoices(limit = 6): Promise<SubscriptionInvoice[]> {
+  const { data, error } = await db
+    .from("hotel_subscription_invoices")
+    .select("id,period,amount,status,paid_at,paid_method")
+    .order("period", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((r) => ({ ...r, amount: Number(r.amount) }));
 }
 
 export interface RequestPayoutInput {

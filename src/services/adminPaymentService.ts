@@ -8,6 +8,22 @@ import { platformDb } from "@/lib/supabase";
 // Untyped cast: these tables aren't in the generated types.
 const db = platformDb as unknown as { from: (table: string) => any };
 
+/**
+ * How Ventera charges this hotel (migration 055) — orthogonal to live/test:
+ * a subscription hotel can still take live Xendit payments, Ventera just
+ * doesn't cut them.
+ */
+export type BillingMode = "commission" | "subscription";
+
+export interface HotelBillingSettings {
+  billing_mode: BillingMode;
+  /** Monthly fee in rupiah. Only meaningful on 'subscription'. */
+  subscription_amount: number;
+  /** Day of month the monthly fee falls due (1–28). */
+  subscription_day: number;
+  subscription_since: string | null;
+}
+
 export interface HotelPaymentRow {
   tenant_id: string;
   name: string;
@@ -16,6 +32,16 @@ export interface HotelPaymentRow {
   mode: "live" | "test";       // effective payment mode (default 'test')
   payments_active: boolean;    // online payments on/off for this hotel
   updated_at: string | null;
+}
+
+/** Read one hotel's config row into billing settings, defaults included. */
+export function billingOf(cfg: any | null | undefined): HotelBillingSettings {
+  return {
+    billing_mode: cfg?.billing_mode === "subscription" ? "subscription" : "commission",
+    subscription_amount: Number(cfg?.subscription_amount ?? 0),
+    subscription_day: Number(cfg?.subscription_day ?? 1),
+    subscription_since: cfg?.subscription_since ?? null,
+  };
 }
 
 /** Every hotel with its payment config (missing config → defaults test/on). */
@@ -66,6 +92,42 @@ export async function setHotelPayment(
   const patch: Record<string, unknown> = { tenant_id: tenantId, updated_by: by };
   if (state === "off") patch.is_active = false;
   else { patch.is_active = true; patch.mode = state; }
+  const { error } = await db.from("hotel_payment_config").upsert(patch, { onConflict: "tenant_id" });
+  if (error) throw error;
+}
+
+/**
+ * Choose how Ventera charges this hotel: a 7% cut per payment, or a flat
+ * monthly fee the hotel transfers offline.
+ *
+ * Writing this column is platform-only (RLS, 032/035) — a hotel that could set
+ * it would be able to zero its own fee. Switching to commission deliberately
+ * leaves `subscription_amount`/`subscription_day` alone: they're the hotel's
+ * agreed terms, and keeping them means switching back doesn't lose them.
+ *
+ * `since` is passed by the caller rather than stamped here, so that editing the
+ * fee of a hotel that already subscribes doesn't silently move its start date.
+ *
+ * The patch stays NARROW on purpose — `mode` and `is_active` are never sent.
+ * PostgREST builds `ON CONFLICT DO UPDATE SET` only from the columns present in
+ * the payload, so the hotel's payment environment is left exactly as it is even
+ * if this page's snapshot of it is stale. Sending it "to be safe" would do the
+ * opposite: an operator saving a fee here would write back a stale mode and
+ * silently undo a Live switch made in another tab.
+ */
+export async function setHotelBilling(
+  tenantId: string,
+  input: { mode: BillingMode; amount?: number; day?: number; since?: string },
+  by: string,
+): Promise<void> {
+  const patch: Record<string, unknown> = {
+    tenant_id: tenantId,
+    billing_mode: input.mode,
+    updated_by: by,
+  };
+  if (input.amount !== undefined) patch.subscription_amount = Math.max(0, Math.round(input.amount));
+  if (input.day !== undefined) patch.subscription_day = Math.min(28, Math.max(1, Math.round(input.day)));
+  if (input.since !== undefined) patch.subscription_since = input.since;
   const { error } = await db.from("hotel_payment_config").upsert(patch, { onConflict: "tenant_id" });
   if (error) throw error;
 }

@@ -8,7 +8,14 @@ import type { PaymentMode } from "./xendit";
 
 export { isConfigured };
 
-/** The global platform fee in basis points (700 = 7%). Falls back to 700. */
+/**
+ * The GLOBAL platform fee in basis points (700 = 7%). Falls back to 700.
+ *
+ * Not what any one hotel is actually charged: since 055 a hotel on the monthly
+ * subscription pays 0. If you need a hotel's real rate, read
+ * `hotel_fee_bps(tenant)` in the DB (or mirror it with feeBpsFor() from ./fee) —
+ * using this number per-hotel would bill a subscriber twice.
+ */
 export async function getFeeBps(): Promise<number> {
   const res = await serviceGet("payment_config?id=eq.true&select=platform_fee_bps&limit=1");
   if (!res.ok) throw new Error(`payment_config_read_failed_${res.status}`);
