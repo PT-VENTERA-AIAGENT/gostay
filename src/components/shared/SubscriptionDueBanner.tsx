@@ -10,8 +10,6 @@ import { useSubscriptionGate } from "@/hooks/useSubscriptionGate";
 // ini muncul begitu ada tagihan lewat jatuh tempo dan menghitung mundur hari
 // tersisa, sehingga saat gerbangnya benar-benar turun tidak ada yang terkejut.
 
-const MASA_TENGGANG = 7;   // sama dengan subscription_grace_days() di 058
-
 export default function SubscriptionDueBanner() {
   const t = useT();
   const { data: gate } = useSubscriptionGate();
@@ -19,8 +17,10 @@ export default function SubscriptionDueBanner() {
   // Sudah tergerbang → yang tampil layar gerbangnya sendiri, bukan spanduk.
   if (!gate || gate.gated || gate.days_late <= 0) return null;
 
-  // gate.gated sudah menyala tepat di hari ke-7, jadi di sini sisa selalu ≥ 1.
-  const sisa = MASA_TENGGANG - gate.days_late;
+  // Masa tenggangnya datang dari DB bersama sisa datanya — menyalinnya sebagai
+  // konstanta di sini berarti mengubahnya di satu tempat diam-diam membuat
+  // hitung mundur ini berbohong.
+  const sisa = gate.grace_days - gate.days_late;
   return (
     <div className="mx-4 mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm md:mx-6">
       <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />

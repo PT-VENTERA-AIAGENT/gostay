@@ -20,6 +20,8 @@ export interface SubscriptionGate {
   due_date: string;
   days_late: number;
   amount_due: number;
+  /** Masa tenggang dari DB — supaya angkanya tidak diduplikasi di komponen. */
+  grace_days: number;
 }
 
 export function useSubscriptionGate() {
@@ -47,6 +49,7 @@ export function useSubscriptionGate() {
         due_date: String(row.due_date),
         days_late: Number(row.days_late ?? 0),
         amount_due: Number(row.amount_due ?? 0),
+        grace_days: Number(row.grace_days ?? 7),
       };
     },
   });

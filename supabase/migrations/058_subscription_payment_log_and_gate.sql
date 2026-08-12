@@ -199,13 +199,20 @@ language sql immutable as $$ select 7 $$;
  *
  * Nol baris = tidak ada yang terutang.
  */
-create or replace function subscription_gate(p_tenant uuid)
+-- Bentuk kolom keluarannya berubah setelah rilis pertama; `create or replace`
+-- ditolak Postgres untuk itu, jadi keduanya dijatuhkan dulu. Urutannya penting:
+-- my_subscription_gate() bergantung pada yang di bawah.
+drop function if exists my_subscription_gate();
+drop function if exists subscription_gate(uuid);
+
+create function subscription_gate(p_tenant uuid)
 returns table (
   gated boolean,
   period date,
   due_date date,
   days_late int,
-  amount_due numeric
+  amount_due numeric,
+  grace_days int
 )
 language sql stable security definer set search_path = public, pg_temp as $$
   with cfg as (
@@ -241,7 +248,8 @@ language sql stable security definer set search_path = public, pg_temp as $$
          o.period,
          o.due_date,
          greatest((current_date - o.due_date)::int, 0) as days_late,
-         o.amount
+         o.amount,
+         subscription_grace_days()
     from owed o
    where o.status = 'unpaid' and o.amount > 0
    order by o.period
@@ -258,10 +266,14 @@ revoke all on function subscription_gate(uuid) from public, anon, authenticated;
 grant execute on function subscription_gate(uuid) to service_role;
 
 /** Gerbang untuk hotel si pemanggil sendiri — yang dipakai aplikasi staf. */
-create or replace function my_subscription_gate()
-returns table (gated boolean, period date, due_date date, days_late int, amount_due numeric)
+create function my_subscription_gate()
+returns table (gated boolean, period date, due_date date, days_late int, amount_due numeric, grace_days int)
 language sql stable security definer set search_path = public, pg_temp as $$
   select * from subscription_gate(public.get_my_tenant());
 $$;
-revoke all on function my_subscription_gate() from public;
+-- `anon` dicabut eksplisit: Supabase memberi hak eksekusi bawaan pada fungsi
+-- baru di skema public, dan DROP+CREATE mengembalikannya. Tanpa login fungsi
+-- ini memang tidak mengembalikan apa-apa (get_my_tenant() null), tapi hak yang
+-- tidak dipakai lebih baik tidak ada.
+revoke all on function my_subscription_gate() from public, anon;
 grant execute on function my_subscription_gate() to authenticated, service_role;

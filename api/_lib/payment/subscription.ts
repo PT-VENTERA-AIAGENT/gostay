@@ -120,10 +120,11 @@ export interface SubscriptionInvoiceRow {
   gateway_attempt: number;
   /** Yang sudah masuk sebelum pembayaran ini (058). */
   paid_total: number;
+  gateway_note: string | null;
 }
 
 const INVOICE_COLUMNS =
-  "id,tenant_id,period,amount,status,paid_total,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt";
+  "id,tenant_id,period,amount,status,paid_total,gateway_note,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt";
 
 function toRow(raw: any): SubscriptionInvoiceRow {
   return {
@@ -279,7 +280,11 @@ export async function handleSubscriptionCheckout(
   }
   if (invoice.status === "paid") return { ok: false, status: 409, error: "already_paid" };
   if (invoice.status === "waived") return { ok: false, status: 409, error: "invoice_waived" };
-  if (!(invoice.amount > 0)) return { ok: false, status: 400, error: "nothing_to_pay" };
+  // Yang ditagih adalah SISA. Hotel yang sudah mentransfer sebagian melihat
+  // sisa itu di layar gerbang; menerbitkan tautan sebesar nominal penuh akan
+  // menagihnya dua kali untuk bagian yang sudah ia bayar.
+  const sisa = invoice.amount - invoice.paid_total;
+  if (!(sisa > 0)) return { ok: false, status: 400, error: "nothing_to_pay" };
 
   const mode = await getSubscriptionMode();
   // Diperiksa lebih dulu supaya kunci Xendit yang belum diisi menjadi jawaban
@@ -293,7 +298,13 @@ export async function handleSubscriptionCheckout(
   // dibayar — dua-duanya masuk untuk satu bulan yang sama.
   const issuedAt = invoice.gateway_issued_at ? Date.parse(invoice.gateway_issued_at) : 0;
   const masihHidup = Date.now() - issuedAt < REUSE_WINDOW_MS;
-  if (invoice.gateway_url && invoice.gateway_ref && invoice.gateway_env === mode && masihHidup) {
+  // Tautan lama hanya boleh dipakai ulang kalau nominalnya masih benar. Begitu
+  // ada pembayaran sebagian masuk, tautan yang terbit sebelumnya menagih lebih
+  // dari yang tersisa — lebih baik menerbitkan yang baru (dan menerima risiko
+  // dua tautan hidup, yang setidaknya tercatat sebagai kelebihan bayar) daripada
+  // menyodorkan angka yang sudah pasti salah.
+  if (invoice.paid_total === 0 && invoice.gateway_url && invoice.gateway_ref
+      && invoice.gateway_env === mode && masihHidup) {
     return {
       ok: true, invoiceUrl: invoice.gateway_url, invoiceId: invoice.gateway_ref,
       amount: invoice.amount, mode, reused: true,
@@ -308,7 +319,7 @@ export async function handleSubscriptionCheckout(
   const created = await createInvoiceViaGateway(
     {
       externalId,
-      amount: invoice.amount,
+      amount: sisa,
       description: hotel.name
         ? `Langganan GoStay ${bulan} — ${hotel.name}`
         : `Langganan GoStay ${bulan}`,
@@ -330,7 +341,7 @@ export async function handleSubscriptionCheckout(
 
   return {
     ok: true, invoiceUrl: created.invoiceUrl, invoiceId: created.id,
-    amount: invoice.amount, mode, reused: false,
+    amount: sisa, mode, reused: false,
   };
 }
 

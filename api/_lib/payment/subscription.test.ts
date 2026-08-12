@@ -122,6 +122,29 @@ describe("handleSubscriptionCheckout", () => {
     expect(calls.filter((c) => c.url.includes("/payments"))).toHaveLength(0);
   });
 
+  it("menagih SISA, bukan nominal penuh, saat sebagian sudah dibayar", async () => {
+    // Layar gerbang menyebut sisa; tautan yang menagih penuh akan menagih hotel
+    // dua kali untuk bagian yang sudah ia transfer.
+    const calls = stubFetch(routes({ ...INVOICE, paid_total: 200000 }));
+    const res = await handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" });
+    expect(res).toMatchObject({ ok: true, amount: 300000 });
+    const body = JSON.parse(String(calls.find((c) => c.url.includes("xendit.local"))!.init?.body));
+    expect(body.amount).toBe(300000);
+  });
+
+  it("tidak memakai ulang tautan yang nominalnya sudah basi", async () => {
+    // Tautan terbit untuk Rp500.000, lalu transfer Rp200.000 masuk. Memakai
+    // ulang tautan itu berarti menyodorkan angka yang sudah pasti salah.
+    const calls = stubFetch(routes({
+      ...INVOICE, paid_total: 200000, gateway_ref: "inv-lama",
+      gateway_url: "https://pay.xendit/lama", gateway_env: "test",
+      gateway_issued_at: new Date().toISOString(), gateway_attempt: 1,
+    }));
+    await expect(handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" }))
+      .resolves.toMatchObject({ reused: false, amount: 300000 });
+    expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(1);
+  });
+
   it("menolak tagihan milik hotel lain seperti tagihan yang tidak ada", async () => {
     stubFetch(routes({ ...INVOICE, tenant_id: "hotel-lain" }));
     // Jawaban yang berbeda akan mengubah endpoint ini jadi alat mengintip
