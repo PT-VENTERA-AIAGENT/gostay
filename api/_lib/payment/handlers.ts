@@ -165,7 +165,16 @@ export async function handleWebhook(
   if (isSubscriptionExternalId(externalId)) {
     const invoice = await findInvoiceForCallback(gatewayRef, externalId);
     if (!invoice) return { ok: false, status: 404, error: "subscription_invoice_not_found" };
-    const outcome = await markInvoicePaidFromCallback(invoice, gatewayRef, modeForEnv(env));
+    const outcome = await markInvoicePaidFromCallback(invoice, gatewayRef, modeForEnv(env), amount);
+    if (outcome === "underpaid") {
+      // Dijawab 200 supaya gateway berhenti mengulang — pengulangan tidak akan
+      // mengubah apa pun. Tagihannya sengaja TETAP belum lunas, dan selisihnya
+      // sudah dicatat di baris tagihan itu supaya operator melihatnya.
+      console.error(
+        `[payment/webhook] langganan kurang bayar: invoice ${invoice.id}, diterima ${amount} dari ${invoice.amount}`,
+      );
+      return { ok: true, outcome: "ignored", status: 200 };
+    }
     return { ok: true, outcome, status: 200 };
   }
 

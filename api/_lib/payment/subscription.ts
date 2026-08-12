@@ -12,7 +12,7 @@
 // memakai awalan itu dan membedakan dirinya dengan penanda `SUB-` sesudahnya.
 
 import { serviceGet, serviceUpdate } from "../wa/client";
-import { createInvoiceViaGateway } from "./gateway";
+import { createInvoiceViaGateway, isGatewayConfigured } from "./gateway";
 import { envForMode, type PaymentMode } from "./xendit";
 
 /** Awalan yang dipakai router callback Ventera untuk mengenali proyek ini. */
@@ -20,8 +20,21 @@ const PREFIX = "GOSTAY-";
 /** Penanda "ini tagihan langganan, bukan reservasi". */
 const SUB_MARKER = "SUB-";
 
-/** Tautan Xendit dianggap masih bisa dipakai selama ini (kedaluwarsa bawaan 24 jam). */
-const REUSE_WINDOW_MS = 20 * 60 * 60 * 1000;
+/**
+ * Umur tautan pembayaran, dan sekaligus jangka pakai-ulangnya. SATU angka untuk
+ * keduanya, dan itu disengaja.
+ *
+ * Kalau jangka pakai-ulang lebih pendek daripada umur invoice di Xendit (bawaan
+ * akun ±24 jam), ada jendela ketika tautan LAMA masih bisa dibayar padahal
+ * barisnya sudah menunjuk ke tautan baru. Hotel yang membayar dari tab lama
+ * atau dari email Xendit akan mengirim uangnya masuk ke akun Ventera sementara
+ * tagihannya tetap tercatat belum lunas — lalu ditagih ulang bulan depan.
+ *
+ * Dengan mengunci invoice_duration ke angka yang sama, tautan lama sudah pasti
+ * mati pada detik kita boleh menerbitkan penggantinya.
+ */
+const INVOICE_TTL_SECONDS = 20 * 60 * 60;
+const REUSE_WINDOW_MS = INVOICE_TTL_SECONDS * 1000;
 
 function slugSegment(hotelSlug: string): string {
   return (hotelSlug ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -47,9 +60,27 @@ export function subscriptionExternalId(hotelSlug: string | null, period: string,
   return attempt > 0 ? `${base}-R${attempt}` : base;
 }
 
-/** Apakah sebuah external_id milik tagihan langganan, bukan reservasi. */
+/**
+ * Apakah sebuah external_id milik tagihan langganan, bukan reservasi.
+ *
+ * Awalannya saja TIDAK cukup. external_id reservasi berbentuk
+ * `GOSTAY-<SLUG>-BK-…`, jadi hotel yang slug-nya kebetulan dimulai "sub"
+ * (mis. `sub-urban-stay`) menghasilkan `GOSTAY-SUB-URBAN-STAY-BK-…` dan akan
+ * dibajak masuk ke cabang langganan: pembayaran tamunya dijawab 404, tidak
+ * pernah tercatat, dan saldo hotel itu tidak pernah dikredit — diam-diam, dan
+ * hanya untuk hotel itu. Karena itu dua syarat lagi: tidak boleh mengandung
+ * penanda booking, dan ekornya harus berbentuk periode YYYYMM (+ -R<n>).
+ */
 export function isSubscriptionExternalId(externalId: string | undefined): boolean {
-  return (externalId ?? "").startsWith(PREFIX + SUB_MARKER);
+  const id = externalId ?? "";
+  return id.startsWith(PREFIX + SUB_MARKER)
+    && !id.includes("-BK-")
+    && /-\d{6}(-R\d+)?$/.test(id);
+}
+
+/** external_id tanpa sufiks percobaan ulang — penanda satu bulan tagihan. */
+function baseExternalId(externalId: string): string {
+  return externalId.replace(/-R\d+$/, "");
 }
 
 export interface SubscriptionInvoiceRow {
@@ -137,14 +168,36 @@ export async function findInvoiceForCallback(
     const rows = (await byExt.json()) as any[];
     if (rows[0]) return toRow(rows[0]);
   }
+
+  // Upaya ketiga: cocokkan bulannya saja, tanpa sufiks percobaan ulang.
+  //
+  // Baris tagihan hanya menyimpan SATU gateway_external_id — yang terakhir
+  // diterbitkan. Kalau dua tab menekan Bayar hampir bersamaan, invoice yang
+  // kalah menjadi yatim: masih bisa dibayar, tapi tidak lagi ditunjuk barisnya.
+  // Tanpa upaya ini pembayaran atas invoice itu dijawab 404 — uangnya sudah
+  // masuk ke akun Ventera sementara tagihannya tetap tercatat belum lunas.
+  // `GOSTAY-SUB-<HOTEL>-<YYYYMM>` unik per hotel per bulan, jadi mencocokkan
+  // awalannya tidak bisa nyasar ke tagihan bulan atau hotel lain.
+  const base = baseExternalId(externalId);
+  const byBase = await serviceGet(
+    `hotel_subscription_invoices?gateway_external_id=like.${encodeURIComponent(base)}*&select=${INVOICE_COLUMNS}&limit=1`,
+  );
+  if (byBase.ok) {
+    const rows = (await byBase.json()) as any[];
+    if (rows[0]) return toRow(rows[0]);
+  }
   return null;
 }
 
-async function patchInvoice(id: number, patch: Record<string, unknown>): Promise<void> {
+async function patchInvoice(
+  id: number,
+  patch: Record<string, unknown>,
+  extraFilter = "",
+): Promise<void> {
   // serviceUpdate menerima path+filter sebagai SATU argumen (lihat wa/client.ts),
   // bukan tabel dan filter terpisah.
   const res = await serviceUpdate(
-    `hotel_subscription_invoices?id=eq.${encodeURIComponent(String(id))}`,
+    `hotel_subscription_invoices?id=eq.${encodeURIComponent(String(id))}${extraFilter}`,
     patch,
   );
   if (!res.ok) throw new Error(`subscription_invoice_update_failed_${res.status}`);
@@ -181,6 +234,11 @@ export async function handleSubscriptionCheckout(
   if (!(invoice.amount > 0)) return { ok: false, status: 400, error: "nothing_to_pay" };
 
   const mode = await getSubscriptionMode();
+  // Diperiksa lebih dulu supaya kunci Xendit yang belum diisi menjadi jawaban
+  // yang bisa dibaca hotel, bukan 502 dari lemparan di kedalaman.
+  if (!isGatewayConfigured(envForMode(mode))) {
+    return { ok: false, status: 503, error: "service_not_configured" };
+  }
 
   // Tautan yang masih hidup dipakai ulang: menerbitkan invoice baru tiap klik
   // menumpuk tagihan kembar di dashboard Xendit, dan tagihan lama tetap bisa
@@ -207,6 +265,7 @@ export async function handleSubscriptionCheckout(
         ? `Langganan GoStay ${bulan} — ${hotel.name}`
         : `Langganan GoStay ${bulan}`,
       successRedirectUrl: input.successRedirectUrl,
+      invoiceDuration: INVOICE_TTL_SECONDS,
     },
     envForMode(mode),
     fetchImpl,
@@ -233,19 +292,36 @@ export async function handleSubscriptionCheckout(
  * Idempoten: callback yang datang dua kali untuk invoice yang sudah lunas
  * dijawab "duplicate" tanpa menulis apa pun. `paid_at` sengaja tidak dikirim —
  * trigger 055 yang mengisinya, supaya waktu lunas selalu waktu server.
+ *
+ * Nominalnya DIPERIKSA. Callback yang membawa uang kurang dari tagihan tidak
+ * boleh menandainya lunas hanya karena statusnya "PAID" — kalau dibiarkan,
+ * selisihnya tidak pernah muncul di layar mana pun. Yang kurang bayar dicatat
+ * di kolom `note` supaya operator melihatnya di tempat ia memang melihat
+ * tagihan, bukan hanya di log server yang tak pernah dibuka.
  */
 export async function markInvoicePaidFromCallback(
   invoice: SubscriptionInvoiceRow,
   gatewayRef: string,
   mode: PaymentMode,
-): Promise<"recorded" | "duplicate"> {
+  paidAmount: number,
+): Promise<"recorded" | "duplicate" | "underpaid"> {
   if (invoice.status === "paid") return "duplicate";
+
+  // Toleransi setengah rupiah: pembulatan boleh, kurang bayar tidak.
+  if (paidAmount + 0.5 < invoice.amount) {
+    await patchInvoice(invoice.id, {
+      note: `Pembayaran online kurang: diterima ${paidAmount} dari ${invoice.amount} (${gatewayRef}).`,
+      updated_by: "xendit_callback",
+    });
+    return "underpaid";
+  }
+
   await patchInvoice(invoice.id, {
     status: "paid",
     paid_method: "xendit",
     gateway_ref: gatewayRef,
     gateway_env: mode,
     updated_by: "xendit_callback",
-  });
+  }, "&status=eq.unpaid");   // atomik: dua callback beriringan tidak saling menimpa
   return "recorded";
 }

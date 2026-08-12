@@ -35,9 +35,21 @@ describe("subscriptionExternalId — bentuk yang dikenali router callback", () =
 
   it("membedakan dirinya dari invoice reservasi", () => {
     expect(isSubscriptionExternalId("GOSTAY-SUB-KOPI-RINTIK-202608")).toBe(true);
+    expect(isSubscriptionExternalId("GOSTAY-SUB-KOPI-RINTIK-202608-R2")).toBe(true);
     expect(isSubscriptionExternalId("GOSTAY-KOPI-RINTIK-BK-20260812-93FD")).toBe(false);
     expect(isSubscriptionExternalId("GOSTAY-BK-1")).toBe(false);
     expect(isSubscriptionExternalId(undefined)).toBe(false);
+  });
+
+  it("tidak membajak reservasi milik hotel yang slug-nya dimulai 'sub'", () => {
+    // `sub-urban-stay` menghasilkan GOSTAY-SUB-URBAN-STAY-BK-… . Kalau ini
+    // terbaca sebagai langganan, pembayaran tamunya dijawab 404, tidak pernah
+    // tercatat, dan saldo hotel itu tidak pernah dikredit — hanya hotel itu,
+    // diam-diam, selamanya.
+    expect(isSubscriptionExternalId("GOSTAY-SUB-URBAN-STAY-BK-20260812-93FD")).toBe(false);
+    expect(isSubscriptionExternalId("GOSTAY-SUBUR-BK-20260101-AAAA")).toBe(false);
+    // Hotel itu tetap bisa punya tagihan langganan sungguhan.
+    expect(isSubscriptionExternalId("GOSTAY-SUB-SUB-URBAN-STAY-202608")).toBe(true);
   });
 });
 
@@ -72,13 +84,15 @@ describe("handleSubscriptionCheckout", () => {
   });
   afterEach(() => { process.env = { ...OLD }; vi.unstubAllGlobals(); });
 
+  // PATCH didaftarkan LEBIH DULU: route GET di bawahnya tidak memeriksa method,
+  // jadi kalau urutannya terbalik ia yang selalu menang dan route PATCH mati.
   const routes = (invoice: unknown, profile: unknown = [{ tenant_id: "t-1", role: "staff", is_active: true }]) => [
+    { match: (u: string, i?: RequestInit) => u.includes("/hotel_subscription_invoices?id=eq.") && i?.method === "PATCH", reply: () => ({}) },
     { match: (u: string) => u.includes("/profiles?"), reply: () => profile },
     { match: (u: string) => u.includes("/hotel_subscription_invoices?id=eq."), reply: () => [invoice] },
     { match: (u: string) => u.includes("/payment_config?"), reply: () => [{ subscription_mode: "test" }] },
     { match: (u: string) => u.includes("/tenants?"), reply: () => [{ slug: "kopi-rintik", name: "Kopi Rintik" }] },
     { match: (u: string) => u.includes("xendit.local"), reply: () => ({ id: "inv-xnd-1", invoice_url: "https://pay.xendit/inv-1", status: "PENDING", amount: 500000 }) },
-    { match: (u: string, i?: RequestInit) => u.includes("/hotel_subscription_invoices?id=eq.") && i?.method === "PATCH", reply: () => ({}) },
   ];
 
   it("menerbitkan tautan dan menyimpan jejaknya di baris tagihan", async () => {
@@ -137,6 +151,25 @@ describe("handleSubscriptionCheckout", () => {
     const calls = stubFetch(routes(segar));
     const res = await handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" });
     expect(res).toMatchObject({ ok: true, invoiceUrl: "https://pay.xendit/lama", reused: true });
+    expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(0);
+  });
+
+  it("mengunci umur invoice, supaya tautan lama mati sebelum penggantinya terbit", async () => {
+    // Tanpa ini Xendit memakai bawaan akun (±24 jam) sementara kita memakai
+    // ulang tautannya 20 jam: ada 4 jam ketika tautan LAMA masih bisa dibayar
+    // padahal barisnya sudah menunjuk yang baru. Hotel yang membayar dari tab
+    // lama mengirim uang yang tagihannya tetap tercatat belum lunas.
+    const calls = stubFetch(routes(INVOICE));
+    await handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" });
+    const body = JSON.parse(String(calls.find((c) => c.url.includes("xendit.local"))!.init?.body));
+    expect(body.invoice_duration).toBe(20 * 60 * 60);
+  });
+
+  it("menjawab service_not_configured saat kunci Xendit belum diisi", async () => {
+    delete process.env.XENDIT_API_KEY_SANDBOX;
+    const calls = stubFetch(routes(INVOICE));
+    await expect(handleSubscriptionCheckout({ invoiceId: 7, profileId: "p-1" }))
+      .resolves.toMatchObject({ ok: false, status: 503, error: "service_not_configured" });
     expect(calls.filter((c) => c.url.includes("xendit.local"))).toHaveLength(0);
   });
 
@@ -203,10 +236,40 @@ describe("handleWebhook — cabang langganan", () => {
     await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "recorded" });
   });
 
+  it("menemukan tagihan lewat bulannya saat invoice lama jadi yatim", async () => {
+    // Dua tab menekan Bayar hampir bersamaan: baris tagihan hanya menyimpan
+    // external_id yang terakhir (-R1), sementara yang dibayar hotel adalah
+    // invoice pertama. Tanpa upaya pencocokan per-bulan ini, uangnya masuk ke
+    // Ventera sementara tagihannya tetap tercatat belum lunas.
+    const calls = stubFetch([
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => ({}) },
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
+      { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [] },
+      { match: (u: string) => u.includes("gateway_external_id=like."), reply: () => [{ ...INVOICE, gateway_external_id: "GOSTAY-SUB-KOPI-RINTIK-202608-R1" }] },
+    ]);
+    await expect(handleWebhook("tok-sandbox", body)).resolves.toMatchObject({ ok: true, outcome: "recorded" });
+    expect(calls.some((c) => c.url.includes("like.GOSTAY-SUB-KOPI-RINTIK-202608"))).toBe(true);
+  });
+
+  it("kurang bayar TIDAK dianggap lunas, dan selisihnya dicatat di tagihan", async () => {
+    const calls = stubFetch([
+      { match: (u: string, i?: RequestInit) => i?.method === "PATCH", reply: () => ({}) },
+      { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [{ ...INVOICE, gateway_ref: "inv-xnd-1" }] },
+    ]);
+    // 200 supaya gateway berhenti mengulang; tagihannya sengaja tetap unpaid.
+    await expect(handleWebhook("tok-sandbox", { ...body, amount: 300000 }))
+      .resolves.toMatchObject({ ok: true, outcome: "ignored" });
+
+    const patch = JSON.parse(String(calls.find((c) => c.init?.method === "PATCH")!.init?.body));
+    expect(patch.status).toBeUndefined();          // tidak dilunasi
+    expect(String(patch.note)).toContain("300000");  // selisihnya terlihat operator
+  });
+
   it("tagihan yang tidak dikenali dijawab 404, bukan dicatat sebagai booking", async () => {
     stubFetch([
       { match: (u: string) => u.includes("gateway_ref=eq."), reply: () => [] },
       { match: (u: string) => u.includes("gateway_external_id=eq."), reply: () => [] },
+      { match: (u: string) => u.includes("gateway_external_id=like."), reply: () => [] },
     ]);
     await expect(handleWebhook("tok-sandbox", body))
       .resolves.toMatchObject({ ok: false, status: 404, error: "subscription_invoice_not_found" });

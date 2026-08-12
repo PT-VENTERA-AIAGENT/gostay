@@ -43,6 +43,13 @@ export interface CreateInvoiceInput {
   payerEmail?: string;
   description?: string;
   successRedirectUrl?: string;
+  /**
+   * Umur invoice dalam DETIK. Dikirim hanya kalau diisi; tanpa ini Xendit
+   * memakai bawaan akun (±24 jam). Pemanggil yang memakai ulang tautannya
+   * selama jangka tertentu WAJIB mengunci angka ini, supaya tautan lama sudah
+   * pasti mati sebelum tautan penggantinya terbit.
+   */
+  invoiceDuration?: number;
 }
 
 export interface CreatedInvoice {

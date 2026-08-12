@@ -84,6 +84,7 @@ export async function createInvoiceViaGateway(
       ...(input.payerEmail ? { payer_email: input.payerEmail } : {}),
       description: input.description,
       ...(input.successRedirectUrl ? { success_redirect_url: input.successRedirectUrl } : {}),
+      ...(input.invoiceDuration ? { invoice_duration: input.invoiceDuration } : {}),
       currency: "IDR",
     }),
   });
