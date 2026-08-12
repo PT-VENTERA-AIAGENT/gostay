@@ -15,7 +15,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIG="$DIR/../migrations"
 TMP="$(mktemp -d)"
 # Guards against a suite that aborts early and reports a vacuous success.
-EXPECTED=72
+EXPECTED=80
 trap 'pg_ctl -D "$TMP/pgdata" stop -m immediate >/dev/null 2>&1; rm -rf "$TMP"' EXIT
 
 echo "==> initdb ($TMP)"

@@ -143,8 +143,6 @@ export const EN: Record<string, string> = {
   "Akses aplikasi dibuka kembali segera setelah pembayarannya masuk.":
     "Access is restored as soon as the payment arrives.",
   "Yang harus dibayar": "Amount due",
-  "Tanggal tagih bulan berikutnya tidak berubah — membayar sekarang tidak menggeser jatuh tempo Anda.":
-    "Next month's billing date does not change — paying now does not move your due date.",
   "Langganan bulan ini belum dibayar": "This month's subscription is unpaid",
   "hari lewat jatuh tempo": "days past due",
   "Akses ditutup dalam": "Access closes in",

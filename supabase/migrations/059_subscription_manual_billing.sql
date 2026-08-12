@@ -18,6 +18,16 @@ language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   n int;
 begin
+  -- Tautan Xendit yang sudah terbit dan BELUM dibayar sama berbahayanya dengan
+  -- pembayaran yang sudah masuk: kalau barisnya lenyap lalu hotel membayar
+  -- tautan itu, findInvoiceForCallback() tidak menemukan apa pun di ketiga
+  -- upayanya — uang masuk ke akun Ventera tanpa catatan sama sekali. Selama
+  -- tautannya masih ada, jawabannya membebaskan, bukan menghapus.
+  if old.gateway_ref is not null or old.gateway_external_id is not null then
+    raise exception 'Tagihan ini punya invoice Xendit yang sudah terbit — bebaskan (waive), jangan dihapus'
+      using errcode = 'check_violation';
+  end if;
+
   select count(*) into n from subscription_payments where invoice_id = old.id;
   if n > 0 then
     raise exception 'Tagihan ini sudah punya % pembayaran tercatat — bebaskan (waive), jangan dihapus', n
@@ -41,3 +51,30 @@ alter table hotel_subscription_invoices
 -- Membebaskan tagihan berarti melepaskannya dari perhitungan gerbang: fungsi
 -- subscription_gate() hanya menghitung baris ber-status 'unpaid', jadi tidak
 -- ada yang perlu diubah di sana — dicatat di sini supaya kaitannya terlihat.
+
+-- ─── Mencabut pembebasan harus MENURUNKAN status, bukan menebaknya ────────────
+-- Sejak 058 status tagihan adalah turunan dari buku pembayaran, dan recompute
+-- sengaja mempertahankan 'waived' (itu keputusan operator, bukan hasil
+-- hitungan). Konsekuensinya: tagihan yang sudah dibebaskan LALU tetap dibayar
+-- hotel — kasus nyata, 057 ada khusus untuk itu — akan kembali jadi 'unpaid'
+-- begitu operator menekan "Tagih lagi", meski uangnya sudah masuk penuh.
+-- paid_at ikut dikosongkan trigger 055, dan gerbang mengunci aplikasi staf
+-- hotel yang sudah membayar.
+--
+-- Ditaruh di DB, bukan di klien, supaya tulisan lewat psql ikut terlindungi.
+-- Sekalian membersihkan alasan pembebasan yang sudah tidak berlaku.
+create or replace function resync_after_unwaive() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if old.status = 'waived' and new.status is distinct from 'waived' then
+    update hotel_subscription_invoices set waived_reason = null
+      where id = new.id and waived_reason is not null;
+    perform recompute_subscription_invoice(new.id);
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists trg_resync_after_unwaive on hotel_subscription_invoices;
+create trigger trg_resync_after_unwaive
+  after update of status on hotel_subscription_invoices
+  for each row execute function resync_after_unwaive();

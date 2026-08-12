@@ -31,6 +31,8 @@ export interface SubscriptionInvoice {
   gateway_note: string | null;
   /** Kenapa tagihan ini dibebaskan (059). */
   waived_reason: string | null;
+  /** Ada tautan Xendit terbit untuk tagihan ini — menghapusnya berbahaya (059). */
+  gateway_ref: string | null;
   updated_by: string | null;
 }
 
@@ -90,7 +92,7 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
     db.from("hotel_subscription_invoices")
       // Nama hotel ikut ditarik di sini supaya baris tagihan tetap bisa
       // ditampilkan meski hotelnya tidak ada lagi di daftar langganan aktif.
-      .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,waived_reason,updated_by,tenants(name,slug)")
+      .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,waived_reason,gateway_ref,updated_by,tenants(name,slug)")
       .gte("period", since)
       .order("period", { ascending: false }),
   ]);
@@ -158,7 +160,7 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
 export async function listHotelInvoices(tenantId: string, limit = 12): Promise<SubscriptionInvoice[]> {
   const { data, error } = await db
     .from("hotel_subscription_invoices")
-    .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,waived_reason,updated_by")
+    .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,waived_reason,gateway_ref,updated_by")
     .eq("tenant_id", tenantId)
     .order("period", { ascending: false })
     .limit(limit);

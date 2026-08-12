@@ -99,8 +99,10 @@ export default function SubscriptionInvoices({
       setCatatan("");
     } catch (e) {
       // Bulan yang sudah punya tagihan ditolak UNIQUE (tenant_id, period).
-      const msg = String((e as Error).message ?? "");
-      gagal(e, msg.includes("duplicate") ? "Bulan ini sudah punya tagihan" : "Gagal menerbitkan tagihan");
+      // Kode SQL-nya, bukan teks pesannya: 23505 = unique_violation, dan teks
+      // PostgREST bisa berubah antar versi.
+      const kembar = (e as { code?: string }).code === "23505";
+      gagal(e, kembar ? "Bulan ini sudah punya tagihan" : "Gagal menerbitkan tagihan");
     }
   }
 
@@ -138,7 +140,8 @@ export default function SubscriptionInvoices({
     } catch (e) { gagal(e, "Gagal menghapus tagihan"); }
   }
 
-  const sibuk = issue.isPending || create.isPending || waive.isPending || hapus.isPending;
+  const sibuk = issue.isPending || create.isPending || waive.isPending || hapus.isPending
+    || record.isPending || undo.isPending;
 
   return (
     <div className="space-y-3">
@@ -294,9 +297,10 @@ export default function SubscriptionInvoices({
                       </button>
                     )}
                     {/* Hanya untuk tagihan yang salah terbit. Disembunyikan
-                        begitu ada uang masuk — database menolaknya juga, tapi
-                        tombol yang pasti gagal lebih baik tidak ditawarkan. */}
-                    {inv.paid_total === 0 && (
+                        begitu ada uang masuk ATAU tautan Xendit sudah terbit —
+                        database menolak keduanya juga, tapi tombol yang pasti
+                        gagal lebih baik tidak ditawarkan. */}
+                    {inv.paid_total === 0 && !inv.gateway_ref && (
                       <button
                         onClick={() => buang(inv)}
                         disabled={sibuk}

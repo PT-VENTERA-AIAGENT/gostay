@@ -68,10 +68,6 @@ export default function SubscriptionGate({ children }: { children: React.ReactNo
         >
           {t("Bayar sekarang")} <ArrowRight className="h-4 w-4" />
         </Link>
-
-        <p className="mt-4 text-xs text-muted-foreground">
-          {t("Tanggal tagih bulan berikutnya tidak berubah — membayar sekarang tidak menggeser jatuh tempo Anda.")}
-        </p>
       </div>
     </div>
   );

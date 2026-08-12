@@ -355,7 +355,59 @@ select tests.blocked('menghapus tagihan yang sudah ada pembayarannya',
 select tests.eq('catatan pembayarannya utuh',
   (select count(*) from subscription_payments where tenant_id=:'T4'), 1);
 
--- Yang belum ada uangnya boleh dihapus — untuk membetulkan salah terbit.
-select tests.allowed('menghapus tagihan yang belum ada pembayarannya',
+-- Tautan Xendit yang sudah terbit tapi BELUM dibayar sama berbahayanya: kalau
+-- barisnya lenyap, pembayaran atas tautan itu tidak menemukan tagihannya dan
+-- uangnya masuk tanpa catatan.
+update hotel_subscription_invoices set gateway_ref='inv-hidup'
+  where tenant_id=:'T4' and period=date_trunc('month', current_date)::date;
+select tests.blocked('menghapus tagihan yang tautan Xendit-nya masih terbit',
   $$delete from hotel_subscription_invoices
-      where tenant_id='11111111-1111-4111-8111-111111111144' and period=date '2026-10-01'$$);
+      where tenant_id='11111111-1111-4111-8111-111111111144'
+        and period=date_trunc('month', current_date)::date$$);
+update hotel_subscription_invoices set gateway_ref=null
+  where tenant_id=:'T4' and period=date_trunc('month', current_date)::date;
+
+-- Yang bersih boleh dihapus — untuk membetulkan salah terbit. Periodenya harus
+-- yang BENAR-BENAR ada, kalau tidak DELETE-nya kena 0 baris dan tidak pernah
+-- melewati jalur "boleh" di trigger sama sekali.
+select tests.eq('tagihan yang mau dihapus memang ada',
+  (select count(*) from hotel_subscription_invoices
+     where tenant_id=:'T4' and period=date_trunc('month', current_date)::date), 1);
+select tests.allowed('menghapus tagihan yang bersih',
+  $$delete from hotel_subscription_invoices
+      where tenant_id='11111111-1111-4111-8111-111111111144'
+        and period=date_trunc('month', current_date)::date$$);
+select tests.eq('tagihannya benar-benar hilang',
+  (select count(*) from hotel_subscription_invoices
+     where tenant_id=:'T4' and period=date_trunc('month', current_date)::date), 0);
+
+\echo ''
+\echo '=== mencabut pembebasan menurunkan status dari buku, bukan menebaknya ==='
+-- Tagihan dibebaskan LALU tetap dibayar hotel. Menekan "Tagih lagi" tidak boleh
+-- membuatnya jadi belum-bayar — itu akan mengunci hotel yang sudah membayar.
+\set T7 '11111111-1111-4111-8111-111111111177'
+insert into tenants (id, name) values (:'T7', 'Hotel Dibebaskan');
+insert into hotel_payment_config (tenant_id, billing_mode, subscription_amount, subscription_day, subscription_since, updated_by)
+  values (:'T7', 'subscription', 400000, 1, (current_date - interval '40 days')::date, 'test');
+insert into hotel_subscription_invoices (tenant_id, period, amount, updated_by)
+  values (:'T7', date_trunc('month', current_date - interval '40 days')::date, 400000, 'test');
+select id as inv7 from hotel_subscription_invoices where tenant_id=:'T7' \gset
+
+update hotel_subscription_invoices set status='waived', waived_reason='promo' where id=:inv7;
+insert into subscription_payments (tenant_id, invoice_id, amount, method, recorded_by)
+  values (:'T7', :inv7, 400000, 'xendit', 'callback');
+select tests.eq('dibebaskan lalu tetap dibayar: statusnya tetap dibebaskan',
+  (select count(*) from hotel_subscription_invoices where id=:inv7 and status='waived'), 1);
+select tests.eqn('tapi uangnya tercatat', (select paid_total from hotel_subscription_invoices where id=:inv7), 400000);
+
+update hotel_subscription_invoices set status='unpaid' where id=:inv7;
+select tests.eq('cabut pembebasan → LUNAS, bukan belum bayar (uangnya sudah masuk)',
+  (select count(*) from hotel_subscription_invoices where id=:inv7 and status='paid'), 1);
+select tests.eq('alasan pembebasan ikut dibersihkan',
+  (select count(*) from hotel_subscription_invoices where id=:inv7 and waived_reason is null), 1);
+-- T7 memang masih menunggak BULAN BERJALAN (yang dibayar bulan sebelumnya),
+-- jadi yang dibuktikan bukan "tidak tergerbang" melainkan: bulan yang uangnya
+-- sudah masuk tidak lagi jadi alasan gerbang.
+select tests.eq('bulan yang sudah dibayar tidak lagi jadi alasan gerbang',
+  (select count(*) from subscription_gate(:'T7')
+     where period = date_trunc('month', current_date - interval '40 days')::date), 0);
