@@ -7,6 +7,9 @@ import { getHotelPaymentMode, getBookingByReference, recordGatewayPayment } from
 import { mapXenditStatus, envForMode, modeForEnv } from "./xendit";
 import { createInvoiceViaGateway } from "./gateway";
 import { matchGatewayToken } from "./token";
+import {
+  isSubscriptionExternalId, findInvoiceForCallback, markInvoicePaidFromCallback,
+} from "./subscription";
 
 const PREFIX = "GOSTAY-";
 
@@ -147,6 +150,23 @@ export async function handleWebhook(
   const amount = Number(body.amount ?? body.paid_amount ?? 0);
   if (!externalId || !gatewayRef || !(amount > 0)) {
     return { ok: false, status: 400, error: "malformed_webhook" };
+  }
+
+  // ── Tagihan langganan Ventera (056) ──
+  //
+  // Diperiksa SEBELUM pencarian booking, dan itu bukan sekadar urutan yang
+  // rapi: referenceFromExternalId() mencari penanda "BK-" yang tidak ada di
+  // external_id langganan, jadi ia akan mengembalikan potongan string yang
+  // tidak berarti dan callback-nya jatuh sebagai booking_not_found.
+  //
+  // Cabang ini SENGAJA tidak memanggil recordGatewayPayment(): uang langganan
+  // milik Ventera. Mencatatnya sebagai `payments` akan mengkredit saldo hotel
+  // dengan uang yang ditagihkan kepadanya, lalu memotong 7% darinya.
+  if (isSubscriptionExternalId(externalId)) {
+    const invoice = await findInvoiceForCallback(gatewayRef, externalId);
+    if (!invoice) return { ok: false, status: 404, error: "subscription_invoice_not_found" };
+    const outcome = await markInvoicePaidFromCallback(invoice, gatewayRef, modeForEnv(env));
+    return { ok: true, outcome, status: 200 };
   }
 
   const reference = referenceFromExternalId(externalId);

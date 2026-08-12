@@ -186,3 +186,63 @@ test("halaman Saldo hotel langganan tidak lagi bercerita soal potongan 7%", asyn
     body: await page.screenshot({ fullPage: false }), contentType: "image/png",
   });
 });
+
+test("hotel bisa membayar tagihan langganannya sendiri lewat Xendit", async ({ page }, testInfo) => {
+  // Sisi hotel dari migration 056. Yang diperiksa: tombolnya mengirim id
+  // tagihan saja (bukan nominal — itu ditentukan server), dan peramban benar
+  // dibawa ke tautan Xendit yang dijawab.
+  await signIn(page, staff);
+
+  const json = (body: unknown) => ({
+    status: 200, contentType: "application/json", body: JSON.stringify(body),
+  });
+
+  await page.route("**/rest/v1/hotel_payment_config*", (route) =>
+    route.fulfill(json({
+      billing_mode: "subscription", subscription_amount: 500000,
+      subscription_day: 10, subscription_since: "2026-08-01",
+    })));
+  await page.route("**/rest/v1/payment_config*", (route) =>
+    route.fulfill(json({ mode: "test", platform_fee_bps: 700, subscription_mode: "live" })));
+  await page.route("**/rest/v1/hotel_balance*", (route) => route.fulfill(json(null)));
+  await page.route("**/rest/v1/balance_ledger*", (route) => route.fulfill(json([])));
+  await page.route("**/rest/v1/payouts*", (route) => route.fulfill(json([])));
+  await page.route("**/rest/v1/hotel_subscription_invoices*", (route) =>
+    route.fulfill(json([
+      { id: 42, period: "2026-08-01", amount: 500000, status: "unpaid", paid_at: null, paid_method: null },
+      { id: 41, period: "2026-07-01", amount: 500000, status: "paid", paid_at: "2026-07-03T02:00:00Z", paid_method: "xendit" },
+    ])));
+
+  // Endpoint pembayarannya dicegat: tidak ada invoice sungguhan yang terbit di
+  // Xendit hanya karena tes ini berjalan.
+  let sent: any = null;
+  await page.route("**/api/payment/subscription-checkout", async (route) => {
+    sent = JSON.parse(route.request().postData() ?? "null");
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ ok: true, invoiceUrl: "https://checkout.xendit.co/web/inv-uji", invoiceId: "inv-uji", amount: 500000, mode: "live", reused: false }),
+    });
+  });
+  // Xendit-nya sendiri tidak boleh benar-benar dikunjungi.
+  await page.route("https://checkout.xendit.co/**", (route) =>
+    route.fulfill({ status: 200, contentType: "text/html", body: "<h1>Halaman pembayaran Xendit (palsu)</h1>" }));
+
+  await page.goto("/saldo");
+
+  // Bulan yang sudah lunas tidak menawarkan tombol bayar lagi.
+  await expect(page.getByText("Juli 2026")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Bayar sekarang" })).toHaveCount(1);
+
+  await testInfo.attach("saldo-tagihan-langganan", {
+    body: await page.screenshot({ fullPage: false }), contentType: "image/png",
+  });
+
+  await page.getByRole("button", { name: "Bayar sekarang" }).click();
+
+  await expect.poll(() => sent, { timeout: 15_000 }).not.toBeNull();
+  // Hanya id tagihan yang dikirim. Nominal dari peramban akan berarti hotel
+  // menetapkan sendiri berapa ia berlangganan.
+  expect(sent).toMatchObject({ invoiceId: 42 });
+  expect(sent.amount).toBeUndefined();
+  await expect(page).toHaveURL(/checkout\.xendit\.co/);
+});

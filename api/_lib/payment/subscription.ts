@@ -1,0 +1,251 @@
+// Pembayaran online untuk tagihan langganan bulanan Ventera (migration 056).
+//
+// Berbeda dari pembayaran reservasi dalam satu hal yang menentukan segalanya:
+// uangnya milik VENTERA, bukan hotel. Karena itu jalur ini TIDAK PERNAH menulis
+// ke tabel `payments` — satu baris di sana memicu credit_hotel_balance(), yang
+// akan mengkredit saldo hotel dengan uang yang justru ditagihkan kepadanya dan
+// memotong 7% dari pendapatan Ventera sendiri. Pelunasan di sini hanya mengubah
+// `hotel_subscription_invoices`.
+//
+// Jalur pulangnya menumpang webhook yang sudah ada. Router callback Ventera
+// memilih tujuan dari awalan `GOSTAY-`, jadi external_id langganan tetap
+// memakai awalan itu dan membedakan dirinya dengan penanda `SUB-` sesudahnya.
+
+import { serviceGet, serviceUpdate } from "../wa/client";
+import { createInvoiceViaGateway } from "./gateway";
+import { envForMode, type PaymentMode } from "./xendit";
+
+/** Awalan yang dipakai router callback Ventera untuk mengenali proyek ini. */
+const PREFIX = "GOSTAY-";
+/** Penanda "ini tagihan langganan, bukan reservasi". */
+const SUB_MARKER = "SUB-";
+
+/** Tautan Xendit dianggap masih bisa dipakai selama ini (kedaluwarsa bawaan 24 jam). */
+const REUSE_WINDOW_MS = 20 * 60 * 60 * 1000;
+
+function slugSegment(hotelSlug: string): string {
+  return (hotelSlug ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/**
+ * external_id tagihan langganan: `GOSTAY-SUB-<HOTEL>-<YYYYMM>` (+ `-R<n>` pada
+ * percobaan ulang).
+ *
+ * Bentuknya harus bisa dibaca manusia di dashboard Xendit — di sana tagihan
+ * langganan berbaur dengan pembayaran tamu, dan tanpa nama hotel + bulan,
+ * keduanya cuma deretan kode. Yang dipakai program untuk menemukan barisnya
+ * BUKAN string ini melainkan kolom yang kita simpan sendiri (lihat
+ * findInvoiceForCallback) — penormalan slug di atas bersifat lossy dan tidak
+ * bisa dibalik dengan aman.
+ */
+export function subscriptionExternalId(hotelSlug: string | null, period: string, attempt = 0): string {
+  const hotel = slugSegment(hotelSlug ?? "");
+  const yyyymm = (period ?? "").slice(0, 7).replace("-", "");
+  const base = hotel
+    ? `${PREFIX}${SUB_MARKER}${hotel}-${yyyymm}`
+    : `${PREFIX}${SUB_MARKER}${yyyymm}`;
+  return attempt > 0 ? `${base}-R${attempt}` : base;
+}
+
+/** Apakah sebuah external_id milik tagihan langganan, bukan reservasi. */
+export function isSubscriptionExternalId(externalId: string | undefined): boolean {
+  return (externalId ?? "").startsWith(PREFIX + SUB_MARKER);
+}
+
+export interface SubscriptionInvoiceRow {
+  id: number;
+  tenant_id: string;
+  period: string;
+  amount: number;
+  status: "unpaid" | "paid" | "waived";
+  gateway_ref: string | null;
+  gateway_external_id: string | null;
+  gateway_url: string | null;
+  gateway_env: "live" | "test" | null;
+  gateway_issued_at: string | null;
+  gateway_attempt: number;
+}
+
+const INVOICE_COLUMNS =
+  "id,tenant_id,period,amount,status,gateway_ref,gateway_external_id,gateway_url,gateway_env,gateway_issued_at,gateway_attempt";
+
+function toRow(raw: any): SubscriptionInvoiceRow {
+  return { ...raw, amount: Number(raw.amount), gateway_attempt: Number(raw.gateway_attempt ?? 0) };
+}
+
+/** Lingkungan penagihan Ventera sendiri — terpisah dari mode pembayaran hotel. */
+export async function getSubscriptionMode(): Promise<PaymentMode> {
+  const res = await serviceGet("payment_config?id=eq.true&select=subscription_mode&limit=1");
+  if (!res.ok) return "test";  // gagal baca = jangan menagih dengan uang sungguhan
+  const rows = (await res.json()) as Array<{ subscription_mode?: string }>;
+  return rows[0]?.subscription_mode === "live" ? "live" : "test";
+}
+
+export async function getSubscriptionInvoice(id: number): Promise<SubscriptionInvoiceRow | null> {
+  const res = await serviceGet(
+    `hotel_subscription_invoices?id=eq.${encodeURIComponent(String(id))}&select=${INVOICE_COLUMNS}&limit=1`,
+  );
+  if (!res.ok) throw new Error(`subscription_invoice_read_failed_${res.status}`);
+  const rows = (await res.json()) as any[];
+  return rows[0] ? toRow(rows[0]) : null;
+}
+
+/** Hotel pemilik sebuah profil — sumber kebenaran kepemilikan, bukan kiriman peramban. */
+export async function profileTenantId(profileId: string): Promise<string | null> {
+  const res = await serviceGet(
+    `profiles?id=eq.${encodeURIComponent(profileId)}&select=tenant_id,role,is_active&limit=1`,
+  );
+  if (!res.ok) throw new Error(`profile_read_failed_${res.status}`);
+  const rows = (await res.json()) as Array<{ tenant_id?: string; role?: string; is_active?: boolean }>;
+  const p = rows[0];
+  // Hanya orang hotel. Tamu tidak boleh menerbitkan tagihan langganan siapa pun.
+  if (!p || p.is_active === false || (p.role !== "staff" && p.role !== "admin")) return null;
+  return p.tenant_id ?? null;
+}
+
+export async function hotelIdentity(tenantId: string): Promise<{ slug: string | null; name: string | null }> {
+  const res = await serviceGet(`tenants?id=eq.${encodeURIComponent(tenantId)}&select=slug,name&limit=1`);
+  if (!res.ok) return { slug: null, name: null };
+  const rows = (await res.json()) as Array<{ slug?: string; name?: string }>;
+  return { slug: rows[0]?.slug ?? null, name: rows[0]?.name ?? null };
+}
+
+/**
+ * Temukan tagihan yang dimaksud sebuah callback.
+ *
+ * Dicari lewat kolom yang KAMI tulis saat menerbitkan invoice — id Xendit lebih
+ * dulu, lalu external_id apa adanya. Tidak ada penguraian string: nama hotel di
+ * external_id sudah dinormalkan dan tidak bisa dikembalikan jadi slug dengan
+ * pasti, jadi menebaknya dari sana akan salah pada hotel tertentu saja — bug
+ * yang muncul belakangan dan sulit ditemukan.
+ */
+export async function findInvoiceForCallback(
+  gatewayRef: string,
+  externalId: string,
+): Promise<SubscriptionInvoiceRow | null> {
+  const byRef = await serviceGet(
+    `hotel_subscription_invoices?gateway_ref=eq.${encodeURIComponent(gatewayRef)}&select=${INVOICE_COLUMNS}&limit=1`,
+  );
+  if (byRef.ok) {
+    const rows = (await byRef.json()) as any[];
+    if (rows[0]) return toRow(rows[0]);
+  }
+  const byExt = await serviceGet(
+    `hotel_subscription_invoices?gateway_external_id=eq.${encodeURIComponent(externalId)}&select=${INVOICE_COLUMNS}&limit=1`,
+  );
+  if (byExt.ok) {
+    const rows = (await byExt.json()) as any[];
+    if (rows[0]) return toRow(rows[0]);
+  }
+  return null;
+}
+
+async function patchInvoice(id: number, patch: Record<string, unknown>): Promise<void> {
+  // serviceUpdate menerima path+filter sebagai SATU argumen (lihat wa/client.ts),
+  // bukan tabel dan filter terpisah.
+  const res = await serviceUpdate(
+    `hotel_subscription_invoices?id=eq.${encodeURIComponent(String(id))}`,
+    patch,
+  );
+  if (!res.ok) throw new Error(`subscription_invoice_update_failed_${res.status}`);
+}
+
+export type SubscriptionCheckoutResult =
+  | { ok: true; invoiceUrl: string; invoiceId: string; amount: number; mode: PaymentMode; reused: boolean }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Terbitkan (atau pakai ulang) tautan pembayaran Xendit untuk satu tagihan
+ * langganan.
+ *
+ * Jumlahnya diambil dari baris tagihan, tidak pernah dari permintaan —
+ * menerimanya dari peramban berarti membiarkan hotel menetapkan sendiri berapa
+ * ia berlangganan. Kepemilikan diperiksa di sini dengan service key: tagihan
+ * harus milik hotel si pemanggil.
+ */
+export async function handleSubscriptionCheckout(
+  input: { invoiceId: number; profileId: string; successRedirectUrl?: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<SubscriptionCheckoutResult> {
+  const tenantId = await profileTenantId(input.profileId);
+  if (!tenantId) return { ok: false, status: 403, error: "not_hotel_member" };
+
+  const invoice = await getSubscriptionInvoice(input.invoiceId);
+  // Tagihan yang tidak ada dan tagihan milik hotel lain dijawab sama, supaya
+  // endpoint ini tidak bisa dipakai menghitung tagihan hotel sebelah.
+  if (!invoice || invoice.tenant_id !== tenantId) {
+    return { ok: false, status: 404, error: "invoice_not_found" };
+  }
+  if (invoice.status === "paid") return { ok: false, status: 409, error: "already_paid" };
+  if (invoice.status === "waived") return { ok: false, status: 409, error: "invoice_waived" };
+  if (!(invoice.amount > 0)) return { ok: false, status: 400, error: "nothing_to_pay" };
+
+  const mode = await getSubscriptionMode();
+
+  // Tautan yang masih hidup dipakai ulang: menerbitkan invoice baru tiap klik
+  // menumpuk tagihan kembar di dashboard Xendit, dan tagihan lama tetap bisa
+  // dibayar — dua-duanya masuk untuk satu bulan yang sama.
+  const issuedAt = invoice.gateway_issued_at ? Date.parse(invoice.gateway_issued_at) : 0;
+  const masihHidup = Date.now() - issuedAt < REUSE_WINDOW_MS;
+  if (invoice.gateway_url && invoice.gateway_ref && invoice.gateway_env === mode && masihHidup) {
+    return {
+      ok: true, invoiceUrl: invoice.gateway_url, invoiceId: invoice.gateway_ref,
+      amount: invoice.amount, mode, reused: true,
+    };
+  }
+
+  const hotel = await hotelIdentity(tenantId);
+  const attempt = invoice.gateway_attempt + (invoice.gateway_external_id ? 1 : 0);
+  const externalId = subscriptionExternalId(hotel.slug, invoice.period, attempt);
+  const bulan = invoice.period.slice(0, 7);
+
+  const created = await createInvoiceViaGateway(
+    {
+      externalId,
+      amount: invoice.amount,
+      description: hotel.name
+        ? `Langganan GoStay ${bulan} — ${hotel.name}`
+        : `Langganan GoStay ${bulan}`,
+      successRedirectUrl: input.successRedirectUrl,
+    },
+    envForMode(mode),
+    fetchImpl,
+  );
+
+  await patchInvoice(invoice.id, {
+    gateway_ref: created.id,
+    gateway_external_id: externalId,
+    gateway_url: created.invoiceUrl,
+    gateway_env: mode,
+    gateway_issued_at: new Date().toISOString(),
+    gateway_attempt: attempt,
+  });
+
+  return {
+    ok: true, invoiceUrl: created.invoiceUrl, invoiceId: created.id,
+    amount: invoice.amount, mode, reused: false,
+  };
+}
+
+/**
+ * Tandai satu tagihan langganan lunas karena callback Xendit.
+ *
+ * Idempoten: callback yang datang dua kali untuk invoice yang sudah lunas
+ * dijawab "duplicate" tanpa menulis apa pun. `paid_at` sengaja tidak dikirim —
+ * trigger 055 yang mengisinya, supaya waktu lunas selalu waktu server.
+ */
+export async function markInvoicePaidFromCallback(
+  invoice: SubscriptionInvoiceRow,
+  gatewayRef: string,
+  mode: PaymentMode,
+): Promise<"recorded" | "duplicate"> {
+  if (invoice.status === "paid") return "duplicate";
+  await patchInvoice(invoice.id, {
+    status: "paid",
+    paid_method: "xendit",
+    gateway_ref: gatewayRef,
+    gateway_env: mode,
+    updated_by: "xendit_callback",
+  });
+  return "recorded";
+}

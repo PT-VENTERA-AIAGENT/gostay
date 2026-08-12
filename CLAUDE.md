@@ -84,6 +84,14 @@ yang sudah migrasi LID "sukses" (dapat messageId) tapi tidak pernah tiba.
   `feeBpsFor()` di `api/_lib/payment/fee.ts` — ubah satu, ubah keduanya.
   Model tagihan TEGAK LURUS dengan live/test, dan hanya super admin yang boleh
   menulisnya (`/platform/hotels/:id`, penagihan di `/platform/subscriptions`).
+- **Langganan bisa dibayar online** (056): hotel menekan Bayar di `/saldo` →
+  `POST /api/payment/subscription-checkout` (auth JWT hotel) → invoice Xendit
+  `external_id = GOSTAY-SUB-<HOTEL>-<YYYYMM>` → callback masuk ke webhook yang
+  sama dan menandai `hotel_subscription_invoices` lunas. Jalur ini TIDAK PERNAH
+  menulis ke `payments`: uang langganan milik Ventera, dan satu baris di sana
+  akan mengkredit saldo hotel sekaligus memotong 7% dari pendapatan Ventera
+  sendiri. Lingkungannya `payment_config.subscription_mode` — TERPISAH dari
+  `mode` (hanya bisa diubah lewat psql; tabel itu disegel dari tulisan klien).
 
 ## Peran & RLS
 

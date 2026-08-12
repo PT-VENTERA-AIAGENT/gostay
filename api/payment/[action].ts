@@ -1,7 +1,9 @@
 // Consolidated payment endpoints, dispatched on {action}:
 //
-//   POST /api/payment/create   → ask the gateway to create an invoice for a booking
-//   POST /api/payment/webhook  → settlement callback from the gateway (records payment)
+//   POST /api/payment/create                → invoice untuk pesanan (jalur WhatsApp)
+//   POST /api/payment/checkout              → tamu membayar pesanannya sendiri
+//   POST /api/payment/subscription-checkout → hotel membayar langganannya ke Ventera
+//   POST /api/payment/webhook               → callback settlement (kedua jenis tagihan)
 //
 // One dynamic route (not several files) to stay within Vercel Hobby's 12-function
 // cap. Thin shell: all logic lives in api/_lib/payment/*.
@@ -15,6 +17,7 @@
 import { readJson, type VercelReq, type VercelRes } from "../_lib/admin/http";
 import { matchGatewayToken } from "../_lib/payment/token";
 import { handleCreateInvoice, handleWebhook } from "../_lib/payment/handlers";
+import { handleSubscriptionCheckout } from "../_lib/payment/subscription";
 import { isConfigured, bookingOwnerProfileId } from "../_lib/payment/service";
 import { verifySupabaseToken } from "../_lib/identity";
 
@@ -121,6 +124,56 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     res.status(200).json({
       ok: true, invoiceUrl: result.invoiceUrl, invoiceId: result.invoiceId,
       amount: result.amount, mode: result.mode,
+    });
+    return;
+  }
+
+  // ── subscription-checkout: HOTEL membayar tagihan langganannya sendiri ──
+  //
+  // Uangnya untuk Ventera, bukan untuk hotel — tapi yang menekan tombolnya orang
+  // hotel, jadi pembuktian dirinya sama seperti `checkout`: token Supabase-nya
+  // sendiri, bukan token internal. Hotel pemilik tagihan ditentukan di server
+  // dari profil si pemanggil; `tenant_id` dari peramban tidak pernah dipercaya.
+  if (action === "subscription-checkout") {
+    const secret = process.env.SUPABASE_JWT_SECRET;
+    const auth = headerValue(req.headers.authorization) ?? "";
+    const jwt = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    if (!secret || !jwt) { res.status(401).json({ error: "unauthorized" }); return; }
+
+    const claims = verifySupabaseToken(jwt, secret);
+    const exp = typeof claims?.exp === "number" ? claims.exp : 0;
+    const sub = typeof claims?.sub === "string" ? claims.sub : "";
+    if (!claims || !sub || exp * 1000 <= Date.now()) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    const body = readJson(req);
+    const invoiceId = Number(body.invoiceId);
+    if (!Number.isInteger(invoiceId) || invoiceId <= 0) {
+      res.status(400).json({ error: "missing_invoice_id" });
+      return;
+    }
+
+    let result;
+    try {
+      result = await handleSubscriptionCheckout({
+        invoiceId,
+        profileId: sub,
+        successRedirectUrl:
+          typeof body.successRedirectUrl === "string" ? body.successRedirectUrl : undefined,
+      });
+    } catch (e) {
+      // Kegagalan Xendit (kunci belum diisi, nominal di bawah minimum) muncul
+      // sebagai lemparan. Dicatat di server; pemanggil hanya dapat kode umum.
+      console.error("[payment/subscription-checkout] gagal menerbitkan tagihan:", e);
+      res.status(502).json({ error: "invoice_create_failed" });
+      return;
+    }
+    if (result.ok === false) { res.status(result.status).json({ error: result.error }); return; }
+    res.status(200).json({
+      ok: true, invoiceUrl: result.invoiceUrl, invoiceId: result.invoiceId,
+      amount: result.amount, mode: result.mode, reused: result.reused,
     });
     return;
   }

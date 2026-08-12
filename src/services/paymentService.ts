@@ -69,3 +69,47 @@ export async function createCheckoutInvoice(bookingReference: string): Promise<s
   }
   return body.invoiceUrl;
 }
+
+/**
+ * Menerbitkan tautan pembayaran Xendit untuk satu tagihan langganan hotel ini.
+ *
+ * Yang dikirim hanya id tagihan. Jumlah dan hotel pemiliknya ditentukan server
+ * dari baris tagihannya — mengirim keduanya dari sini berarti membiarkan hotel
+ * menetapkan sendiri berapa dan atas nama siapa ia berlangganan.
+ *
+ * Server boleh mengembalikan tautan yang SAMA kalau tagihan ini baru saja
+ * diterbitkan (`reused`), supaya menekan tombolnya dua kali tidak menumpuk
+ * tagihan kembar di Xendit — dua-duanya bisa dibayar untuk satu bulan yang sama.
+ */
+export async function createSubscriptionInvoice(invoiceId: number): Promise<string> {
+  const token = getSession()?.supabase_token;
+  if (!token) throw new UserFacingError(tr("Silakan masuk lebih dulu untuk membayar."));
+
+  const res = await fetch("/api/payment/subscription-checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      invoiceId,
+      successRedirectUrl: `${window.location.origin}/saldo`,
+    }),
+  });
+
+  const body = (await res.json().catch(() => ({}))) as { invoiceUrl?: string; error?: string };
+  if (!res.ok || !body.invoiceUrl) {
+    const known: Record<string, string> = {
+      unauthorized: "Sesi Anda sudah berakhir. Silakan masuk kembali.",
+      not_hotel_member: "Hanya staf hotel yang bisa membayar langganan.",
+      invoice_not_found: "Tagihan ini tidak ditemukan.",
+      already_paid: "Tagihan ini sudah lunas.",
+      invoice_waived: "Tagihan ini sudah dibebaskan Ventera.",
+      service_not_configured: "Pembayaran online belum aktif.",
+      invoice_create_failed: "Tautan pembayaran belum bisa dibuat. Coba lagi sebentar.",
+    };
+    if (!known[body.error ?? ""]) console.error("[langganan] gagal membuat tagihan:", body.error);
+    throw new UserFacingError(
+      known[body.error ?? ""] ??
+        tr("Tautan pembayaran belum bisa dibuka. Coba lagi sebentar, atau hubungi Ventera."),
+    );
+  }
+  return body.invoiceUrl;
+}

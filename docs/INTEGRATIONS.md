@@ -158,9 +158,32 @@ menahan dana atomik; saldo kurang = ditolak DB). Proses setujui/tolak =
 kewenangan platform. UI hotel: `/saldo`; konsol: `/platform/balances`.
 
 Tagihan langganan bulanan (`hotel_subscription_invoices`, 055) BUKAN bagian dari
-saldo: uangnya tidak pernah lewat GoStay. Satu baris per hotel per bulan
-(periode dinormalkan ke tanggal 1, UNIQUE per hotel), diterbitkan dan ditandai
-lunas oleh operator di `/platform/subscriptions` setelah transfer diterima.
+saldo: uangnya milik Ventera, bukan hotel. Satu baris per hotel per bulan
+(periode dinormalkan ke tanggal 1, UNIQUE per hotel), diterbitkan di
+`/platform/subscriptions`. Dua cara melunasinya:
+
+- **Offline** — hotel transfer ke Ventera, operator menandai lunas
+  (`paid_method='transfer'`).
+- **Online** (056) — hotel menekan Bayar di `/saldo` →
+  `POST /api/payment/subscription-checkout` (auth JWT hotel, bukan token
+  internal; kepemilikan tagihan diperiksa server dari profil pemanggil) →
+  invoice Xendit `external_id = GOSTAY-SUB-<HOTEL>-<YYYYMM>` (+`-R<n>` untuk
+  penerbitan ulang) → callback masuk lewat webhook yang SAMA. Webhook memeriksa
+  awalan `GOSTAY-SUB-` LEBIH DULU, sebelum pencarian booking, dan menandai
+  tagihan lunas (`paid_method='xendit'`).
+
+**Jalur langganan tidak pernah menulis ke `payments`.** Satu baris di sana akan
+memicu `credit_hotel_balance()` — mengkredit saldo hotel dengan uang yang justru
+ditagihkan kepadanya, lalu memotong 7% dari pendapatan Ventera sendiri. Tautan
+Xendit dipakai ulang selama < 20 jam supaya menekan tombol dua kali tidak
+menerbitkan tagihan kembar; idempotensi callback dijaga UNIQUE `gateway_ref`.
+
+Lingkungannya `payment_config.subscription_mode` ('live'|'test', bawaan test) —
+**terpisah** dari `payment_config.mode`: hotel yang masih test tetap berutang
+uang sungguhan, dan menumpang `mode` akan ikut memindahkan setiap hotel tanpa
+baris `hotel_payment_config` ke live lewat fallback. Tabel `payment_config`
+disegel dari tulisan klien sejak 030, jadi saklarnya lewat psql:
+`update payment_config set subscription_mode='live' where id = true;`
 
 ## 4. SSO & identitas
 

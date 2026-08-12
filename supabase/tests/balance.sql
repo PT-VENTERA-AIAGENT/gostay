@@ -192,3 +192,34 @@ update hotel_subscription_invoices set status='unpaid', updated_by='test'
 select tests.eq('dibatalkan lunas → paid_at ikut dibersihkan',
   (select count(*) from hotel_subscription_invoices
      where tenant_id=:'T3' and status='unpaid' and paid_at is null), 1);
+
+\echo ''
+\echo '=== langganan dibayar online: uangnya milik Ventera, saldo hotel diam ==='
+-- Inti migration 056. Kalau pelunasan langganan pernah menulis ke `payments`,
+-- trigger saldo akan mengkredit hotel dengan uang yang justru ditagihkan
+-- kepadanya, lalu memotong 7% dari pendapatan Ventera sendiri. Dua angka di
+-- bawah yang menahan itu: saldo dan jumlah baris buku besar harus tidak
+-- bergerak sedikit pun oleh pelunasan.
+select available as saldo_awal from hotel_balance where tenant_id=:'T3' \gset
+select count(*) as ledger_awal from balance_ledger where tenant_id=:'T3' \gset
+
+update hotel_subscription_invoices
+   set status='paid', paid_method='xendit', gateway_ref='inv-xnd-1',
+       gateway_external_id='GOSTAY-SUB-HOTEL-LANGGANAN-202608',
+       gateway_env='test', updated_by='xendit_callback'
+ where tenant_id=:'T3' and period = date '2026-08-01';
+
+select tests.eqn('saldo hotel tidak bergerak saat langganan dilunasi',
+  (select available from hotel_balance where tenant_id=:'T3'), :saldo_awal);
+select tests.eq ('tidak ada baris buku besar baru',
+  (select count(*) from balance_ledger where tenant_id=:'T3'), :ledger_awal);
+select tests.eq ('pelunasan online tercatat sebagai xendit',
+  (select count(*) from hotel_subscription_invoices
+     where tenant_id=:'T3' and status='paid' and paid_method='xendit' and paid_at is not null), 1);
+
+-- Idempotensi callback: satu invoice Xendit tidak boleh menempel ke dua tagihan.
+insert into hotel_subscription_invoices (tenant_id, period, amount, updated_by)
+  values (:'T3', date '2026-09-01', 500000, 'test');
+select tests.blocked('id invoice Xendit yang sama dipakai dua tagihan',
+  $$update hotel_subscription_invoices set gateway_ref='inv-xnd-1'
+      where tenant_id='11111111-1111-4111-8111-111111111133' and period = date '2026-09-01'$$);

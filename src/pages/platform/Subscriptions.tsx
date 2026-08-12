@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { CalendarClock, Loader2, CheckCircle2, Plus, AlertTriangle } from "lucide-react";
+import { CalendarClock, Loader2, CheckCircle2, Plus, AlertTriangle, FlaskConical } from "lucide-react";
 import PageTransition from "@/components/shared/PageTransition";
 import { cn } from "@/lib/utils";
 import { tr } from "@/lib/i18n";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscriptions, useIssueInvoices, useSetInvoiceStatus } from "@/hooks/useSubscriptions";
+import { usePaymentConfig } from "@/hooks/useSaldo";
 import { periodOf, periodLabel } from "@/services/subscriptionService";
 import { PageHeader, StatCard, Table, Th, Td, EmptyState, formatIDR } from "@/components/platform/widgets";
 
@@ -23,6 +24,7 @@ export default function PlatformSubscriptions() {
   const by = user?.email ?? user?.id ?? "admin";
 
   const { data: hotels = [], isLoading } = useSubscriptions();
+  const { data: config } = usePaymentConfig();
   const issue = useIssueInvoices();
   const setStatus = useSetInvoiceStatus();
 
@@ -78,6 +80,24 @@ export default function PlatformSubscriptions() {
       />
 
       <div className="p-4 md:p-6 space-y-5">
+        {/* Hotel bisa membayar tagihannya sendiri lewat Xendit (056). Selama
+            lingkungan ini masih sandbox, tautan yang mereka buka TIDAK menerima
+            uang sungguhan — dan itu tidak kelihatan dari layar mana pun kecuali
+            disebut di sini. Saklarnya sengaja tidak ada di UI: payment_config
+            memang disegel dari tulisan klien sejak 030, dan ini switch sekali
+            seumur hidup. Pindahkan lewat psql:
+              update payment_config set subscription_mode='live',
+                     updated_by='<anda>' where id = true; */}
+        {config?.subscriptionMode !== "live" && (
+          <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex gap-2.5 text-sm text-foreground">
+            <FlaskConical className="w-4 h-4 shrink-0 mt-0.5 text-warning" />
+            <p>
+              {tr("Pembayaran langganan masih memakai Xendit sandbox — tautan yang dibuka hotel tidak menerima uang sungguhan.")}{" "}
+              <code className="text-xs">payment_config.subscription_mode = 'live'</code> {tr("untuk menyalakannya.")}
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <StatCard label={tr("Hotel berlangganan")} value={aktif.length} />
           <StatCard label={tr("Nilai per bulan")} value={formatIDR(totals.monthly)} />

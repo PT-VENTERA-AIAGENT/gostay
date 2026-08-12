@@ -48,6 +48,8 @@ export interface Payout {
 export interface PaymentConfig {
   mode: "live" | "test";
   feeBps: number;
+  /** Lingkungan untuk tagihan langganan Ventera sendiri — terpisah dari `mode` (056). */
+  subscriptionMode: "live" | "test";
 }
 
 /**
@@ -106,13 +108,14 @@ export async function getPayouts(): Promise<Payout[]> {
 export async function getPaymentConfig(): Promise<PaymentConfig> {
   const { data, error } = await db
     .from("payment_config")
-    .select("mode,platform_fee_bps")
+    .select("mode,platform_fee_bps,subscription_mode")
     .eq("id", true)
     .maybeSingle();
   if (error) throw error;
   return {
     mode: data?.mode === "live" ? "live" : "test",
     feeBps: typeof data?.platform_fee_bps === "number" ? data.platform_fee_bps : 700,
+    subscriptionMode: data?.subscription_mode === "live" ? "live" : "test",
   };
 }
 
