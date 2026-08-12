@@ -29,6 +29,8 @@ export interface SubscriptionInvoice {
   note: string | null;
   /** Catatan mesin: kurang bayar, bayar ganda, atau bayar atas tagihan yang dibebaskan (057). */
   gateway_note: string | null;
+  /** Kenapa tagihan ini dibebaskan (059). */
+  waived_reason: string | null;
   updated_by: string | null;
 }
 
@@ -88,7 +90,7 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
     db.from("hotel_subscription_invoices")
       // Nama hotel ikut ditarik di sini supaya baris tagihan tetap bisa
       // ditampilkan meski hotelnya tidak ada lagi di daftar langganan aktif.
-      .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,updated_by,tenants(name,slug)")
+      .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,waived_reason,updated_by,tenants(name,slug)")
       .gte("period", since)
       .order("period", { ascending: false }),
   ]);
@@ -156,7 +158,7 @@ export async function listSubscriptions(monthsBack = 12): Promise<SubscriptionHo
 export async function listHotelInvoices(tenantId: string, limit = 12): Promise<SubscriptionInvoice[]> {
   const { data, error } = await db
     .from("hotel_subscription_invoices")
-    .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,updated_by")
+    .select("id,tenant_id,period,amount,status,paid_total,paid_at,paid_method,note,gateway_note,waived_reason,updated_by")
     .eq("tenant_id", tenantId)
     .order("period", { ascending: false })
     .limit(limit);
@@ -243,11 +245,64 @@ export async function undoManualPayments(invoiceId: number): Promise<void> {
   if (error) throw error;
 }
 
-/** Bebaskan sebuah tagihan (atau cabut pembebasannya). Keputusan operator. */
-export async function setInvoiceWaived(id: number, waived: boolean, by: string): Promise<void> {
+/**
+ * Terbitkan satu tagihan di luar jadwal.
+ *
+ * Penerbitan otomatis hanya tahu tarif bulanan hotel; ini untuk bulan atau
+ * nominal yang tidak mengikuti pola itu. Periodenya dinormalkan ke tanggal 1
+ * oleh trigger 055, dan UNIQUE (tenant_id, period) menahan tagihan kembar —
+ * jadi menagih bulan yang sudah punya tagihan ditolak database, bukan
+ * menghasilkan dua baris untuk bulan yang sama.
+ */
+export async function createManualInvoice(input: {
+  tenantId: string;
+  period: string;          // YYYY-MM-01 (tanggal berapa pun di bulan itu diterima)
+  amount: number;
+  by: string;
+  note?: string;
+}): Promise<void> {
+  const amount = Math.max(0, Math.round(input.amount));
+  const { error } = await db.from("hotel_subscription_invoices").insert({
+    tenant_id: input.tenantId,
+    period: input.period,
+    amount,
+    note: input.note ?? null,
+    updated_by: input.by,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Lepas sebuah tagihan: dibebaskan, bukan dihapus.
+ *
+ * Tagihan yang dibebaskan keluar dari perhitungan gerbang (subscription_gate
+ * hanya menghitung yang 'unpaid'), tapi barisnya tetap ada beserta alasannya —
+ * tiga bulan lagi tidak ada yang ingat kenapa hotel itu tidak jadi ditagih
+ * kalau jejaknya hilang.
+ */
+export async function setInvoiceWaived(
+  id: number, waived: boolean, by: string, reason?: string,
+): Promise<void> {
   const { error } = await db
     .from("hotel_subscription_invoices")
-    .update({ status: waived ? "waived" : "unpaid", updated_by: by })
+    .update({
+      status: waived ? "waived" : "unpaid",
+      waived_reason: waived ? (reason?.trim() || null) : null,
+      updated_by: by,
+    })
     .eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Hapus tagihan yang salah terbit.
+ *
+ * Hanya untuk membetulkan kekeliruan penerbitan. Tagihan yang sudah punya
+ * pembayaran ditolak trigger 059 — menghapusnya akan ikut menghapus catatan
+ * uang yang benar-benar sudah diterima Ventera (ON DELETE CASCADE), tanpa
+ * mengembalikan uangnya. Untuk kasus itu jawabannya membebaskan, bukan menghapus.
+ */
+export async function deleteInvoice(id: number): Promise<void> {
+  const { error } = await db.from("hotel_subscription_invoices").delete().eq("id", id);
   if (error) throw error;
 }

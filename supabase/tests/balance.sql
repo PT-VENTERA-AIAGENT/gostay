@@ -316,3 +316,46 @@ select tests.eq('dijalankan lagi tidak membuat tagihan kembar',
   (select ensure_subscription_invoices(:'T4')), 0);
 select tests.eq('tagihan yang sudah lunas tidak diterbitkan ulang',
   (select count(*) from hotel_subscription_invoices where tenant_id=:'T6'), 1);
+
+\echo ''
+\echo '=== penagihan manual: tagih di luar jadwal, dan lepas tagihan ==='
+-- Tagih manual: bulan dan nominal yang tidak mengikuti pola langganan.
+insert into hotel_subscription_invoices (tenant_id, period, amount, note, updated_by)
+  values (:'T4', date '2026-11-01', 1250000, 'setup awal', 'operator');
+select tests.eqn('tagihan manual tercatat dengan nominalnya sendiri',
+  (select amount from hotel_subscription_invoices where tenant_id=:'T4' and period=date '2026-11-01'), 1250000);
+select tests.blocked('menagih bulan yang sudah punya tagihan',
+  $$insert into hotel_subscription_invoices (tenant_id, period, amount)
+      values ('11111111-1111-4111-8111-111111111144', date '2026-11-01', 999)$$);
+
+-- Melepas tagihan mengeluarkannya dari gerbang, tapi barisnya tetap ada.
+select tests.eq('sebelum dibebaskan: masih tergerbang',
+  (select count(*) from subscription_gate(:'T4') where gated), 1);
+update hotel_subscription_invoices set status='waived', waived_reason='promo bulan pertama'
+  where tenant_id=:'T4';
+select tests.eq('semua tagihan dibebaskan → gerbang terbuka',
+  (select count(*) from subscription_gate(:'T4') where gated), 0);
+select tests.eq('barisnya tetap ada beserta alasannya',
+  (select count(*) from hotel_subscription_invoices
+     where tenant_id=:'T4' and status='waived' and waived_reason is not null), 5);
+
+-- Ditagih lagi: pembebasan dicabut, gerbang kembali.
+update hotel_subscription_invoices set status='unpaid', waived_reason=null where tenant_id=:'T4';
+select tests.eq('pembebasan dicabut → tergerbang lagi',
+  (select count(*) from subscription_gate(:'T4') where gated), 1);
+
+-- Tagihan yang sudah ada uangnya tidak boleh dihapus: ON DELETE CASCADE akan
+-- ikut menghapus catatan uang yang benar-benar sudah diterima Ventera.
+insert into subscription_payments (tenant_id, invoice_id, amount, method, recorded_by)
+  select tenant_id, id, 1250000, 'transfer', 'operator' from hotel_subscription_invoices
+   where tenant_id=:'T4' and period=date '2026-11-01';
+select tests.blocked('menghapus tagihan yang sudah ada pembayarannya',
+  $$delete from hotel_subscription_invoices
+      where tenant_id='11111111-1111-4111-8111-111111111144' and period=date '2026-11-01'$$);
+select tests.eq('catatan pembayarannya utuh',
+  (select count(*) from subscription_payments where tenant_id=:'T4'), 1);
+
+-- Yang belum ada uangnya boleh dihapus — untuk membetulkan salah terbit.
+select tests.allowed('menghapus tagihan yang belum ada pembayarannya',
+  $$delete from hotel_subscription_invoices
+      where tenant_id='11111111-1111-4111-8111-111111111144' and period=date '2026-10-01'$$);

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listSubscriptions, listHotelInvoices, issueInvoices,
   recordManualPayment, undoManualPayments, setInvoiceWaived,
+  createManualInvoice, deleteInvoice,
   type SubscriptionInvoice,
 } from "@/services/subscriptionService";
 
@@ -52,11 +53,31 @@ export function useUndoPayments() {
   });
 }
 
+/** Bebaskan / cabut pembebasan satu tagihan. */
 export function useSetInvoiceWaived() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: number; waived: boolean; by: string }) =>
-      setInvoiceWaived(v.id, v.waived, v.by),
+    mutationFn: (v: { id: number; waived: boolean; by: string; reason?: string }) =>
+      setInvoiceWaived(v.id, v.waived, v.by, v.reason),
+    onSuccess: () => qc.invalidateQueries({ queryKey: subscriptionKeys.all }),
+  });
+}
+
+/** Terbitkan satu tagihan di luar jadwal. */
+export function useCreateInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { tenantId: string; period: string; amount: number; by: string; note?: string }) =>
+      createManualInvoice(v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: subscriptionKeys.all }),
+  });
+}
+
+/** Hapus tagihan yang salah terbit (ditolak kalau sudah ada pembayarannya). */
+export function useDeleteInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) => deleteInvoice(v.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: subscriptionKeys.all }),
   });
 }
