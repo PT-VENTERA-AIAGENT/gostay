@@ -152,7 +152,11 @@ export default function BookingDetails() {
     navigate("/portal/book/review", { state: payload });
   }
 
-  const canContinue = firstName.trim() && lastName.trim() && email.trim() && phone.trim();
+  // Nama belakang TIDAK diwajibkan: banyak tamu Indonesia hanya punya satu kata
+  // nama, dan memaksa mereka mengarang nama kedua adalah cara menghalangi
+  // pemesanan sekaligus mengotori data. BookingReview menyusun full_name dengan
+  // `.trim()`, jadi nama satu kata masuk apa adanya.
+  const canContinue = firstName.trim() && email.trim() && phone.trim();
 
   return (
     <PageTransition>
@@ -216,7 +220,10 @@ export default function BookingDetails() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground mb-1.5 block">{t("Last Name")}</label>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">
+                {t("Last Name")}{" "}
+                <span className="font-normal text-muted-foreground">({t("optional")})</span>
+              </label>
               <input
                 type="text"
                 value={lastName}
